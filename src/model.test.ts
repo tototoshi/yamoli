@@ -62,3 +62,28 @@ test('JSON round trip and normalization', () => {
   expect(loose.node('x').attributes).toEqual([]);
   expect(() => OutlineStore.fromJSON({})).toThrow();
 });
+
+test('moveTo places a subtree before a sibling or at the end, never inside itself', () => {
+  const s = OutlineStore.create();
+  const a = s.addChild(s.rootId, -1, 'a');
+  const a1 = s.addChild(a.id, -1, 'a1');
+  const b = s.addChild(s.rootId, -1, 'b');
+  const c = s.addChild(s.rootId, -1, 'c');
+  s.setCollapsed(a.id, true);
+
+  expect(s.moveTo(c.id, s.rootId, a.id)).toBe(true);
+  expect(tree(s)).toEqual(['c', ['a', ['a1']], 'b']);
+  // Into a collapsed node expands it.
+  expect(s.moveTo(b.id, a.id, null)).toBe(true);
+  expect(tree(s)).toEqual(['c', ['a', ['a1', 'b']]]);
+  expect(s.node(a.id).collapsed).toBe(false);
+  // Same position, into itself, into a descendant: refused.
+  expect(s.moveTo(b.id, a.id, null)).toBe(false);
+  expect(s.moveTo(a1.id, a.id, b.id)).toBe(false);
+  expect(s.moveTo(a.id, a.id, null)).toBe(false);
+  expect(s.moveTo(a.id, a1.id, null)).toBe(false);
+  // Reordering within the same parent.
+  expect(s.moveTo(b.id, a.id, a1.id)).toBe(true);
+  expect(tree(s)).toEqual(['c', ['a', ['b', 'a1']]]);
+  expect(s.parentOf(b.id)).toBe(a.id);
+});

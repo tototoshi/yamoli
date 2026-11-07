@@ -222,6 +222,20 @@ export class OutlineStore {
     return true;
   }
 
+  /**
+   * Move id (with its subtree) under parentId, just before sibling beforeId
+   * (or at the end when null). Refuses moves into its own subtree and no-op moves.
+   */
+  moveTo(id: string, parentId: string, beforeId: string | null): boolean {
+    if (id === this.rootId || id === parentId || this.isAncestor(id, parentId) || beforeId === id) return false;
+    const kids = this.node(parentId).children;
+    if (this.parent[id] === parentId && (kids[kids.indexOf(id) + 1] ?? null) === beforeId) return false;
+    this.detach(id);
+    this.insert(id, parentId, beforeId ? kids.indexOf(beforeId) : -1);
+    this.node(parentId).collapsed = false;
+    return true;
+  }
+
   /** Swap with the previous (delta=-1) or next (delta=1) sibling. */
   move(id: string, delta: -1 | 1): boolean {
     const kids = this.siblings(id);

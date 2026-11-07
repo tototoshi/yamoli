@@ -4,6 +4,7 @@ import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, us
 import { applyFocus, Controller, fText } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
 import { highlight, parseInline, type Seg } from './inline';
+import { startBulletDrag } from './drag';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { flush } from './storage';
@@ -200,6 +201,7 @@ const SHORTCUTS: [string, string][] = [
   ['Alt+D', 'データを追加'],
   ['Esc / ⌘+Enter', 'データ編集を終了'],
   ['⌘/Ctrl+Shift+Backspace', '行を削除（子も含む）'],
+  ['● をドラッグ', '行を移動（Esc でキャンセル）'],
   ['⌘/Ctrl+Z', '元に戻す'],
   ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
   ['⌘/Ctrl+F', '検索（Esc でクリア）'],
@@ -256,7 +258,14 @@ function NodeItem({ id }: { id: string }) {
         >
           {n.children.length && !search ? '▾' : ''}
         </button>
-        <a class="bullet" href={ctl.hashFor(id)} tabIndex={-1} title="ズームイン">
+        <a
+          class="bullet"
+          href={ctl.hashFor(id)}
+          tabIndex={-1}
+          title="クリックでズームイン / ドラッグで移動"
+          draggable={false}
+          onPointerDown={(e) => startBulletDrag(e, id, ctl)}
+        >
           <span class="dot" />
         </a>
         <NodeText node={n} />

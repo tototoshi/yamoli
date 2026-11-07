@@ -171,6 +171,27 @@ ul.children ul.children {
   transition: transform 0.1s;
 }
 .bullet:hover .dot { transform: scale(1.5); }
+.bullet { touch-action: none; cursor: grab; }
+body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }
+.node.drag-source { opacity: 0.35; }
+.drop-indicator {
+  position: fixed;
+  z-index: 20;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.drop-indicator::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 .node.collapsed > .row > .bullet .dot { box-shadow: 0 0 0 5px var(--faint); }
 
 textarea.text {

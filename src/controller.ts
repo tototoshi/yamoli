@@ -228,6 +228,10 @@ export class Controller {
     this.commit(refocusNode ? fText(nodeId) : undefined);
   }
 
+  moveNode(id: string, parentId: string, beforeId: string | null) {
+    if (this.store.moveTo(id, parentId, beforeId)) this.commit();
+  }
+
   replaceStore(next: OutlineStore) {
     this.store = next;
     this.editing.clear();
