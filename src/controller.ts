@@ -2,6 +2,7 @@
  * Editing logic shared by all components. The store is mutated in place;
  * commit() saves and asks the App to re-render, optionally moving focus.
  */
+import { UndoHistory } from './history';
 import { OutlineStore } from './model';
 import { flush, load, save } from './storage';
 
@@ -17,6 +18,12 @@ export const fText = (id: string, start: number | 'end' = 'end', end?: number | 
   start,
   end,
 });
+
+export function captureFocus(): Focus | null {
+  const a = document.activeElement as HTMLTextAreaElement | HTMLInputElement | null;
+  if (!a?.dataset?.fk) return null;
+  return { key: a.dataset.fk, start: a.selectionStart ?? undefined, end: a.selectionEnd ?? undefined };
+}
 
 export function applyFocus(f: Focus | null | undefined) {
   if (!f) return;
@@ -38,6 +45,7 @@ export class Controller {
   /** ids of data blocks currently showing their editor */
   editing = new Set<string>();
   pendingFocus: Focus | null = null;
+  history = new UndoHistory<Focus | null>(this.snapshot());
   private rerender: () => void = () => {};
 
   constructor() {
@@ -48,10 +56,39 @@ export class Controller {
     this.rerender = rerender;
   }
 
-  /** Save and re-render. focus=undefined leaves focus where it is. */
-  commit(focus?: Focus | null) {
+  /**
+   * Record an undo step, save and re-render. focus=undefined leaves focus where it is.
+   * Commits sharing a `coalesce` key (e.g. typing in one field) merge into one undo step.
+   */
+  commit(focus?: Focus | null, coalesce?: string) {
+    this.history.record(this.snapshot(), captureFocus(), coalesce ?? null);
     save(this.store);
     if (focus !== undefined) this.pendingFocus = focus;
+    this.rerender();
+  }
+
+  private snapshot() {
+    return JSON.stringify(this.store.toJSON());
+  }
+
+  undo() {
+    this.restore(this.history.undo(captureFocus()));
+  }
+
+  redo() {
+    this.restore(this.history.redo(captureFocus()));
+  }
+
+  private restore(entry: { state: string; meta: Focus | null } | null) {
+    if (!entry) return;
+    this.store = OutlineStore.fromJSON(JSON.parse(entry.state));
+    this.editing.clear();
+    if (!this.store.get(this.zoomId)) {
+      this.zoomId = this.store.rootId;
+      window.history.replaceState(null, '', this.hashFor(this.zoomId));
+    }
+    save(this.store);
+    this.pendingFocus = entry.meta;
     this.rerender();
   }
 
@@ -122,13 +159,12 @@ export class Controller {
   replaceStore(next: OutlineStore) {
     this.store = next;
     this.editing.clear();
-    save(next);
-    flush();
     if (!next.get(this.zoomId)) {
       this.zoomId = next.rootId;
-      history.replaceState(null, '', this.hashFor(this.zoomId));
+      window.history.replaceState(null, '', this.hashFor(this.zoomId));
     }
     this.commit(null);
+    flush();
   }
 
   // ================================================================ keyboard

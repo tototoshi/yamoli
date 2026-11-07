@@ -84,6 +84,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 }
 .mini:hover { color: var(--fg); background: var(--hover); }
 .mini.danger:hover { color: var(--danger); }
+.mini:disabled { opacity: 0.4; cursor: default; background: transparent; color: var(--muted); }
 
 /* ---------------------------------------------------------------- page */
 

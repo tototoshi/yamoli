@@ -24,6 +24,14 @@ export function App() {
   useEffect(() => {
     const onHash = () => ctl.onHashChange();
     const onKey = (e: KeyboardEvent) => {
+      if (imeActive(e)) return;
+      // Our history replaces the browser's per-field undo everywhere.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.code === 'KeyZ' || (e.code === 'KeyY' && e.ctrlKey))) {
+        e.preventDefault();
+        if (e.code === 'KeyY' || e.shiftKey) ctl.redo();
+        else ctl.undo();
+        return;
+      }
       if (e.target === document.body && e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
         ctl.zoomOut();
@@ -117,6 +125,12 @@ function TopBar() {
         ))}
       </nav>
       <span class="spacer" />
+      <button class="mini" title="元に戻す (⌘/Ctrl+Z)" disabled={!ctl.history.canUndo} onMouseDown={keepFocus} onClick={() => ctl.undo()}>
+        ↶
+      </button>
+      <button class="mini" title="やり直す (⌘/Ctrl+Shift+Z)" disabled={!ctl.history.canRedo} onMouseDown={keepFocus} onClick={() => ctl.redo()}>
+        ↷
+      </button>
       <HelpMenu />
       <button class="mini" onClick={() => fileRef.current?.click()}>
         Import
@@ -131,6 +145,8 @@ function TopBar() {
 
 const SHORTCUTS: [string, string][] = [
   ['Enter', '新しい行（カーソル位置で分割）'],
+  ['⌘/Ctrl+Z', '元に戻す'],
+  ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
   ['Shift+Enter', '行内改行'],
   ['Tab / Shift+Tab', 'インデント / アウトデント'],
   ['↑ / ↓', '前 / 次の行へ'],
@@ -216,7 +232,7 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
       value={node.text}
       onInput={(e) => {
         ctl.store.setText(node.id, e.currentTarget.value);
-        ctl.commit();
+        ctl.commit(undefined, 'text:' + node.id);
       }}
       onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
       onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
@@ -273,7 +289,7 @@ function AttributeChip({ nodeId, attr }: { nodeId: string; attr: Attribute }) {
       value={attr[name]}
       onInput={(e) => {
         ctl.store.updateAttribute(nodeId, attr.id, { [name]: e.currentTarget.value });
-        ctl.commit();
+        ctl.commit(undefined, `${name}:${attr.id}`);
       }}
       onKeyDown={(e) => !imeActive(e) && ctl.onAttrKeydown(e, e.currentTarget)}
     />
@@ -376,7 +392,7 @@ function DataBlockView({ nodeId, data: d }: { nodeId: string; data: DataBlock })
             value={d.content}
             onInput={(e) => {
               ctl.store.updateData(nodeId, d.id, { content: e.currentTarget.value });
-              ctl.commit();
+              ctl.commit(undefined, 'data:' + d.id);
             }}
             onKeyDown={(e) => !imeActive(e) && ctl.onDataKeydown(e, e.currentTarget)}
             onBlur={onBlur}
