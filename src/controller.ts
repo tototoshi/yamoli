@@ -4,6 +4,7 @@
  */
 import { DEP_KEY } from './deps';
 import type { ScheduleResult } from './schedule';
+import { addScheduleSample } from './sample';
 import { UndoHistory } from './history';
 import { linkCandidates, pickerQueryAt } from './links';
 import { OutlineStore } from './model';
@@ -374,6 +375,13 @@ export class Controller {
 
   moveNode(id: string, parentId: string, beforeId: string | null) {
     if (this.store.moveTo(id, parentId, beforeId)) this.commit();
+  }
+
+  /** Append the scheduling sample at the end of the top level and zoom into it. */
+  addSample() {
+    const id = addScheduleSample(this.store, this.store.rootId);
+    this.commit(null);
+    this.zoomTo(id);
   }
 
   replaceStore(next: OutlineStore) {

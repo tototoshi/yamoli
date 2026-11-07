@@ -1,4 +1,5 @@
 import { OutlineStore } from './model';
+import { addScheduleSample } from './sample';
 
 const STORAGE_KEY = 'outliner:v1';
 const PREFS_KEY = 'outliner:prefs';
@@ -77,6 +78,8 @@ function seed(): OutlineStore {
   s.addData(conf.id, 'json', '{"theme":"auto","fontSize":15,"tags":["outline","notes"],"beta":true}');
   const sales = s.addChild(proj.id, -1, '売上');
   s.addData(sales.id, 'csv', 'month,amount\n2026-09,120\n2026-10,135\n2026-11,150');
+
+  addScheduleSample(s, r);
 
   const shop = s.addChild(r, -1, '買い物リスト');
   ['牛乳', '卵', 'パン'].forEach((t) => s.addChild(shop.id, -1, t));

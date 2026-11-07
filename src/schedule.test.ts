@@ -119,3 +119,30 @@ test('is:late / is:critical / is:milestone search', async () => {
   s.setCompleted(tst, true);
   expect(find('is:遅延')).toEqual([]);
 });
+
+test('the sample project schedules with a late test and critical chain', async () => {
+  const { addScheduleSample } = await import('./sample');
+  const s = OutlineStore.create();
+  const p = addScheduleSample(s, s.rootId, D('2026-11-04')); // Wed -> starts Mon 11/9
+  const r = run(s, new Map([['2026-11-23', '勤労感謝の日']]));
+  const by = (t: string) => r.byId.get(s.node(p).children.find((c) => s.node(c).text === t)!)!;
+  expect(dates(r.byId.get(p))).toEqual(['2026-11-09', '2026-11-24']);
+  expect(dates(by('API 実装'))).toEqual(['2026-11-12', '2026-11-18']);
+  expect(dates(by('テスト'))).toEqual(['2026-11-19', '2026-11-20']);
+  expect(by('テスト').late).toBe(1);
+  expect(dates(by('公開'))).toEqual(['2026-11-24', '2026-11-24']);
+  expect(by('API 実装').critical).toBe(true);
+  expect(by('画面実装').critical).toBe(false);
+});
+
+test('work after a milestone starts the same day', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'p');
+  s.addAttribute(p.id, 'start', '2026-11-09');
+  const m = s.addChild(p.id, -1, 'kickoff');
+  s.addAttribute(m.id, 'duration', '0d');
+  const t = s.addChild(p.id, -1, 'work');
+  s.addAttribute(t.id, 'duration', '1d');
+  s.addAttribute(t.id, 'after', `[[${m.id}]]`);
+  expect(dates(run(s).byId.get(t.id))).toEqual(['2026-11-09', '2026-11-09']);
+});

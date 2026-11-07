@@ -231,11 +231,18 @@ const SHORTCUTS: [string, string][] = [
 ];
 
 function HelpMenu() {
+  const ctl = useCtl();
   return (
     <details class="help">
       <summary>ショートカット</summary>
       <dl>
         {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
+        <dd class="help-sample">
+          <button class="mini" onClick={() => ctl.addSample()}>
+            サンプルプロジェクトを追加
+          </button>
+          依存関係と日程計算の例
+        </dd>
       </dl>
     </details>
   );

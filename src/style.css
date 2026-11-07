@@ -104,6 +104,8 @@ button, select, input, textarea { font: inherit; color: inherit; }
 }
 .help dt { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
 .help dd { margin: 0; }
+.help .help-sample { grid-column: 1 / -1; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--faint); }
+.help .help-sample .mini { margin-right: 8px; }
 
 .mini {
   padding: 1px 8px;

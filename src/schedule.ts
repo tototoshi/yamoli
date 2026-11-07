@@ -110,12 +110,13 @@ export function computeSchedule(
   };
 
   /**
-   * When dependents may start after `id`: its end if scheduled; otherwise an
+   * The last day dependents must wait out after `id`: its end if scheduled
+   * (a milestone takes no time, so the day before it); otherwise an
    * unscheduled item passes its own dependencies through (zero length).
    */
   const endOf = (id: string, seen = new Set<string>()): Day | undefined => {
     const s = schedOf(id);
-    if (s) return s.end;
+    if (s) return s.kind === 'milestone' ? s.start - 1 : s.end;
     if (seen.has(id)) return undefined;
     seen.add(id);
     let best: Day | undefined;
