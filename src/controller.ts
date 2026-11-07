@@ -4,7 +4,7 @@
  */
 import { UndoHistory } from './history';
 import { OutlineStore } from './model';
-import { parseQuery, searchTree, type SearchResult } from './search';
+import { parseQuery, searchTree, type SearchResult, type Term } from './search';
 import { flush, load, save } from './storage';
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
@@ -48,8 +48,11 @@ export class Controller {
   pendingFocus: Focus | null = null;
   history = new UndoHistory<Focus | null>(this.snapshot());
   query = '';
+  terms: Term[] = [];
   /** Active search result for the zoomed view, or null when not searching. */
   search: SearchResult | null = null;
+  /** The one row rendered as an editor; all other rows show formatted text. */
+  activeText: string | null = null;
   private rerender: () => void = () => {};
 
   constructor() {
@@ -67,9 +70,27 @@ export class Controller {
   commit(focus?: Focus | null, coalesce?: string) {
     this.history.record(this.snapshot(), captureFocus(), coalesce ?? null);
     save(this.store);
-    if (focus !== undefined) this.pendingFocus = focus;
+    if (focus !== undefined) this.setPendingFocus(focus);
     if (this.search) this.extendSearch(focus);
     this.rerender();
+  }
+
+  /** Move focus (switching a row into edit mode if needed) and re-render. */
+  focus(f: Focus | null) {
+    this.setPendingFocus(f);
+    this.rerender();
+  }
+
+  /** Called when a row editor loses focus to something other than itself. */
+  deactivate(id: string) {
+    if (this.activeText !== id) return;
+    this.activeText = null;
+    this.rerender();
+  }
+
+  private setPendingFocus(f: Focus | null) {
+    this.pendingFocus = f;
+    if (f?.key.startsWith('text:')) this.activeText = f.key.slice(5);
   }
 
   private snapshot() {
@@ -93,7 +114,7 @@ export class Controller {
       window.history.replaceState(null, '', this.hashFor(this.zoomId));
     }
     save(this.store);
-    this.pendingFocus = entry.meta;
+    this.setPendingFocus(entry.meta);
     this.search = this.runSearch();
     this.rerender();
   }
@@ -107,8 +128,8 @@ export class Controller {
   }
 
   private runSearch(): SearchResult | null {
-    const terms = parseQuery(this.query);
-    return terms.length ? searchTree(this.store, this.zoomId, terms) : null;
+    this.terms = parseQuery(this.query);
+    return this.terms.length ? searchTree(this.store, this.zoomId, this.terms) : null;
   }
 
   /**
@@ -179,8 +200,7 @@ export class Controller {
     } else if (zoom.children.length) {
       focus = fText(zoom.children[0]);
     }
-    this.pendingFocus = focus;
-    this.rerender();
+    this.focus(focus);
     window.scrollTo(0, 0);
   }
 
@@ -322,7 +342,7 @@ export class Controller {
       const target = idx > 0 ? vis[idx - 1] : !isTitle && zoomId !== store.rootId ? zoomId : null;
       if (target) {
         e.preventDefault();
-        applyFocus(fText(target, start));
+        this.focus(fText(target, start));
       }
       return;
     }
@@ -331,7 +351,7 @@ export class Controller {
       const target = isTitle ? vis[0] : vis[idx + 1];
       if (target) {
         e.preventDefault();
-        applyFocus(fText(target, start));
+        this.focus(fText(target, start));
       }
     }
   }
@@ -343,10 +363,10 @@ export class Controller {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (field === 'key') applyFocus({ key: `value:${id}:${attrId}`, start: 'end' });
-      else applyFocus(fText(id));
+      else this.focus(fText(id));
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      applyFocus(fText(id));
+      this.focus(fText(id));
     } else if (e.key === 'Backspace' && field === 'key' && !input.value) {
       const a = this.store.node(id).attributes.find((x) => x.id === attrId);
       if (a && !a.value) {

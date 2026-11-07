@@ -3,6 +3,7 @@ import { createContext } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { applyFocus, Controller, fText } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
+import { highlight, parseInline, type Seg } from './inline';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { flush } from './storage';
@@ -47,8 +48,8 @@ export function App() {
     window.addEventListener('hashchange', onHash);
     document.addEventListener('keydown', onKey);
     const first = ctl.store.node(ctl.zoomId).children[0];
-    if (first) ctl.pendingFocus = fText(first);
-    rerender();
+    if (first) ctl.focus(fText(first));
+    else rerender();
     return () => {
       window.removeEventListener('hashchange', onHash);
       document.removeEventListener('keydown', onKey);
@@ -175,11 +176,11 @@ function SearchBox() {
         if (e.key === 'Escape') {
           e.preventDefault();
           if (ctl.query) ctl.setQuery('');
-          else applyFocus(fText(ctl.visibleRows()[0] ?? ctl.zoomId));
+          else ctl.focus(fText(ctl.visibleRows()[0] ?? ctl.zoomId));
         } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
           e.preventDefault();
           const first = ctl.visibleRows().find((id) => ctl.search?.matches.has(id)) ?? ctl.visibleRows()[0];
-          if (first) applyFocus(fText(first));
+          if (first) ctl.focus(fText(first));
         }
       }}
     />
@@ -275,6 +276,7 @@ function NodeItem({ id }: { id: string }) {
 
 function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
   const ctl = useCtl();
+  if (!title && ctl.activeText !== node.id) return <RowView node={node} />;
   return (
     <AutoTextarea
       class={'text' + (title ? ' title' : '')}
@@ -288,8 +290,73 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
       }}
       onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
       onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
+      onBlur={(e) => {
+        const ta = e.currentTarget;
+        setTimeout(() => document.activeElement !== ta && ctl.deactivate(node.id), 0);
+      }}
     />
   );
+}
+
+/** A row's text shown with inline formatting; clicking it switches to the editor. */
+function RowView({ node }: { node: OutlineNode }) {
+  const ctl = useCtl();
+  const segs = useMemo(() => parseInline(node.text), [node.text]);
+
+  const onClick = (e: MouseEvent) => {
+    const target = e.target as Element;
+    if (target.closest('a')) return; // let links open
+    const tag = target.closest<HTMLElement>('.tag');
+    if (tag) {
+      ctl.setQuery(tag.textContent ?? '');
+      return;
+    }
+    // Map the clicked point back to a caret offset in the source text.
+    let pos: number | 'end' = 'end';
+    const hit = caretFromPoint(e.clientX, e.clientY);
+    const span = hit?.node.parentElement?.closest<HTMLElement>('[data-o]');
+    if (hit && span && (e.currentTarget as Element).contains(span)) {
+      pos = Number(span.dataset.o) + hit.offset;
+    }
+    ctl.focus(fText(node.id, pos));
+  };
+
+  return (
+    <div class="text text-view" data-id={node.id} onClick={onClick}>
+      {segs.map((seg) => (
+        <SegView key={seg.start} seg={seg} />
+      ))}
+    </div>
+  );
+}
+
+function SegView({ seg }: { seg: Seg }) {
+  const ctl = useCtl();
+  const pieces = highlight(seg.text, ctl.terms).map((p) => (
+    <span key={p.offset} data-o={seg.start + p.offset} class={p.mark ? 'hl' : undefined}>
+      {p.text}
+    </span>
+  ));
+  switch (seg.kind) {
+    case 'code':
+      return <code>{pieces}</code>;
+    case 'strong':
+      return <strong>{pieces}</strong>;
+    case 'em':
+      return <em>{pieces}</em>;
+    case 'del':
+      return <del>{pieces}</del>;
+    case 'tag':
+      return <span class="tag" title="このタグで検索">{pieces}</span>;
+    case 'link':
+      return (
+        <a href={seg.href} target="_blank" rel="noopener noreferrer">
+          {pieces}
+        </a>
+      );
+    default:
+      return <>{pieces}</>;
+  }
 }
 
 function Actions({ id, class: cls }: { id: string; class: string }) {
@@ -464,6 +531,15 @@ function DataBlockView({ nodeId, data: d }: { nodeId: string; data: DataBlock })
 }
 
 // ================================================================ helpers
+
+function caretFromPoint(x: number, y: number): { node: Node; offset: number } | null {
+  if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(x, y);
+    return p && { node: p.offsetNode, offset: p.offset };
+  }
+  const r = document.caretRangeFromPoint?.(x, y); // Safari < 18.4
+  return r && { node: r.startContainer, offset: r.startOffset };
+}
 
 /** A textarea that grows to fit its content. */
 function AutoTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement> & Record<`data-${string}`, string>) {

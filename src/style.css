@@ -16,6 +16,7 @@
   --j-num: #b5622f;
   --j-lit: #2f5bb5;
   --match-bg: #fff6d1;
+  --hl-bg: #ffe27a;
   --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
@@ -73,7 +74,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
   color: var(--muted);
 }
 .node.search-match > .row { background: var(--match-bg); border-radius: 4px; }
-.node.search-context > .row textarea.text:not(:focus) { color: var(--muted); }
+.node.search-context > .row .text:not(:focus) { color: var(--muted); }
 
 .help { position: relative; font-size: 13px; color: var(--muted); }
 .help summary { cursor: pointer; list-style: none; }
@@ -186,6 +187,28 @@ textarea.text {
   line-height: 1.6;
 }
 textarea.text.title { padding: 0; }
+
+.text-view {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(1.6em + 2px);
+  padding: 1px 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  cursor: text;
+}
+.text-view code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+.text-view a { color: var(--accent); }
+.text-view .tag { color: var(--accent); cursor: pointer; }
+.text-view .tag:hover { text-decoration: underline; }
+.text-view .hl { background: var(--hl-bg); border-radius: 2px; }
 
 .row-actions {
   flex: none;
