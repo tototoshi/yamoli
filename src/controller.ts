@@ -2,6 +2,7 @@
  * Editing logic shared by all components. The store is mutated in place;
  * commit() saves and asks the App to re-render, optionally moving focus.
  */
+import { DEP_KEY } from './deps';
 import { UndoHistory } from './history';
 import { linkCandidates, pickerQueryAt } from './links';
 import { OutlineStore } from './model';
@@ -69,6 +70,8 @@ export class Controller {
    */
   activeField: string | null = null;
   picker: LinkPicker | null = null;
+  /** Items on a dependency cycle; recomputed by the App on every render. */
+  cycles = new Set<string>();
   private rerender: () => void = () => {};
 
   constructor() {
@@ -317,6 +320,22 @@ export class Controller {
     const d = this.store.addData(id, format);
     this.editing.add(d.id);
     this.commit({ key: 'data:' + d.id, start: 0 });
+  }
+
+  /** Start adding a dependency: focus the `after` value with the link picker open. */
+  addDependency(id: string) {
+    const n = this.store.node(id);
+    let a = n.attributes.find((x) => x.key.trim().toLowerCase() === DEP_KEY);
+    if (a) {
+      const v = a.value.trimEnd();
+      this.store.updateAttribute(id, a.id, { value: v + (!v || v.endsWith(',') ? ' ' : ', ') + '[[' });
+    } else {
+      a = this.store.addAttribute(id, DEP_KEY, '[[');
+    }
+    const key = `value:${id}:${a.id}`;
+    this.commit({ key, start: 'end' });
+    this.picker = { key, from: a.value.length - 2, candidates: linkCandidates(this.store, '', id), selected: 0 };
+    this.rerender();
   }
 
   startEditing(nodeId: string, dataId: string) {

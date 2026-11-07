@@ -63,3 +63,22 @@ test('wantsCompleted only for a positive is:done term', () => {
   expect(wantsCompleted(parseQuery('-is:done'))).toBe(false);
   expect(wantsCompleted(parseQuery('task'))).toBe(false);
 });
+
+test('is:ready / is:blocked / is:cycle use dependency status', () => {
+  const s = OutlineStore.create();
+  const a = s.addChild(s.rootId, -1, 'a');
+  const b = s.addChild(s.rootId, -1, 'b');
+  const c = s.addChild(s.rootId, -1, 'c');
+  s.addAttribute(b.id, 'after', `[[${a.id}]]`);
+  const ids = (q: string) => [...searchTree(s, s.rootId, parseQuery(q)).matches];
+  expect(ids('is:blocked')).toEqual([b.id]);
+  expect(ids('is:ready')).toEqual([]);
+  s.setCompleted(a.id, true);
+  expect(ids('is:ready')).toEqual([b.id]);
+  expect(ids('is:着手可')).toEqual([b.id]);
+  s.setCompleted(b.id, true);
+  expect(ids('is:ready')).toEqual([]); // completed rows are neither ready nor blocked
+  s.addAttribute(a.id, 'after', `[[${c.id}]]`);
+  s.addAttribute(c.id, 'after', `[[${a.id}]]`);
+  expect(ids('is:cycle')).toEqual([a.id, c.id]);
+});

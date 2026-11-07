@@ -5,6 +5,7 @@ import { applyFocus, Controller, fText } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
 import { highlight, parseInline, type Seg } from './inline';
 import { findBacklinks, nodeLabel } from './links';
+import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
 import { startBulletDrag } from './drag';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
@@ -67,6 +68,7 @@ export function App() {
 
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
+  ctl.cycles = findCycles(store);
   const rows = ctl.shownChildren(zoomId);
   document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Outliner';
 
@@ -217,6 +219,7 @@ const SHORTCUTS: [string, string][] = [
   ['⌘/Ctrl+Z', '元に戻す'],
   ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
   ['⌘/Ctrl+F', '検索（Esc でクリア、is:done で完了のみ）'],
+  ['is:ready / is:blocked', '着手可 / 待ち の行を検索（after 属性の依存）'],
 ];
 
 function HelpMenu() {
@@ -240,6 +243,7 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
       {isRoot ? <h1 class="title-static">Home</h1> : <NodeText node={node} title />}
       <Meta node={node} />
       <Actions id={node.id} class="header-actions" />
+      {!isRoot && <DependencyPanel id={node.id} />}
       {!isRoot && <Backlinks id={node.id} />}
     </section>
   );
@@ -282,6 +286,7 @@ function NodeItem({ id }: { id: string }) {
           <span class="dot" />
         </a>
         <NodeText node={n} />
+        <DepBadge id={id} />
         <Actions id={id} class="row-actions" />
       </div>
       <Meta node={n} />
@@ -443,6 +448,11 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
       <button class="mini" title="データを追加 (Alt+D)" onMouseDown={keepFocus} onClick={() => ctl.addData(id)}>
         + データ
       </button>
+      {id !== ctl.store.rootId && (
+        <button class="mini" title="依存先を追加（after 属性）" onMouseDown={keepFocus} onClick={() => ctl.addDependency(id)}>
+          + 依存
+        </button>
+      )}
     </span>
   );
 }
@@ -626,7 +636,8 @@ function DataBlockView({ nodeId, data: d }: { nodeId: string; data: DataBlock })
 function Backlinks({ id }: { id: string }) {
   const ctl = useCtl();
   const { store } = ctl;
-  const links = findBacklinks(store, id);
+  // Links from `after` attributes are listed by DependencyPanel instead.
+  const links = findBacklinks(store, id).filter((b) => b.via?.trim().toLowerCase() !== DEP_KEY);
   if (!links.length) return null;
   return (
     <div class="backlinks">
@@ -692,6 +703,66 @@ function LinkPickerMenu() {
         <li class="empty">一致するアイテムがありません</li>
       )}
     </ul>
+  );
+}
+
+// ================================================================ dependencies
+
+/** Ready / waiting / cycle marker for open rows that have dependencies. */
+function DepBadge({ id }: { id: string }) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const status = depStatus(store, id, ctl.cycles);
+  if (status === 'none' || (store.node(id).completed && status !== 'cycle')) return null;
+  if (status === 'ready') {
+    return (
+      <span class="dep-badge ready" title="前提がすべて完了しています">
+        着手可
+      </span>
+    );
+  }
+  if (status === 'cycle') {
+    return (
+      <span class="dep-badge cycle" title="依存関係が循環しています">
+        循環
+      </span>
+    );
+  }
+  const waiting = blockers(store, id);
+  return (
+    <span class="dep-badge blocked" title={'待っている: ' + waiting.map((w) => nodeLabel(store, w)).join('、')}>
+      待ち {waiting.length}
+    </span>
+  );
+}
+
+function DependencyPanel({ id }: { id: string }) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const before = dependencies(store, id);
+  const after = dependents(store, id);
+  if (!before.length && !after.length) return null;
+  const chip = (d: string) => (
+    <a key={d} class={'ref' + (store.node(d).completed ? ' done' : '')} href={ctl.hashFor(d)}>
+      {nodeLabel(store, d)}
+    </a>
+  );
+  return (
+    <div class="deps">
+      {before.length > 0 && (
+        <div class="deps-row">
+          <span class="deps-title">前提</span>
+          {before.map(chip)}
+          <DepBadge id={id} />
+        </div>
+      )}
+      {after.length > 0 && (
+        <div class="deps-row">
+          <span class="deps-title">後続</span>
+          {after.map(chip)}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,0 +1,82 @@
+/*
+ * Dependencies between items, expressed as links in `after` attributes:
+ *
+ *   after: [[design]], [[api]]   -> this item can start once both are completed
+ *
+ * The dependency graph is a DAG unless someone writes a cycle; items on a
+ * cycle are reported so the UI can warn about them.
+ */
+import { refIds } from './links';
+import type { OutlineStore } from './model';
+
+export const DEP_KEY = 'after';
+
+export type DepStatus = 'none' | 'ready' | 'blocked' | 'cycle';
+
+const isDepKey = (key: string) => key.trim().toLowerCase() === DEP_KEY;
+
+/** Items id depends on (existing, de-duplicated, never itself). */
+export function dependencies(store: OutlineStore, id: string): string[] {
+  const out = new Set<string>();
+  for (const a of store.node(id).attributes) {
+    if (!isDepKey(a.key)) continue;
+    for (const ref of refIds(a.value)) if (ref !== id && store.get(ref)) out.add(ref);
+  }
+  return [...out];
+}
+
+/** Items that depend on id. */
+export function dependents(store: OutlineStore, id: string): string[] {
+  return Object.keys(store.nodes).filter((n) => n !== id && dependencies(store, n).includes(id));
+}
+
+/** Ids of every item that sits on a dependency cycle (Tarjan's SCC). */
+export function findCycles(store: OutlineStore): Set<string> {
+  const index = new Map<string, number>();
+  const low = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const result = new Set<string>();
+  let counter = 0;
+
+  const visit = (v: string) => {
+    index.set(v, counter);
+    low.set(v, counter);
+    counter++;
+    stack.push(v);
+    onStack.add(v);
+    for (const w of dependencies(store, v)) {
+      if (!index.has(w)) {
+        visit(w);
+        low.set(v, Math.min(low.get(v)!, low.get(w)!));
+      } else if (onStack.has(w)) {
+        low.set(v, Math.min(low.get(v)!, index.get(w)!));
+      }
+    }
+    if (low.get(v) === index.get(v)) {
+      const scc: string[] = [];
+      let w: string;
+      do {
+        w = stack.pop()!;
+        onStack.delete(w);
+        scc.push(w);
+      } while (w !== v);
+      if (scc.length > 1) scc.forEach((id) => result.add(id));
+    }
+  };
+
+  for (const id of Object.keys(store.nodes)) if (!index.has(id)) visit(id);
+  return result;
+}
+
+export function depStatus(store: OutlineStore, id: string, cycles: Set<string>): DepStatus {
+  const deps = dependencies(store, id);
+  if (!deps.length) return 'none';
+  if (cycles.has(id)) return 'cycle';
+  return deps.every((d) => store.node(d).completed) ? 'ready' : 'blocked';
+}
+
+/** The dependencies of id that are not completed yet. */
+export function blockers(store: OutlineStore, id: string): string[] {
+  return dependencies(store, id).filter((d) => !store.node(d).completed);
+}
