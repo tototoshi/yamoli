@@ -2,13 +2,13 @@
  * Inline formatting for row text shown outside the editor.
  *
  * Supported: `code`, **bold**, *italic*, ~~strike~~, [label](https://…),
- * bare https:// URLs and #tags. Markup characters are hidden; every segment
+ * bare https:// URLs, #tags and [[id]] links to other items. Markup characters are hidden; every segment
  * remembers where its text starts in the source so a click can be mapped
  * back to a caret position.
  */
 import type { Term } from './search';
 
-export type SegKind = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link' | 'tag';
+export type SegKind = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link' | 'tag' | 'ref';
 
 export interface Seg {
   kind: SegKind;
@@ -16,28 +16,45 @@ export interface Seg {
   /** Offset of `text` within the source string. */
   start: number;
   href?: string;
+  /** Target node id of a 'ref' segment (whose text is the raw `[[id]]`). */
+  refId?: string;
 }
 
-const INLINE =
-  /`([^`]+)`|\*\*([^*]+)\*\*|~~([^~]+)~~|\*([^*\s][^*]*)\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()]+)|(^|\s)(#[^\s#.,!?、。]+)/g;
+const INLINE = new RegExp(
+  [
+    /\[\[(?<ref>[^[\]\s]+)\]\]/,
+    /`(?<code>[^`]+)`/,
+    /\*\*(?<strong>[^*]+)\*\*/,
+    /~~(?<del>[^~]+)~~/,
+    /\*(?<em>[^*\s][^*]*)\*/,
+    /\[(?<label>[^\]]+)\]\((?<href>https?:\/\/[^)\s]+)\)/,
+    /(?<url>https?:\/\/[^\s<>()]+)/,
+    /(?<pre>^|\s)(?<tag>#[^\s#.,!?、。]+)/,
+  ]
+    .map((r) => r.source)
+    .join('|'),
+  'g'
+);
 
 export function parseInline(src: string): Seg[] {
   const out: Seg[] = [];
   let last = 0;
-  const push = (kind: SegKind, text: string, start: number, href?: string) => out.push({ kind, text, start, href });
+  const push = (seg: Seg) => out.push(seg);
   for (const m of src.matchAll(INLINE)) {
-    const i = m.index! + (m[8]?.length ?? 0); // a #tag's leading space stays plain text
-    if (i > last) push('text', src.slice(last, i), last);
-    if (m[1] !== undefined) push('code', m[1], i + 1);
-    else if (m[2] !== undefined) push('strong', m[2], i + 2);
-    else if (m[3] !== undefined) push('del', m[3], i + 2);
-    else if (m[4] !== undefined) push('em', m[4], i + 1);
-    else if (m[5] !== undefined) push('link', m[5], i + 1, m[6]);
-    else if (m[7] !== undefined) push('link', m[7], i, m[7]);
-    else push('tag', m[9], i);
+    const g = m.groups!;
+    const i = m.index! + (g.pre?.length ?? 0); // a #tag's leading space stays plain text
+    if (i > last) push({ kind: 'text', text: src.slice(last, i), start: last });
+    if (g.ref !== undefined) push({ kind: 'ref', text: m[0], start: i, refId: g.ref });
+    else if (g.code !== undefined) push({ kind: 'code', text: g.code, start: i + 1 });
+    else if (g.strong !== undefined) push({ kind: 'strong', text: g.strong, start: i + 2 });
+    else if (g.del !== undefined) push({ kind: 'del', text: g.del, start: i + 2 });
+    else if (g.em !== undefined) push({ kind: 'em', text: g.em, start: i + 1 });
+    else if (g.label !== undefined) push({ kind: 'link', text: g.label, start: i + 1, href: g.href });
+    else if (g.url !== undefined) push({ kind: 'link', text: g.url, start: i, href: g.url });
+    else push({ kind: 'tag', text: g.tag, start: i });
     last = m.index! + m[0].length;
   }
-  if (last < src.length) push('text', src.slice(last), last);
+  if (last < src.length) push({ kind: 'text', text: src.slice(last), start: last });
   return out;
 }
 

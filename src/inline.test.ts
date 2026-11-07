@@ -43,3 +43,12 @@ test('highlight marks search words, ignoring case and width', () => {
   ]);
   expect(highlight('abc', [])).toEqual([{ text: 'abc', offset: 0, mark: false }]);
 });
+
+test('[[id]] becomes a ref segment', () => {
+  const segs = parseInline('see [[abc123]] and [[ x ]]');
+  expect(segs.map((s) => [s.kind, s.text, s.refId])).toEqual([
+    ['text', 'see ', undefined],
+    ['ref', '[[abc123]]', 'abc123'],
+    ['text', ' and [[ x ]]', undefined],
+  ]);
+});

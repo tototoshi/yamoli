@@ -3,6 +3,7 @@
  * commit() saves and asks the App to re-render, optionally moving focus.
  */
 import { UndoHistory } from './history';
+import { linkCandidates, pickerQueryAt } from './links';
 import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, save, savePrefs } from './storage';
@@ -40,6 +41,16 @@ export function applyFocus(f: Focus | null | undefined) {
 
 const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
 
+/** State of the `[[` link picker attached to one editable field. */
+export interface LinkPicker {
+  /** Focus key of the field (text:… or value:…). */
+  key: string;
+  /** Index of the `[[` being completed. */
+  from: number;
+  candidates: string[];
+  selected: number;
+}
+
 export class Controller {
   store: OutlineStore = load();
   zoomId: string;
@@ -52,8 +63,12 @@ export class Controller {
   /** Active search result for the zoomed view, or null when not searching. */
   search: SearchResult | null = null;
   prefs = loadPrefs();
-  /** The one row rendered as an editor; all other rows show formatted text. */
-  activeText: string | null = null;
+  /**
+   * Focus key of the one row text (text:id) or attribute value (value:node:attr)
+   * rendered as an editor; all others show formatted text.
+   */
+  activeField: string | null = null;
+  picker: LinkPicker | null = null;
   private rerender: () => void = () => {};
 
   constructor() {
@@ -82,16 +97,68 @@ export class Controller {
     this.rerender();
   }
 
-  /** Called when a row editor loses focus to something other than itself. */
-  deactivate(id: string) {
-    if (this.activeText !== id) return;
-    this.activeText = null;
+  /** Called when a field editor loses focus to something other than itself. */
+  deactivate(key: string) {
+    if (this.activeField !== key) return;
+    this.activeField = null;
+    this.picker = null;
     this.rerender();
   }
 
   private setPendingFocus(f: Focus | null) {
     this.pendingFocus = f;
-    if (f?.key.startsWith('text:')) this.activeText = f.key.slice(5);
+    if (this.picker && this.picker.key !== f?.key) this.picker = null;
+    if (f && /^(text|value):/.test(f.key)) this.activeField = f.key;
+  }
+
+  // ================================================================ link picker
+
+  /** Open, update or close the picker after the field's value or caret changed. */
+  updatePicker(el: HTMLTextAreaElement | HTMLInputElement, selfId: string) {
+    const q = pickerQueryAt(el.value, el.selectionStart ?? 0);
+    this.picker = q
+      ? { key: el.dataset.fk!, from: q.from, candidates: linkCandidates(this.store, q.query, selfId), selected: 0 }
+      : null;
+  }
+
+  /** Keyboard handling while the picker is open. Returns true if the key was consumed. */
+  private pickerKeydown(e: KeyboardEvent, el: HTMLTextAreaElement | HTMLInputElement): boolean {
+    const p = this.picker;
+    if (!p || p.key !== el.dataset.fk) return false;
+    const n = p.candidates.length;
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
+      e.preventDefault();
+      p.selected = (p.selected + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+      this.rerender();
+      return true;
+    }
+    if ((e.key === 'Enter' || e.key === 'Tab') && n) {
+      e.preventDefault();
+      this.insertLink(p.candidates[p.selected]);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.picker = null;
+      this.rerender();
+      return true;
+    }
+    return false;
+  }
+
+  /** Replace the `[[query` before the caret with a link to targetId. */
+  insertLink(targetId: string) {
+    const p = this.picker;
+    if (!p) return;
+    const el = document.querySelector<HTMLTextAreaElement | HTMLInputElement>(`[data-fk="${CSS.escape(p.key)}"]`);
+    if (!el) return;
+    const link = `[[${targetId}]]`;
+    const next = el.value.slice(0, p.from) + link + el.value.slice(el.selectionStart ?? el.value.length);
+    const [kind, nodeId, attrId] = p.key.split(':');
+    if (kind === 'text') this.store.setText(nodeId, next);
+    else this.store.updateAttribute(nodeId, attrId, { value: next });
+    this.picker = null;
+    this.commit({ key: p.key, start: p.from + link.length });
   }
 
   private snapshot() {
@@ -282,6 +349,7 @@ export class Controller {
   // ================================================================ keyboard
 
   onTextKeydown(e: KeyboardEvent, ta: HTMLTextAreaElement) {
+    if (this.pickerKeydown(e, ta)) return;
     const { store, zoomId } = this;
     const id = ta.dataset.id!;
     const n = store.node(id);
@@ -421,12 +489,13 @@ export class Controller {
   }
 
   onAttrKeydown(e: KeyboardEvent, input: HTMLInputElement) {
+    if (this.pickerKeydown(e, input)) return;
     const id = input.dataset.id!;
     const attrId = input.dataset.attr!;
     const field = input.dataset.field;
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (field === 'key') applyFocus({ key: `value:${id}:${attrId}`, start: 'end' });
+      if (field === 'key') this.focus({ key: `value:${id}:${attrId}`, start: 'end' });
       else this.focus(fText(id));
     } else if (e.key === 'Escape') {
       e.preventDefault();

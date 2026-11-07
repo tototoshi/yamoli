@@ -4,6 +4,7 @@ import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, us
 import { applyFocus, Controller, fText } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
 import { highlight, parseInline, type Seg } from './inline';
+import { findBacklinks, nodeLabel } from './links';
 import { startBulletDrag } from './drag';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
@@ -95,6 +96,7 @@ export function App() {
           )}
         </section>
       </main>
+      <LinkPickerMenu />
     </Ctx.Provider>
   );
 }
@@ -208,6 +210,7 @@ const SHORTCUTS: [string, string][] = [
   ['Alt+← / ⌘+,', 'ズームアウト（ブラウザの戻るでも可）'],
   ['Alt+A', '属性を追加'],
   ['Alt+D', 'データを追加'],
+  ['[[', '他のアイテムへのリンク（本文・属性の値）'],
   ['Esc / ⌘+Enter', 'データ編集を終了'],
   ['⌘/Ctrl+Shift+Backspace', '行を削除（子も含む）'],
   ['● をドラッグ', '行を移動（Esc でキャンセル）'],
@@ -237,6 +240,7 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
       {isRoot ? <h1 class="title-static">Home</h1> : <NodeText node={node} title />}
       <Meta node={node} />
       <Actions id={node.id} class="header-actions" />
+      {!isRoot && <Backlinks id={node.id} />}
     </section>
   );
 }
@@ -294,36 +298,66 @@ function NodeItem({ id }: { id: string }) {
 
 function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
   const ctl = useCtl();
-  if (!title && ctl.activeText !== node.id) return <RowView node={node} />;
+  const key = 'text:' + node.id;
+  if (!title && ctl.activeField !== key) {
+    return (
+      <InlineView
+        class="text text-view"
+        text={node.text}
+        data-id={node.id}
+        onEdit={(pos) => ctl.focus(fText(node.id, pos))}
+      />
+    );
+  }
   return (
     <AutoTextarea
       class={'text' + (title ? ' title' : '')}
       placeholder={title ? '無題' : undefined}
       data-id={node.id}
-      data-fk={'text:' + node.id}
+      data-fk={key}
       value={node.text}
       onInput={(e) => {
         ctl.store.setText(node.id, e.currentTarget.value);
-        ctl.commit(undefined, 'text:' + node.id);
+        ctl.updatePicker(e.currentTarget, node.id);
+        ctl.commit(undefined, key);
       }}
       onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
       onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
       onBlur={(e) => {
         const ta = e.currentTarget;
-        setTimeout(() => document.activeElement !== ta && ctl.deactivate(node.id), 0);
+        setTimeout(() => document.activeElement !== ta && ctl.deactivate(key), 0);
       }}
     />
   );
 }
 
-/** A row's text shown with inline formatting; clicking it switches to the editor. */
-function RowView({ node }: { node: OutlineNode }) {
+/**
+ * Text shown with inline formatting; clicking it calls onEdit with the caret
+ * offset under the pointer. Links open, item links zoom, #tags search.
+ */
+function InlineView({
+  text,
+  class: cls,
+  placeholder,
+  focusable,
+  onEdit,
+  ...rest
+}: {
+  text: string;
+  class: string;
+  placeholder?: string;
+  /** Reachable with Tab (focusing it starts editing). */
+  focusable?: boolean;
+  onEdit: (pos: number | 'end') => void;
+} & Record<`data-${string}`, string>) {
   const ctl = useCtl();
-  const segs = useMemo(() => parseInline(node.text), [node.text]);
+  const segs = useMemo(() => parseInline(text), [text]);
+  const pointerDown = useRef(false);
 
   const onClick = (e: MouseEvent) => {
+    pointerDown.current = false;
     const target = e.target as Element;
-    if (target.closest('a')) return; // let links open
+    if (target.closest('a')) return; // let links open / zoom
     const tag = target.closest<HTMLElement>('.tag');
     if (tag) {
       ctl.setQuery(tag.textContent ?? '');
@@ -336,14 +370,22 @@ function RowView({ node }: { node: OutlineNode }) {
     if (hit && span && (e.currentTarget as Element).contains(span)) {
       pos = Number(span.dataset.o) + hit.offset;
     }
-    ctl.focus(fText(node.id, pos));
+    onEdit(pos);
   };
 
   return (
-    <div class="text text-view" data-id={node.id} onClick={onClick}>
+    <div
+      class={cls}
+      tabIndex={focusable ? 0 : undefined}
+      onMouseDown={() => (pointerDown.current = true)}
+      onFocus={() => !pointerDown.current && onEdit('end')}
+      onClick={onClick}
+      {...rest}
+    >
       {segs.map((seg) => (
         <SegView key={seg.start} seg={seg} />
       ))}
+      {!text && placeholder && <span class="placeholder">{placeholder}</span>}
     </div>
   );
 }
@@ -366,6 +408,15 @@ function SegView({ seg }: { seg: Seg }) {
       return <del>{pieces}</del>;
     case 'tag':
       return <span class="tag" title="このタグで検索">{pieces}</span>;
+    case 'ref': {
+      const target = ctl.store.get(seg.refId!);
+      if (!target) return <>{pieces}</>; // unknown id: show the raw text
+      return (
+        <a class={'ref' + (target.completed ? ' done' : '')} href={ctl.hashFor(target.id)} title="クリックで移動">
+          {nodeLabel(ctl.store, target.id)}
+        </a>
+      );
+    }
     case 'link':
       return (
         <a href={seg.href} target="_blank" rel="noopener noreferrer">
@@ -418,6 +469,7 @@ function Meta({ node }: { node: OutlineNode }) {
 
 function AttributeChip({ nodeId, attr }: { nodeId: string; attr: Attribute }) {
   const ctl = useCtl();
+  const valueKey = `value:${nodeId}:${attr.id}`;
   const field = (name: 'key' | 'value') => (
     <input
       class={`attr-input attr-${name}`}
@@ -431,16 +483,32 @@ function AttributeChip({ nodeId, attr }: { nodeId: string; attr: Attribute }) {
       value={attr[name]}
       onInput={(e) => {
         ctl.store.updateAttribute(nodeId, attr.id, { [name]: e.currentTarget.value });
+        if (name === 'value') ctl.updatePicker(e.currentTarget, nodeId);
         ctl.commit(undefined, `${name}:${attr.id}`);
       }}
       onKeyDown={(e) => !imeActive(e) && ctl.onAttrKeydown(e, e.currentTarget)}
+      onBlur={(e) => {
+        if (name !== 'value') return;
+        const input = e.currentTarget;
+        setTimeout(() => document.activeElement !== input && ctl.deactivate(valueKey), 0);
+      }}
     />
   );
   return (
     <span class="attr">
       {field('key')}
       <span class="attr-sep">:</span>
-      {field('value')}
+      {ctl.activeField === valueKey ? (
+        field('value')
+      ) : (
+        <InlineView
+          class="attr-value-view"
+          text={attr.value}
+          placeholder="value"
+          focusable
+          onEdit={(pos) => ctl.focus({ key: valueKey, start: pos })}
+        />
+      )}
       <button
         class="attr-del"
         tabIndex={-1}
@@ -550,6 +618,80 @@ function DataBlockView({ nodeId, data: d }: { nodeId: string; data: DataBlock })
           />
         ))}
     </div>
+  );
+}
+
+// ================================================================ links
+
+function Backlinks({ id }: { id: string }) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const links = findBacklinks(store, id);
+  if (!links.length) return null;
+  return (
+    <div class="backlinks">
+      <div class="backlinks-title">被リンク {links.length}</div>
+      <ul>
+        {links.map((b, i) => {
+          const path = store
+            .path(b.nodeId)
+            .slice(1, -1)
+            .map((a) => nodeLabel(store, a))
+            .join(' › ');
+          return (
+            <li key={`${b.nodeId}:${b.via ?? ''}:${i}`}>
+              <a href={ctl.hashFor(b.nodeId)}>{nodeLabel(store, b.nodeId)}</a>
+              {b.via !== null && <span class="via">{b.via || '(属性)'}</span>}
+              {path && <span class="bl-path">{path}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Candidate list for the `[[` link picker, positioned under its field. */
+function LinkPickerMenu() {
+  const ctl = useCtl();
+  const p = ctl.picker;
+  const ref = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => {
+    if (!p || !ref.current) return;
+    const field = document.querySelector(`[data-fk="${CSS.escape(p.key)}"]`);
+    if (!field) return;
+    const r = field.getBoundingClientRect();
+    ref.current.style.left = r.left + 'px';
+    ref.current.style.top = r.bottom + 4 + 'px';
+  });
+  if (!p) return null;
+  const { store } = ctl;
+  return (
+    <ul ref={ref} class="link-picker">
+      {p.candidates.length ? (
+        p.candidates.map((id, i) => (
+          <li
+            key={id}
+            class={i === p.selected ? 'selected' : undefined}
+            onMouseDown={(e) => {
+              e.preventDefault(); // keep the field focused
+              ctl.insertLink(id);
+            }}
+          >
+            <span class="pick-label">{nodeLabel(store, id)}</span>
+            <span class="pick-path">
+              {store
+                .path(id)
+                .slice(1, -1)
+                .map((a) => nodeLabel(store, a))
+                .join(' › ')}
+            </span>
+          </li>
+        ))
+      ) : (
+        <li class="empty">一致するアイテムがありません</li>
+      )}
+    </ul>
   );
 }
 
