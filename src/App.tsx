@@ -1,5 +1,4 @@
 import type { TargetedEvent, TextareaHTMLAttributes } from 'preact';
-import { createContext } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { applyFocus, Controller, fText } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
@@ -7,14 +6,14 @@ import { highlight, parseInline, type Seg } from './inline';
 import { findBacklinks, nodeLabel } from './links';
 import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
 import { startBulletDrag } from './drag';
-import { formatDate, shortDate, today } from './calendar';
+import { Ctx, useCtl } from './context';
+import { GanttView } from './GanttView';
+import { shortDate, today } from './calendar';
+import { schedTooltip } from './gantt';
 import { computeSchedule } from './schedule';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { dataFile, flush, saveState } from './storage';
-
-const Ctx = createContext<Controller>(null!);
-const useCtl = () => useContext(Ctx);
 
 // Keep focus in the text while clicking toolbar-ish buttons.
 const keepFocus = (e: MouseEvent) => e.preventDefault();
@@ -79,9 +78,10 @@ export function App() {
   return (
     <Ctx.Provider value={ctl}>
       <TopBar />
-      <main class="page">
+      <main class={'page' + (ctl.view === 'gantt' ? ' wide' : '')}>
         <ZoomHeader node={zoom} />
-        <section class="outline">
+        <div class="view-bar">
+          <ViewSwitch />
           {search && (
             <div class="search-info">
               {search.matches.size ? `${search.matches.size} 件` : '見つかりません'}
@@ -90,17 +90,23 @@ export function App() {
               </button>
             </div>
           )}
-          <ul class="children top">
-            {rows.map((id) => (
-              <NodeItem key={id} id={id} />
-            ))}
-          </ul>
-          {!search && !zoom.children.length && (
-            <button class="add-first" onClick={() => ctl.commit(fText(store.addChild(zoomId).id, 0))}>
-              + 項目を追加
-            </button>
-          )}
-        </section>
+        </div>
+        {ctl.view === 'gantt' ? (
+          <GanttView />
+        ) : (
+          <section class="outline">
+            <ul class="children top">
+              {rows.map((id) => (
+                <NodeItem key={id} id={id} />
+              ))}
+            </ul>
+            {!search && !zoom.children.length && (
+              <button class="add-first" onClick={() => ctl.commit(fText(store.addChild(zoomId).id, 0))}>
+                + 項目を追加
+              </button>
+            )}
+          </section>
+        )}
       </main>
       <LinkPickerMenu />
     </Ctx.Provider>
@@ -160,10 +166,22 @@ function TopBar() {
       >
         {ctl.prefs.showCompleted ? '完了を隠す' : '完了を表示'}
       </button>
-      <button class="mini" title="元に戻す (⌘/Ctrl+Z)" disabled={!ctl.history.canUndo} onMouseDown={keepFocus} onClick={() => ctl.undo()}>
+      <button
+        class="mini"
+        title="元に戻す (⌘/Ctrl+Z)"
+        disabled={!ctl.history.canUndo}
+        onMouseDown={keepFocus}
+        onClick={() => ctl.undo()}
+      >
         ↶
       </button>
-      <button class="mini" title="やり直す (⌘/Ctrl+Shift+Z)" disabled={!ctl.history.canRedo} onMouseDown={keepFocus} onClick={() => ctl.redo()}>
+      <button
+        class="mini"
+        title="やり直す (⌘/Ctrl+Shift+Z)"
+        disabled={!ctl.history.canRedo}
+        onMouseDown={keepFocus}
+        onClick={() => ctl.redo()}
+      >
         ↷
       </button>
       <SaveIndicator />
@@ -213,7 +231,10 @@ function SaveIndicator() {
   switch (s.kind) {
     case 'local':
       return (
-        <span class="save-state" title="ファイル保存用のサーバーが見つからないため、このブラウザ内に保存しています（URL ごとに別のデータになります）">
+        <span
+          class="save-state"
+          title="ファイル保存用のサーバーが見つからないため、このブラウザ内に保存しています（URL ごとに別のデータになります）"
+        >
           ブラウザに保存
         </span>
       );
@@ -239,10 +260,18 @@ function SaveIndicator() {
       return (
         <span class="save-state conflict" title={where}>
           ⚠ 他の画面でファイルが更新されました
-          <button class="mini" title="こちらの未保存の変更を捨てて、ファイルの内容を表示します" onClick={() => ctl.resolveConflict('file')}>
+          <button
+            class="mini"
+            title="こちらの未保存の変更を捨てて、ファイルの内容を表示します"
+            onClick={() => ctl.resolveConflict('file')}
+          >
             ファイルを読み込む
           </button>
-          <button class="mini" title="ファイルをこの画面の内容で上書きします" onClick={() => ctl.resolveConflict('mine')}>
+          <button
+            class="mini"
+            title="ファイルをこの画面の内容で上書きします"
+            onClick={() => ctl.resolveConflict('mine')}
+          >
             こちらで上書き
           </button>
         </span>
@@ -295,6 +324,25 @@ function HelpMenu() {
 }
 
 // ================================================================ outline
+
+function ViewSwitch() {
+  const ctl = useCtl();
+  const item = (view: 'outline' | 'gantt', label: string) => (
+    <button
+      class={ctl.view === view ? 'on' : ''}
+      onMouseDown={keepFocus}
+      onClick={() => ctl.view !== view && ctl.setView(view)}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div class="view-switch" role="group" aria-label="表示">
+      {item('outline', 'アウトライン')}
+      {item('gantt', 'ガント')}
+    </div>
+  );
+}
 
 function ZoomHeader({ node }: { node: OutlineNode }) {
   const ctl = useCtl();
@@ -475,7 +523,11 @@ function SegView({ seg }: { seg: Seg }) {
     case 'del':
       return <del>{pieces}</del>;
     case 'tag':
-      return <span class="tag" title="このタグで検索">{pieces}</span>;
+      return (
+        <span class="tag" title="このタグで検索">
+          {pieces}
+        </span>
+      );
     case 'ref': {
       const target = ctl.store.get(seg.refId!);
       if (!target) return <>{pieces}</>; // unknown id: show the raw text
@@ -501,7 +553,12 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
   return (
     <span class={cls}>
       {id !== ctl.zoomId && (
-        <button class="mini" title="完了 / 未完了 (⌘/Ctrl+Enter)" onMouseDown={keepFocus} onClick={() => ctl.toggleComplete(id)}>
+        <button
+          class="mini"
+          title="完了 / 未完了 (⌘/Ctrl+Enter)"
+          onMouseDown={keepFocus}
+          onClick={() => ctl.toggleComplete(id)}
+        >
           ✓
         </button>
       )}
@@ -512,7 +569,12 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
         + データ
       </button>
       {id !== ctl.store.rootId && (
-        <button class="mini" title="依存先を追加（after 属性）" onMouseDown={keepFocus} onClick={() => ctl.addDependency(id)}>
+        <button
+          class="mini"
+          title="依存先を追加（after 属性）"
+          onMouseDown={keepFocus}
+          onClick={() => ctl.addDependency(id)}
+        >
           + 依存
         </button>
       )}
@@ -855,17 +917,9 @@ function SchedLabel({ id, header }: { id: string; header?: boolean }) {
   const now = today();
   const done = store.node(id).completed;
   const span = s.end - s.start + 1;
-  const range = s.kind === 'milestone' ? `◆ ${shortDate(s.start, now)}` : `${shortDate(s.start, now)} → ${shortDate(s.end, now)}`;
-  const tip = [
-    s.kind === 'summary' ? '子の作業の期間' : s.kind === 'milestone' ? 'マイルストーン' : '作業',
-    s.kind === 'milestone' ? formatDate(s.start) : `${formatDate(s.start)} 〜 ${formatDate(s.end)}（${span}日間）`,
-    s.due !== undefined && `期限 ${formatDate(s.due)}`,
-    s.late > 0 && `${s.late}日超過`,
-    s.delayed && '依存のため指定の開始日より遅れて開始',
-    s.critical && s.kind !== 'summary' && 'クリティカルパス上（遅れると全体が遅れる）',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const range =
+    s.kind === 'milestone' ? `◆ ${shortDate(s.start, now)}` : `${shortDate(s.start, now)} → ${shortDate(s.end, now)}`;
+  const tip = schedTooltip(s);
   let cls = 'sched ' + s.kind;
   if (s.critical && s.kind !== 'summary') cls += ' critical';
   if (header) cls += ' header';

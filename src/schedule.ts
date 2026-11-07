@@ -236,3 +236,17 @@ export function computeSchedule(
   }
   return res;
 }
+
+/** The working calendar in effect at id (unparseable settings are ignored). */
+export function calendarAt(store: OutlineStore, id: string, jpDays: ReadonlyMap<string, string> | null = null) {
+  const find = (key: string) => {
+    for (const a of store.path(id).reverse()) {
+      const v = attr(store.node(a), key);
+      if (v) return v;
+    }
+    return undefined;
+  };
+  const w = find('workdays');
+  const h = find('holidays');
+  return new WorkCalendar((w && parseWorkdays(w)) || undefined, (h && parseHolidays(h)) || undefined, jpDays);
+}

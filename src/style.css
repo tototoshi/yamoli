@@ -23,6 +23,13 @@
   --blocked-fg: #9a5a10;
   --cycle-bg: #fbe5e5;
   --late-bg: #fbe5e5;
+  --bar: #a9c0ee;
+  --bar-crit: #f0b14f;
+  --bar-late: #e06a6a;
+  --bar-done: #d3d7dd;
+  --summary: #4a4f57;
+  --day-off: #f3f4f6;
+  --today-bg: rgba(59, 111, 216, 0.1);
   --crit: #d08a10;
   --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -79,7 +86,6 @@ button, select, input, textarea { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 0 8px 28px;
   font-size: 13px;
   color: var(--muted);
 }
@@ -126,6 +132,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- page */
 
 .page { max-width: 860px; margin: 0 auto; padding: 24px 16px 40vh; }
+.page.wide { max-width: 1400px; }
 
 .zoom-header { margin: 0 0 12px 28px; }
 .title-static, .text.title {
@@ -524,3 +531,77 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   .row-actions { display: none; }
   .zoom-header { margin-left: 0; }
 }
+
+/* ---------------------------------------------------------------- views */
+
+.view-bar { display: flex; align-items: center; gap: 12px; margin: 0 0 10px 28px; }
+.view-switch { display: inline-flex; border: 1px solid var(--faint); border-radius: 6px; overflow: hidden; }
+.view-switch button {
+  padding: 2px 12px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.view-switch button + button { border-left: 1px solid var(--faint); }
+.view-switch button.on { background: var(--attr-bg); color: var(--attr-fg); }
+
+/* ---------------------------------------------------------------- gantt */
+
+.gantt-empty { margin-left: 28px; color: var(--muted); font-size: 14px; }
+.gantt-tools { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.gantt-legend { margin-left: auto; color: var(--muted); font-size: 12px; }
+.gantt-legend .lg { display: inline-block; width: 14px; height: 8px; margin: 0 4px 0 10px; border-radius: 2px; vertical-align: middle; }
+.lg.task { background: var(--bar); }
+.lg.critical { background: var(--bar-crit); }
+.lg.late { background: var(--bar-late); }
+.lg.due { width: 2px; background: var(--danger); }
+
+.gantt {
+  display: grid;
+  grid-template-columns: minmax(140px, 260px) minmax(0, 1fr);
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gantt-names { border-right: 1px solid var(--faint); min-width: 0; }
+.gantt-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.gantt-name .toggle { margin-left: 0; height: 100%; }
+.gantt-name a { overflow: hidden; text-overflow: ellipsis; color: var(--fg); text-decoration: none; }
+.gantt-name a:hover { color: var(--accent); }
+.gantt-name.summary a { font-weight: 600; }
+.gantt-name.done a { color: var(--muted); text-decoration: line-through; }
+.gantt-name.hover { background: var(--hover); }
+.gantt-chart { overflow-x: auto; }
+.gantt-svg { display: block; font-family: var(--font); }
+
+.gantt-svg .row-hover { fill: var(--hover); }
+.gantt-svg .day-off { fill: var(--day-off); }
+.gantt-svg .today { fill: var(--today-bg); }
+.gantt-svg .month-line { stroke: var(--faint); }
+.gantt-svg .head-line { stroke: var(--faint); }
+.gantt-svg .month-label { fill: var(--fg); font-size: 12px; font-weight: 600; }
+.gantt-svg .day-label { fill: var(--muted); font-size: 11px; }
+.gantt-svg .day-label.center { text-anchor: middle; }
+.gantt-svg .day-label.now { fill: var(--accent); font-weight: 700; }
+.gantt-svg .bar { fill: var(--bar); }
+.gantt-svg .bar.critical { fill: var(--bar-crit); }
+.gantt-svg .bar.late { fill: var(--bar-late); }
+.gantt-svg .summary { fill: var(--summary); }
+.gantt-svg .milestone { fill: var(--summary); }
+.gantt-svg .milestone.critical { fill: var(--bar-crit); stroke: var(--summary); stroke-width: 1; }
+.gantt-svg .done .bar, .gantt-svg .done .milestone { fill: var(--bar-done); stroke: none; }
+.gantt-svg .done .summary { fill: var(--bar-done); }
+.gantt-svg .due { stroke: var(--danger); stroke-width: 2; stroke-dasharray: 3 2; }
+.gantt-svg .dep { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+.gantt-svg .dep.critical { stroke: var(--crit); stroke-width: 1.6; }
+.gantt-svg .arrow-head { fill: var(--muted); }
+.gantt-svg .arrow-head.critical { fill: var(--crit); }
+.gantt-svg .unscheduled { fill: var(--muted); font-size: 12px; font-style: italic; }

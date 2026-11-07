@@ -11,6 +11,8 @@ import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs } from './storage';
 
+export type View = 'outline' | 'gantt';
+
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
 export interface Focus {
   key: string;
@@ -56,7 +58,7 @@ export interface LinkPicker {
 
 export class Controller {
   store: OutlineStore = load();
-  zoomId: string;
+  zoomId!: string; // set from the URL in the constructor
   /** ids of data blocks currently showing their editor */
   editing = new Set<string>();
   pendingFocus: Focus | null = null;
@@ -72,6 +74,8 @@ export class Controller {
    */
   activeField: string | null = null;
   picker: LinkPicker | null = null;
+  /** How the zoomed item's contents are shown. */
+  view: View = 'outline';
   /** Items on a dependency cycle; recomputed by the App on every render. */
   cycles = new Set<string>();
   /** Computed dates; recomputed by the App on every render. */
@@ -82,7 +86,7 @@ export class Controller {
   private rerender: () => void = () => {};
 
   constructor() {
-    this.zoomId = this.idFromHash();
+    this.readHash();
     onSaveState(() => this.rerender());
     onExternalChange((next) => this.applyExternal(next));
   }
@@ -191,7 +195,7 @@ export class Controller {
     this.editing.clear();
     if (!this.store.get(this.zoomId)) {
       this.zoomId = this.store.rootId;
-      window.history.replaceState(null, '', this.hashFor(this.zoomId));
+      window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
     }
     save(this.store);
     this.setPendingFocus(entry.meta);
@@ -280,14 +284,47 @@ export class Controller {
 
   // ================================================================ zoom
 
-  idFromHash(): string {
-    const m = location.hash.match(/^#\/(.+)$/);
-    const id = m ? decodeURIComponent(m[1]) : this.store.rootId;
-    return this.store.get(id) ? id : this.store.rootId;
+  /**
+   * Take the zoomed item and view from the URL (#/id?view=gantt). Without a
+   * view, an item opens the way it was last viewed.
+   */
+  private readHash() {
+    const m = location.hash.match(/^#\/([^?]*)(?:\?(.*))?$/);
+    const raw = m?.[1] ? decodeURIComponent(m[1]) : this.store.rootId;
+    this.zoomId = this.store.get(raw) ? raw : this.store.rootId;
+    const asked = new URLSearchParams(m?.[2] ?? '').get('view');
+    if (asked === 'gantt' || asked === 'outline') {
+      this.view = asked;
+      this.rememberView();
+    } else {
+      this.view = this.prefs.ganttItems.includes(this.zoomId) ? 'gantt' : 'outline';
+      if (this.view === 'gantt') window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
+    }
   }
 
-  hashFor(id: string) {
-    return id === this.store.rootId ? '#/' : '#/' + encodeURIComponent(id);
+  private rememberView() {
+    const { ganttItems } = this.prefs;
+    const isGantt = this.view === 'gantt';
+    if (ganttItems.includes(this.zoomId) === isGantt) return;
+    const others = ganttItems.filter((id) => id !== this.zoomId && this.store.get(id));
+    this.prefs = { ...this.prefs, ganttItems: isGantt ? [...others, this.zoomId] : others };
+    savePrefs(this.prefs);
+  }
+
+  hashFor(id: string, view?: View) {
+    const base = id === this.store.rootId ? '#/' : '#/' + encodeURIComponent(id);
+    return view ? `${base}?view=${view}` : base;
+  }
+
+  /** Switch how the zoomed item is shown (remembered for next time). */
+  setView(view: View) {
+    location.hash = this.hashFor(this.zoomId, view);
+  }
+
+  setGanttScale(scale: number) {
+    this.prefs = { ...this.prefs, ganttScale: scale };
+    savePrefs(this.prefs);
+    this.rerender();
   }
 
   zoomTo(id: string) {
@@ -302,7 +339,14 @@ export class Controller {
   onHashChange() {
     const { store } = this;
     const prev = this.zoomId;
-    this.zoomId = this.idFromHash();
+    const prevView = this.view;
+    this.readHash();
+    if (this.zoomId === prev && this.view !== prevView) {
+      // Only the view changed: keep scroll, focus the item's first row.
+      const first = this.view === 'outline' ? this.visibleRows()[0] : undefined;
+      this.focus(first ? fText(first) : null);
+      return;
+    }
     this.editing.clear();
     this.search = this.runSearch();
     const zoom = store.node(this.zoomId);
@@ -314,7 +358,7 @@ export class Controller {
     } else if (zoom.children.length) {
       focus = fText(zoom.children[0]);
     }
-    this.focus(focus);
+    this.focus(this.view === 'outline' ? focus : null);
     window.scrollTo(0, 0);
   }
 
@@ -392,7 +436,7 @@ export class Controller {
     this.editing.clear();
     if (!next.get(this.zoomId)) {
       this.zoomId = next.rootId;
-      window.history.replaceState(null, '', this.hashFor(this.zoomId));
+      window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
     }
     this.history.record(this.snapshot(), captureFocus(), null);
     this.search = this.runSearch();
@@ -409,7 +453,7 @@ export class Controller {
     this.editing.clear();
     if (!next.get(this.zoomId)) {
       this.zoomId = next.rootId;
-      window.history.replaceState(null, '', this.hashFor(this.zoomId));
+      window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
     }
     this.search = this.runSearch();
     this.commit(null);

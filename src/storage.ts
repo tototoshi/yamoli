@@ -6,10 +6,14 @@ const PREFS_KEY = 'outliner:prefs';
 
 export interface Prefs {
   showCompleted: boolean;
+  /** Items last viewed as a Gantt chart. */
+  ganttItems: string[];
+  /** Index into the Gantt chart's day widths. */
+  ganttScale: number;
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true };
+  const defaults: Prefs = { showCompleted: true, ganttItems: [], ganttScale: 2 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
   } catch {
