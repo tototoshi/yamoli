@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { formatDate, parseDate } from './calendar';
 import { findCycles } from './deps';
-import { dependencyLinks, ganttRange, monthBands } from './gantt';
+import { dependencyLinks, ganttRange, monthBands, scheduleIssue } from './gantt';
 import { OutlineStore } from './model';
 import { computeSchedule } from './schedule';
 
@@ -38,4 +38,26 @@ test('links connect rows that are both shown', () => {
   expect(dependencyLinks(s, rows, sched)).toEqual([{ from: a, to: b, critical: true }]);
   expect(dependencyLinks(s, [b], sched)).toEqual([]);
   expect(parseDate('2026-12-01')).toBe(sched.byId.get(b)!.due);
+});
+
+test('rows without a bar say why', () => {
+  const { s, rows } = project();
+  const [p, a, , c] = rows;
+  const fresh = s.addChild(p, -1, '新しい作業').id; // no attributes yet
+  const done = s.addChild(p, -1, '済んだ作業').id;
+  s.setCompleted(done, true);
+  const group = s.addChild(p, -1, 'グループ').id;
+  s.addChild(group, -1, '中身');
+  s.addAttribute(c, 'due', 'someday');
+  const sched = computeSchedule(s, findCycles(s));
+  const issue = (id: string) => scheduleIssue(s, id, sched, new Set());
+  expect(issue(a)).toBeNull(); // has a bar
+  expect(issue(fresh)).toBe('duration 未設定');
+  expect(issue(done)).toBeNull();
+  expect(issue(group)).toBeNull();
+  expect(issue(c)).toBe('⚠ due: someday');
+
+  s.node(p).attributes = []; // no start anywhere
+  const unstarted = computeSchedule(s, findCycles(s));
+  expect(scheduleIssue(s, a, unstarted, new Set())).toBe('開始日未設定');
 });

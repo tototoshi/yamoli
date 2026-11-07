@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import preact from '@preact/preset-vite';
-import { dataMiddleware, defaultDataPath } from './server/dataFile';
+import { dataMiddleware, defaultDataPath } from './server/dataFile.ts';
 
 /** Serve the outline file at /api/data (see server/dataFile.ts). */
 function dataFile(): Plugin {

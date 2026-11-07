@@ -308,16 +308,16 @@ const SHORTCUTS: [string, string][] = [
 function HelpMenu() {
   const ctl = useCtl();
   return (
-    <details class="help">
+    <details class="help" onToggle={(e) => e.currentTarget.querySelector("dl")?.scrollTo(0, 0)}>
       <summary>ショートカット</summary>
       <dl>
-        {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
         <dd class="help-sample">
           <button class="mini" onClick={() => ctl.addSample()}>
             サンプルプロジェクトを追加
           </button>
-          依存関係と日程計算の例
+          依存関係・日程計算・ガントの例
         </dd>
+        {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
       </dl>
     </details>
   );

@@ -120,19 +120,25 @@ test('is:late / is:critical / is:milestone search', async () => {
   expect(find('is:遅延')).toEqual([]);
 });
 
-test('the sample project schedules with a late test and critical chain', async () => {
+test('the sample WBS schedules through phases, holidays and a critical chain', async () => {
   const { addScheduleSample } = await import('./sample');
   const s = OutlineStore.create();
   const p = addScheduleSample(s, s.rootId, D('2026-11-04')); // Wed -> starts Mon 11/9
   const r = run(s, new Map([['2026-11-23', '勤労感謝の日']]));
-  const by = (t: string) => r.byId.get(s.node(p).children.find((c) => s.node(c).text === t)!)!;
-  expect(dates(r.byId.get(p))).toEqual(['2026-11-09', '2026-11-24']);
-  expect(dates(by('API 実装'))).toEqual(['2026-11-12', '2026-11-18']);
-  expect(dates(by('テスト'))).toEqual(['2026-11-19', '2026-11-20']);
-  expect(by('テスト').late).toBe(1);
-  expect(dates(by('公開'))).toEqual(['2026-11-24', '2026-11-24']);
-  expect(by('API 実装').critical).toBe(true);
-  expect(by('画面実装').critical).toBe(false);
+  const find = (t: string) => s.visible(p).find((id) => s.node(id).text === t)!;
+  const by = (t: string) => r.byId.get(find(t))!;
+  expect(dates(r.byId.get(p))).toEqual(['2026-11-09', '2026-12-14']);
+  expect(dates(by('情報設計'))).toEqual(['2026-11-12', '2026-11-13']); // waits for the planning phase
+  expect(dates(by('API 実装'))).toEqual(['2026-11-18', '2026-11-25']); // skips the weekend and 11/23
+  expect(dates(by('API 連携'))).toEqual(['2026-12-01', '2026-12-02']);
+  expect(by('総合テスト').late).toBe(3);
+  expect(dates(by('公開'))).toEqual(['2026-12-08', '2026-12-08']);
+  expect(dates(by('監視・改善'))).toEqual(['2026-12-08', '2026-12-14']);
+  expect(by('デザイン').kind).toBe('summary');
+  const critical = ['要件定義', '情報設計', 'ワイヤーフレーム', 'ビジュアルデザイン', '画面実装', 'API 連携', '総合テスト', '公開', '監視・改善'];
+  for (const t of critical) expect([t, by(t).critical]).toEqual([t, true]);
+  expect(by('API 実装').critical).toBe(false);
+  expect(by('法務レビュー').critical).toBe(false);
 });
 
 test('work after a milestone starts the same day', () => {

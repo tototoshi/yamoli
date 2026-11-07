@@ -5,7 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { today, type Day } from './calendar';
 import { useCtl } from './context';
-import { dependencyLinks, ganttRange, monthBands, schedTooltip } from './gantt';
+import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
 import { nodeLabel } from './links';
 import { calendarAt, type Sched } from './schedule';
 
@@ -21,18 +21,22 @@ export function GanttView() {
   const [hover, setHover] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   // The zoomed item itself heads the chart (its span, or its own bar).
   const isRoot = zoomId === store.rootId;
   const rows = isRoot ? ctl.visibleRows() : [zoomId, ...ctl.visibleRows()];
   const scale = Math.min(Math.max(ctl.prefs.ganttScale, 0), GANTT_SCALES.length - 1);
   const dw = GANTT_SCALES[scale];
-  // Fill the available width with days.
-  const range = ganttRange(rows, schedule, Math.max(21, Math.floor(chartWidth / dw)));
   const now = today();
+  // Fill the available width with days. With nothing dated yet (say the
+  // project's start is missing), lay the rows out around today so their
+  // problems still show.
+  const minDays = Math.max(21, Math.floor(chartWidth / dw));
+  const range = ganttRange(rows, schedule, minDays) ?? { from: now - 2, to: now - 3 + minDays };
 
   const scrollToToday = () => {
     const el = chartRef.current;
-    if (el && range) el.scrollLeft = (now - range.from) * dw - el.clientWidth / 3;
+    if (el) el.scrollLeft = (now - range.from) * dw - el.clientWidth / 3;
   };
   useEffect(() => {
     const el = chartRef.current;
@@ -40,14 +44,13 @@ export function GanttView() {
     const ro = new ResizeObserver(() => setChartWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [!!range]);
+  }, [rows.length > 0]);
   // Start with today in view when the chart spans it.
   useLayoutEffect(() => {
-    if (range && now > range.from && now <= range.to) scrollToToday();
+    if (now > range.from && now <= range.to) scrollToToday();
   }, [zoomId, dw]);
 
-  if (!rows.length) return <p class="gantt-empty">項目がありません</p>;
-  if (!range) {
+  if (!rows.length) {
     return (
       <p class="gantt-empty">
         日程のある作業がありません。作業に <code>duration</code>（例 3d）を、プロジェクトに <code>start</code>（例
@@ -126,7 +129,7 @@ export function GanttView() {
             );
           })}
         </div>
-        <div class="gantt-chart" ref={chartRef}>
+        <div class="gantt-chart" ref={chartRef} onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}>
           <svg width={width} height={height} class="gantt-svg">
             <defs>
               <marker
@@ -219,9 +222,16 @@ export function GanttView() {
               const s = schedule.byId.get(id);
               const y = rowY(i);
               if (!s) {
-                return schedule.unscheduled.has(id) ? (
-                  <text key={id} x={6} y={y + ROW / 2 + 4} class="unscheduled">
-                    開始日未設定
+                // Explain the missing bar, at the visible left edge.
+                const issue = scheduleIssue(store, id, schedule, ctl.cycles);
+                return issue ? (
+                  <text
+                    key={id}
+                    x={scrollLeft + 6}
+                    y={y + ROW / 2 + 4}
+                    class={'unscheduled' + (issue.startsWith('⚠') ? ' invalid' : '')}
+                  >
+                    {issue}
                   </text>
                 ) : null;
               }
@@ -231,6 +241,11 @@ export function GanttView() {
                   <Bar s={s} x={x} y={y} />
                   {s.due !== undefined && (
                     <line x1={x(s.due + 1)} x2={x(s.due + 1)} y1={y + 3} y2={y + ROW - 3} class="due" />
+                  )}
+                  {schedule.invalid.has(id) && (
+                    <text x={x(s.end + 1) + 10} y={y + ROW / 2 + 4} class="unscheduled invalid">
+                      ⚠ {schedule.invalid.get(id)}
+                    </text>
                   )}
                 </g>
               );

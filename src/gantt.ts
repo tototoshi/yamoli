@@ -13,6 +13,22 @@ export interface DayRange {
   to: Day;
 }
 
+/**
+ * Why a row has no bar, or null when it has one or needs none (a group, or
+ * finished work). Every open leaf counts as a task, so new items show up as
+ * still needing a duration rather than silently missing from the plan.
+ */
+export function scheduleIssue(store: OutlineStore, id: string, schedule: ScheduleResult, cycles: Set<string>) {
+  if (schedule.byId.has(id)) return null;
+  const invalid = schedule.invalid.get(id);
+  if (invalid) return `⚠ ${invalid}`;
+  if (cycles.has(id)) return '⚠ 依存が循環しています';
+  if (schedule.unscheduled.has(id)) return '開始日未設定';
+  const n = store.node(id);
+  if (!n.children.length && !n.completed) return 'duration 未設定';
+  return null;
+}
+
 /** Days covering every scheduled row and due date, with a little margin. */
 export function ganttRange(rows: string[], schedule: ScheduleResult, minDays = 21): DayRange | null {
   let from = Infinity;
