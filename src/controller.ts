@@ -47,6 +47,19 @@ export function applyFocus(f: Focus | null | undefined) {
 const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
 
 /** State of the `[[` link picker attached to one editable field. */
+/** The menu opened by right-clicking an item's bullet. */
+export interface ItemMenu {
+  id: string;
+  x: number;
+  y: number;
+}
+
+/** A short message at the bottom of the screen, optionally offering undo. */
+export interface Toast {
+  message: string;
+  undo: boolean;
+}
+
 export interface LinkPicker {
   /** Focus key of the field (text:… or value:…). */
   key: string;
@@ -74,6 +87,9 @@ export class Controller {
    */
   activeField: string | null = null;
   picker: LinkPicker | null = null;
+  menu: ItemMenu | null = null;
+  toast: Toast | null = null;
+  private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** How the zoomed item's contents are shown. */
   view: View = 'outline';
   /** Items on a dependency cycle; recomputed by the App on every render. */
@@ -268,6 +284,68 @@ export class Controller {
   }
 
   /** Toggle completion; if completed rows are hidden, focus moves to a neighbour. */
+  // ================================================================ item menu
+
+  openMenu(id: string, x: number, y: number) {
+    this.menu = { id, x, y };
+    this.rerender();
+  }
+
+  closeMenu() {
+    if (!this.menu) return;
+    this.menu = null;
+    this.rerender();
+  }
+
+  showToast(message: string, undo = false) {
+    this.toast = { message, undo };
+    this.holdToast(false);
+    this.rerender();
+  }
+
+  /** Keep the toast up while the pointer is on it; otherwise it fades after a while. */
+  holdToast(hold: boolean) {
+    clearTimeout(this.toastTimer);
+    if (hold || !this.toast) return;
+    this.toastTimer = setTimeout(() => {
+      this.toast = null;
+      this.rerender();
+    }, 10000);
+  }
+
+  hideToast() {
+    clearTimeout(this.toastTimer);
+    this.toast = null;
+    this.rerender();
+  }
+
+  /** Delete id and everything under it (undoable), focusing a neighbouring row. */
+  deleteItem(id: string) {
+    const { store } = this;
+    if (id === store.rootId || id === this.zoomId) return;
+    const vis = this.visibleRows();
+    const idx = vis.indexOf(id);
+    const next = vis.slice(idx + 1).find((r) => !store.isAncestor(id, r)) ?? vis[idx - 1];
+    const label = store.node(id).text.split('\n')[0].trim() || '無題';
+    const below = store.descendantCount(id);
+    store.remove(id);
+    this.commit(this.view === 'outline' && next ? fText(next) : null);
+    this.showToast(`「${label.length > 20 ? label.slice(0, 20) + '…' : label}」を削除しました${below ? `（中の ${below} 件も）` : ''}`, true);
+  }
+
+  duplicateItem(id: string) {
+    const copy = this.store.duplicate(id);
+    if (copy) this.commit(this.view === 'outline' ? fText(copy.id) : null);
+  }
+
+  /** Put a [[link]] to id on the clipboard, to paste into text or an `after`. */
+  copyLink(id: string) {
+    navigator.clipboard.writeText(`[[${id}]]`).then(
+      () => this.showToast('リンクをコピーしました。本文や属性の値に貼り付けると参照になります'),
+      () => this.showToast('クリップボードにコピーできませんでした')
+    );
+  }
+
   toggleComplete(id: string) {
     const vis = this.visibleRows();
     const idx = vis.indexOf(id);

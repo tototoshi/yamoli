@@ -109,6 +109,8 @@ export function App() {
         )}
       </main>
       <LinkPickerMenu />
+      <ItemMenuView />
+      <ToastView />
     </Ctx.Provider>
   );
 }
@@ -308,7 +310,7 @@ const SHORTCUTS: [string, string][] = [
 function HelpMenu() {
   const ctl = useCtl();
   return (
-    <details class="help" onToggle={(e) => e.currentTarget.querySelector("dl")?.scrollTo(0, 0)}>
+    <details class="help" onToggle={(e) => e.currentTarget.querySelector('dl')?.scrollTo(0, 0)}>
       <summary>ショートカット</summary>
       <dl>
         <dd class="help-sample">
@@ -389,9 +391,13 @@ function NodeItem({ id }: { id: string }) {
           class="bullet"
           href={ctl.hashFor(id)}
           tabIndex={-1}
-          title="クリックでズームイン / ドラッグで移動"
+          title="クリックでズームイン / ドラッグで移動 / 右クリックでメニュー"
           draggable={false}
-          onPointerDown={(e) => startBulletDrag(e, id, ctl)}
+          onPointerDown={(e) => e.button === 0 && startBulletDrag(e, id, ctl)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            ctl.openMenu(id, e.clientX, e.clientY);
+          }}
         >
           <span class="dot" />
         </a>
@@ -828,6 +834,128 @@ function LinkPickerMenu() {
         <li class="empty">一致するアイテムがありません</li>
       )}
     </ul>
+  );
+}
+
+// ================================================================ item menu
+
+function ItemMenuView() {
+  const ctl = useCtl();
+  const m = ctl.menu;
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Keep the menu on screen and give it keyboard focus.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!m || !el) return;
+    const r = el.getBoundingClientRect();
+    el.style.left = Math.max(8, Math.min(m.x, innerWidth - r.width - 8)) + 'px';
+    el.style.top = Math.max(8, Math.min(m.y, innerHeight - r.height - 8)) + 'px';
+    el.querySelector<HTMLButtonElement>('button')?.focus();
+  }, [m]);
+
+  useEffect(() => {
+    if (!m) return;
+    const close = (e: Event) => {
+      if (e.type === 'mousedown' && ref.current?.contains(e.target as Node)) return;
+      ctl.closeMenu();
+    };
+    document.addEventListener('mousedown', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('blur', close);
+    window.addEventListener('hashchange', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('hashchange', close);
+    };
+  }, [m]);
+
+  if (!m || !ctl.store.get(m.id)) return null;
+  const { store } = ctl;
+  const n = store.node(m.id);
+  const below = store.descendantCount(m.id);
+  const outline = ctl.view === 'outline';
+  const run = (fn: () => void) => () => {
+    ctl.closeMenu();
+    fn();
+  };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    const items = [...ref.current!.querySelectorAll<HTMLButtonElement>('button')];
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === 'Escape') ctl.closeMenu();
+    else if (e.key === 'ArrowDown') items[(i + 1) % items.length].focus();
+    else if (e.key === 'ArrowUp') items[(i - 1 + items.length) % items.length].focus();
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  return (
+    <div ref={ref} class="item-menu" role="menu" onKeyDown={onKeyDown} onContextMenu={(e) => e.preventDefault()}>
+      <div class="item-menu-title">{nodeLabel(store, m.id) || '無題'}</div>
+      <button role="menuitem" onClick={run(() => (location.hash = ctl.hashFor(m.id, outline ? undefined : 'gantt')))}>
+        ズームイン
+      </button>
+      {outline && n.children.length > 0 && (
+        <button role="menuitem" onClick={run(() => (location.hash = ctl.hashFor(m.id, 'gantt')))}>
+          ガントで開く
+        </button>
+      )}
+      <hr />
+      <button role="menuitem" onClick={run(() => ctl.toggleComplete(m.id))}>
+        {n.completed ? '未完了に戻す' : '完了にする'}
+      </button>
+      {outline && (
+        <>
+          <button role="menuitem" onClick={run(() => ctl.addAttribute(m.id))}>
+            属性を追加
+          </button>
+          <button role="menuitem" onClick={run(() => ctl.addData(m.id))}>
+            データを追加
+          </button>
+          <button role="menuitem" onClick={run(() => ctl.addDependency(m.id))}>
+            依存を追加
+          </button>
+        </>
+      )}
+      <button role="menuitem" onClick={run(() => ctl.duplicateItem(m.id))}>
+        複製{below ? `（中の ${below} 件も）` : ''}
+      </button>
+      <button role="menuitem" onClick={run(() => ctl.copyLink(m.id))}>
+        リンクをコピー
+      </button>
+      <hr />
+      <button role="menuitem" class="danger" onClick={run(() => ctl.deleteItem(m.id))}>
+        削除{below ? `（中の ${below} 件も）` : ''}
+      </button>
+    </div>
+  );
+}
+
+function ToastView() {
+  const ctl = useCtl();
+  const t = ctl.toast;
+  if (!t) return null;
+  return (
+    <div class="toast" role="status" onMouseEnter={() => ctl.holdToast(true)} onMouseLeave={() => ctl.holdToast(false)}>
+      {t.message}
+      {t.undo && (
+        <button
+          onClick={() => {
+            ctl.undo();
+            ctl.hideToast();
+          }}
+        >
+          元に戻す
+        </button>
+      )}
+      <button class="close" title="閉じる" onClick={() => ctl.hideToast()}>
+        ×
+      </button>
+    </div>
   );
 }
 

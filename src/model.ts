@@ -190,6 +190,42 @@ export class OutlineStore {
     this.node(id).text = text;
   }
 
+  /**
+   * Copy id and its subtree right after it. Links ([[id]]) between items
+   * inside the copy point to the copies, so e.g. dependencies within a
+   * duplicated project stay within it.
+   */
+  duplicate(id: string): OutlineNode | null {
+    if (id === this.rootId) return null;
+    const ids = new Map<string, string>();
+    const collect = (nid: string) => {
+      ids.set(nid, uid());
+      this.node(nid).children.forEach(collect);
+    };
+    collect(id);
+    const relink = (s: string) => s.replace(/\[\[([^[\]\s]+)\]\]/g, (m, ref) => (ids.has(ref) ? `[[${ids.get(ref)}]]` : m));
+    for (const [from, to] of ids) {
+      const n = this.node(from);
+      this.nodes[to] = {
+        ...n,
+        id: to,
+        text: relink(n.text),
+        children: n.children.map((c) => ids.get(c)!),
+        attributes: n.attributes.map((a) => ({ id: uid(), key: a.key, value: relink(a.value) })),
+        data: n.data.map((d) => ({ ...d, id: uid() })),
+      };
+      this.parent[to] = from === id ? this.parent[id] : ids.get(this.parent[from])!;
+    }
+    const copy = ids.get(id)!;
+    this.node(this.parent[id]).children.splice(this.indexOf(id) + 1, 0, copy);
+    return this.node(copy);
+  }
+
+  /** Number of items below id. */
+  descendantCount(id: string): number {
+    return this.node(id).children.reduce((sum, c) => sum + 1 + this.descendantCount(c), 0);
+  }
+
   remove(id: string): boolean {
     if (id === this.rootId) return false;
     this.detach(id);

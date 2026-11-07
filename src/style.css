@@ -608,3 +608,61 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-svg .arrow-head.critical { fill: var(--crit); }
 .gantt-svg .unscheduled { fill: var(--muted); font-size: 12px; font-style: italic; }
 .gantt-svg .unscheduled.invalid { fill: var(--danger); font-style: normal; }
+
+/* ---------------------------------------------------------------- item menu, toast */
+
+.item-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+  font-size: 13px;
+}
+.item-menu-title {
+  padding: 4px 10px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item-menu button {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.item-menu button:hover, .item-menu button:focus { background: var(--attr-bg); outline: none; }
+.item-menu button.danger { color: var(--danger); }
+.item-menu button.danger:hover, .item-menu button.danger:focus { background: var(--late-bg); }
+.item-menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--faint); }
+
+.toast {
+  position: fixed;
+  z-index: 40;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 10px 8px 16px;
+  background: #2a2d33;
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+}
+.toast button { padding: 2px 8px; border: 0; border-radius: 5px; background: none; color: #9fbfff; font-weight: 600; cursor: pointer; }
+.toast button:hover { background: rgba(255, 255, 255, 0.1); }
+.toast button.close { color: #aab; font-weight: 400; }

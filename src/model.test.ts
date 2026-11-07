@@ -88,3 +88,27 @@ test('moveTo places a subtree before a sibling or at the end, never inside itsel
   expect(tree(s)).toEqual(['c', ['a', ['b', 'a1']]]);
   expect(s.parentOf(b.id)).toBe(a.id);
 });
+
+test('duplicate copies a subtree after the original and relinks inside it', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'project');
+  const other = s.addChild(s.rootId, -1, 'other');
+  const a = s.addChild(p.id, -1, 'a');
+  const b = s.addChild(p.id, -1, 'b');
+  s.addAttribute(b.id, 'after', `[[${a.id}]], [[${other.id}]]`);
+  s.addData(a.id, 'markdown', 'note');
+
+  const copy = s.duplicate(p.id)!;
+  expect(s.node(s.rootId).children).toEqual([p.id, copy.id, other.id]);
+  expect(copy.text).toBe('project');
+  expect(s.descendantCount(copy.id)).toBe(2);
+  const [a2, b2] = copy.children;
+  expect(a2).not.toBe(a.id);
+  expect(s.parentOf(b2)).toBe(copy.id);
+  expect(s.node(b2).attributes[0].value).toBe(`[[${a2}]], [[${other.id}]]`);
+  expect(s.node(a2).data[0].content).toBe('note');
+  expect(s.node(a2).data[0].id).not.toBe(s.node(a.id).data[0].id);
+  // The original is untouched.
+  expect(s.node(b.id).attributes[0].value).toBe(`[[${a.id}]], [[${other.id}]]`);
+  expect(s.duplicate(s.rootId)).toBeNull();
+});

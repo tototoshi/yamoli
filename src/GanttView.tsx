@@ -112,6 +112,10 @@ export function GanttView() {
               <div
                 key={id}
                 class={cls}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  ctl.openMenu(id, e.clientX, e.clientY);
+                }}
                 style={{ height: `${ROW}px`, paddingLeft: `${4 + depth * 16}px` }}
                 onMouseEnter={() => setHover(id)}
               >
