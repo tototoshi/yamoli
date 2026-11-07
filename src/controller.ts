@@ -9,7 +9,7 @@ import { UndoHistory } from './history';
 import { linkCandidates, pickerQueryAt } from './links';
 import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
-import { flush, load, loadPrefs, save, savePrefs } from './storage';
+import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs } from './storage';
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
 export interface Focus {
@@ -83,6 +83,8 @@ export class Controller {
 
   constructor() {
     this.zoomId = this.idFromHash();
+    onSaveState(() => this.rerender());
+    onExternalChange((next) => this.applyExternal(next));
   }
 
   bind(rerender: () => void) {
@@ -382,6 +384,24 @@ export class Controller {
     const id = addScheduleSample(this.store, this.store.rootId);
     this.commit(null);
     this.zoomTo(id);
+  }
+
+  /** Show an outline someone else saved (undoable, not saved back). */
+  private applyExternal(next: OutlineStore) {
+    this.store = next;
+    this.editing.clear();
+    if (!next.get(this.zoomId)) {
+      this.zoomId = next.rootId;
+      window.history.replaceState(null, '', this.hashFor(this.zoomId));
+    }
+    this.history.record(this.snapshot(), captureFocus(), null);
+    this.search = this.runSearch();
+    this.rerender();
+  }
+
+  resolveConflict(keep: 'file' | 'mine') {
+    flush();
+    void resolveConflict(keep, this.store);
   }
 
   replaceStore(next: OutlineStore) {

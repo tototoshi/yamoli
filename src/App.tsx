@@ -11,7 +11,7 @@ import { formatDate, shortDate, today } from './calendar';
 import { computeSchedule } from './schedule';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
-import { flush } from './storage';
+import { dataFile, flush, saveState } from './storage';
 
 const Ctx = createContext<Controller>(null!);
 const useCtl = () => useContext(Ctx);
@@ -166,6 +166,7 @@ function TopBar() {
       <button class="mini" title="やり直す (⌘/Ctrl+Shift+Z)" disabled={!ctl.history.canRedo} onMouseDown={keepFocus} onClick={() => ctl.redo()}>
         ↷
       </button>
+      <SaveIndicator />
       <HelpMenu />
       <button class="mini" onClick={() => fileRef.current?.click()}>
         Import
@@ -202,6 +203,51 @@ function SearchBox() {
       }}
     />
   );
+}
+
+/** Where the outline is saved, and whether that worked. */
+function SaveIndicator() {
+  const ctl = useCtl();
+  const s = saveState();
+  const where = dataFile ? `保存先: ${dataFile}` : '';
+  switch (s.kind) {
+    case 'local':
+      return (
+        <span class="save-state" title="ファイル保存用のサーバーが見つからないため、このブラウザ内に保存しています（URL ごとに別のデータになります）">
+          ブラウザに保存
+        </span>
+      );
+    case 'saved':
+      return (
+        <span class="save-state" title={where}>
+          保存済み
+        </span>
+      );
+    case 'saving':
+      return (
+        <span class="save-state" title={where}>
+          保存中…
+        </span>
+      );
+    case 'error':
+      return (
+        <span class="save-state error" title={where}>
+          ⚠ {s.message}
+        </span>
+      );
+    case 'conflict':
+      return (
+        <span class="save-state conflict" title={where}>
+          ⚠ 他の画面でファイルが更新されました
+          <button class="mini" title="こちらの未保存の変更を捨てて、ファイルの内容を表示します" onClick={() => ctl.resolveConflict('file')}>
+            ファイルを読み込む
+          </button>
+          <button class="mini" title="ファイルをこの画面の内容で上書きします" onClick={() => ctl.resolveConflict('mine')}>
+            こちらで上書き
+          </button>
+        </span>
+      );
+  }
 }
 
 const SHORTCUTS: [string, string][] = [

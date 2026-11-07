@@ -3,10 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && tsc -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc"
+    "typecheck": "tsc && tsc -p tsconfig.node.json"
   },
   "dependencies": {
     "@holiday-jp/holiday_jp": "^2.5.2",
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^22.20.5",
     "jsdom": "^31.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",

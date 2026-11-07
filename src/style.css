@@ -54,6 +54,9 @@ button, select, input, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--faint);
 }
 .brand { font-weight: 600; color: var(--fg); text-decoration: none; }
+.save-state { flex: none; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.save-state.error { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; color: var(--danger); }
+.save-state.conflict { display: inline-flex; align-items: center; gap: 6px; color: var(--blocked-fg); }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; color: var(--muted); font-size: 13px; }
 .crumb { color: var(--muted); text-decoration: none; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crumb::before { content: '›'; margin-right: 4px; }
