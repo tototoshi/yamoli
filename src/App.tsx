@@ -32,6 +32,13 @@ export function App() {
         else ctl.undo();
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyF') {
+        e.preventDefault();
+        const box = document.querySelector<HTMLInputElement>('input.search');
+        box?.focus();
+        box?.select();
+        return;
+      }
       if (e.target === document.body && e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
         ctl.zoomOut();
@@ -55,8 +62,9 @@ export function App() {
     ctl.pendingFocus = null;
   });
 
-  const { store, zoomId } = ctl;
+  const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
+  const rows = search ? zoom.children.filter((c) => search.shown.has(c)) : zoom.children;
   document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Outliner';
 
   return (
@@ -65,12 +73,20 @@ export function App() {
       <main class="page">
         <ZoomHeader node={zoom} />
         <section class="outline">
+          {search && (
+            <div class="search-info">
+              {search.matches.size ? `${search.matches.size} 件` : '見つかりません'}
+              <button class="mini" onClick={() => ctl.setQuery('')}>
+                検索をクリア
+              </button>
+            </div>
+          )}
           <ul class="children top">
-            {zoom.children.map((id) => (
+            {rows.map((id) => (
               <NodeItem key={id} id={id} />
             ))}
           </ul>
-          {!zoom.children.length && (
+          {!search && !zoom.children.length && (
             <button class="add-first" onClick={() => ctl.commit(fText(store.addChild(zoomId).id, 0))}>
               + 項目を追加
             </button>
@@ -125,6 +141,7 @@ function TopBar() {
         ))}
       </nav>
       <span class="spacer" />
+      <SearchBox />
       <button class="mini" title="元に戻す (⌘/Ctrl+Z)" disabled={!ctl.history.canUndo} onMouseDown={keepFocus} onClick={() => ctl.undo()}>
         ↶
       </button>
@@ -143,10 +160,34 @@ function TopBar() {
   );
 }
 
+function SearchBox() {
+  const ctl = useCtl();
+  return (
+    <input
+      class="search"
+      type="search"
+      placeholder="検索 (⌘F)　例: status:進行中"
+      spellcheck={false}
+      value={ctl.query}
+      onInput={(e) => ctl.setQuery(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (imeActive(e)) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          if (ctl.query) ctl.setQuery('');
+          else applyFocus(fText(ctl.visibleRows()[0] ?? ctl.zoomId));
+        } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const first = ctl.visibleRows().find((id) => ctl.search?.matches.has(id)) ?? ctl.visibleRows()[0];
+          if (first) applyFocus(fText(first));
+        }
+      }}
+    />
+  );
+}
+
 const SHORTCUTS: [string, string][] = [
   ['Enter', '新しい行（カーソル位置で分割）'],
-  ['⌘/Ctrl+Z', '元に戻す'],
-  ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
   ['Shift+Enter', '行内改行'],
   ['Tab / Shift+Tab', 'インデント / アウトデント'],
   ['↑ / ↓', '前 / 次の行へ'],
@@ -158,6 +199,9 @@ const SHORTCUTS: [string, string][] = [
   ['Alt+D', 'データを追加'],
   ['Esc / ⌘+Enter', 'データ編集を終了'],
   ['⌘/Ctrl+Shift+Backspace', '行を削除（子も含む）'],
+  ['⌘/Ctrl+Z', '元に戻す'],
+  ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
+  ['⌘/Ctrl+F', '検索（Esc でクリア）'],
 ];
 
 function HelpMenu() {
@@ -187,21 +231,29 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
 
 function NodeItem({ id }: { id: string }) {
   const ctl = useCtl();
+  const { search } = ctl;
   const n = ctl.store.node(id);
-  const hasKids = n.children.length > 0;
-  const toggle = () => hasKids && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
+  // While searching, show only rows on a path to a match, fully expanded.
+  const kids = search ? n.children.filter((c) => search.shown.has(c)) : n.children;
+  const expanded = search ? kids.length > 0 : !n.collapsed;
+  const hasHidden = n.children.length > 0 && !expanded;
+  const toggle = () => !search && n.children.length && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
+
+  let cls = 'node';
+  if (hasHidden) cls += ' collapsed';
+  if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
 
   return (
-    <li class={'node' + (hasKids && n.collapsed ? ' collapsed' : '')} data-id={id}>
+    <li class={cls} data-id={id}>
       <div class="row">
         <button
-          class={'toggle' + (hasKids ? '' : ' empty')}
+          class={'toggle' + (n.children.length && !search ? '' : ' empty')}
           tabIndex={-1}
           title={n.collapsed ? '展開' : '折りたたむ'}
           onMouseDown={keepFocus}
           onClick={toggle}
         >
-          {hasKids ? '▾' : ''}
+          {n.children.length && !search ? '▾' : ''}
         </button>
         <a class="bullet" href={ctl.hashFor(id)} tabIndex={-1} title="ズームイン">
           <span class="dot" />
@@ -210,9 +262,9 @@ function NodeItem({ id }: { id: string }) {
         <Actions id={id} class="row-actions" />
       </div>
       <Meta node={n} />
-      {hasKids && !n.collapsed && (
+      {expanded && kids.length > 0 && (
         <ul class="children">
-          {n.children.map((c) => (
+          {kids.map((c) => (
             <NodeItem key={c} id={c} />
           ))}
         </ul>

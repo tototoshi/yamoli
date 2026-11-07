@@ -15,6 +15,7 @@
   --j-str: #2e7d4f;
   --j-num: #b5622f;
   --j-lit: #2f5bb5;
+  --match-bg: #fff6d1;
   --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
@@ -50,6 +51,29 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .crumb::before { content: '›'; margin-right: 4px; }
 .crumb:hover { color: var(--accent); }
 .spacer { flex: 1; }
+
+.search {
+  width: 240px;
+  max-width: 40vw;
+  padding: 2px 10px;
+  font-size: 13px;
+  border: 1px solid var(--faint);
+  border-radius: 999px;
+  background: var(--hover);
+  outline: none;
+}
+.search:focus { border-color: var(--accent); background: var(--bg); }
+
+.search-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px 28px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.node.search-match > .row { background: var(--match-bg); border-radius: 4px; }
+.node.search-context > .row textarea.text:not(:focus) { color: var(--muted); }
 
 .help { position: relative; font-size: 13px; color: var(--muted); }
 .help summary { cursor: pointer; list-style: none; }

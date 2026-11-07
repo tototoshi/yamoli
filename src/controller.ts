@@ -4,6 +4,7 @@
  */
 import { UndoHistory } from './history';
 import { OutlineStore } from './model';
+import { parseQuery, searchTree, type SearchResult } from './search';
 import { flush, load, save } from './storage';
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
@@ -46,6 +47,9 @@ export class Controller {
   editing = new Set<string>();
   pendingFocus: Focus | null = null;
   history = new UndoHistory<Focus | null>(this.snapshot());
+  query = '';
+  /** Active search result for the zoomed view, or null when not searching. */
+  search: SearchResult | null = null;
   private rerender: () => void = () => {};
 
   constructor() {
@@ -64,6 +68,7 @@ export class Controller {
     this.history.record(this.snapshot(), captureFocus(), coalesce ?? null);
     save(this.store);
     if (focus !== undefined) this.pendingFocus = focus;
+    if (this.search) this.extendSearch(focus);
     this.rerender();
   }
 
@@ -89,7 +94,53 @@ export class Controller {
     }
     save(this.store);
     this.pendingFocus = entry.meta;
+    this.search = this.runSearch();
     this.rerender();
+  }
+
+  // ================================================================ search
+
+  setQuery(q: string) {
+    this.query = q;
+    this.search = this.runSearch();
+    this.rerender();
+  }
+
+  private runSearch(): SearchResult | null {
+    const terms = parseQuery(this.query);
+    return terms.length ? searchTree(this.store, this.zoomId, terms) : null;
+  }
+
+  /**
+   * Results only grow while searching, so a row being edited (or just added)
+   * doesn't vanish when it stops matching.
+   */
+  private extendSearch(focus: Focus | null | undefined) {
+    const search = this.search!;
+    const fresh = this.runSearch();
+    fresh?.matches.forEach((id) => search.matches.add(id));
+    fresh?.shown.forEach((id) => search.shown.add(id));
+    const id = focus?.key.startsWith('text:') ? focus.key.slice(5) : null;
+    if (id && this.store.isAncestor(this.zoomId, id)) {
+      const path = this.store.path(id);
+      path.slice(path.indexOf(this.zoomId) + 1).forEach((a) => search.shown.add(a));
+    }
+  }
+
+  /** Rows on screen in order: filtered (and fully expanded) while searching. */
+  visibleRows(): string[] {
+    const { search, store } = this;
+    if (!search) return store.visible(this.zoomId);
+    const out: string[] = [];
+    const walk = (id: string) => {
+      for (const c of store.node(id).children) {
+        if (!search.shown.has(c)) continue;
+        out.push(c);
+        walk(c);
+      }
+    };
+    walk(this.zoomId);
+    return out;
   }
 
   // ================================================================ zoom
@@ -118,6 +169,7 @@ export class Controller {
     const prev = this.zoomId;
     this.zoomId = this.idFromHash();
     this.editing.clear();
+    this.search = this.runSearch();
     const zoom = store.node(this.zoomId);
     let focus: Focus | null = null;
     if (store.visible(this.zoomId).includes(prev)) {
@@ -163,6 +215,7 @@ export class Controller {
       this.zoomId = next.rootId;
       window.history.replaceState(null, '', this.hashFor(this.zoomId));
     }
+    this.search = this.runSearch();
     this.commit(null);
     flush();
   }
@@ -176,7 +229,7 @@ export class Controller {
     const isTitle = id === zoomId;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
-    const vis = store.visible(zoomId);
+    const vis = this.visibleRows();
     const idx = vis.indexOf(id);
     const zoomFocus = zoomId !== store.rootId ? fText(zoomId) : null;
 
