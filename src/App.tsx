@@ -7,6 +7,8 @@ import { highlight, parseInline, type Seg } from './inline';
 import { findBacklinks, nodeLabel } from './links';
 import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
 import { startBulletDrag } from './drag';
+import { formatDate, shortDate, today } from './calendar';
+import { computeSchedule } from './schedule';
 import type { Attribute, DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { flush } from './storage';
@@ -69,6 +71,8 @@ export function App() {
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
   ctl.cycles = findCycles(store);
+  ctl.schedule = computeSchedule(store, ctl.cycles, ctl.jpDays);
+  if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
   document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Outliner';
 
@@ -220,6 +224,10 @@ const SHORTCUTS: [string, string][] = [
   ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
   ['⌘/Ctrl+F', '検索（Esc でクリア、is:done で完了のみ）'],
   ['is:ready / is:blocked', '着手可 / 待ち の行を検索（after 属性の依存）'],
+  ['is:late / is:critical', '期限超過 / クリティカルパス上の作業を検索'],
+  ['duration: 3d / 2w / 10cd', '作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）'],
+  ['start / due', '開始日（子にも継承）/ 期限 — 例 2026-11-10'],
+  ['workdays / holidays', '稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）'],
 ];
 
 function HelpMenu() {
@@ -243,6 +251,7 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
       {isRoot ? <h1 class="title-static">Home</h1> : <NodeText node={node} title />}
       <Meta node={node} />
       <Actions id={node.id} class="header-actions" />
+      {!isRoot && <SchedLabel id={node.id} header />}
       {!isRoot && <DependencyPanel id={node.id} />}
       {!isRoot && <Backlinks id={node.id} />}
     </section>
@@ -286,6 +295,7 @@ function NodeItem({ id }: { id: string }) {
           <span class="dot" />
         </a>
         <NodeText node={n} />
+        <SchedLabel id={id} />
         <DepBadge id={id} />
         <Actions id={id} class="row-actions" />
       </div>
@@ -763,6 +773,60 @@ function DependencyPanel({ id }: { id: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ================================================================ schedule
+
+/** Computed dates next to a row: "11/10 → 11/12", "◆ 11/24", late / critical marks. */
+function SchedLabel({ id, header }: { id: string; header?: boolean }) {
+  const { schedule, store } = useCtl();
+  const invalid = schedule.invalid.get(id);
+  const bad = invalid && (
+    <span class="sched invalid" title="この値を解釈できません">
+      ⚠ {invalid}
+    </span>
+  );
+  if (schedule.unscheduled.has(id)) {
+    return (
+      <>
+        <span class="sched unscheduled" title="start がこの行にも親にもなく、日程を計算できる依存もありません">
+          開始日未設定
+        </span>
+        {bad}
+      </>
+    );
+  }
+  const s = schedule.byId.get(id);
+  if (!s) return bad || null;
+  const now = today();
+  const done = store.node(id).completed;
+  const span = s.end - s.start + 1;
+  const range = s.kind === 'milestone' ? `◆ ${shortDate(s.start, now)}` : `${shortDate(s.start, now)} → ${shortDate(s.end, now)}`;
+  const tip = [
+    s.kind === 'summary' ? '子の作業の期間' : s.kind === 'milestone' ? 'マイルストーン' : '作業',
+    s.kind === 'milestone' ? formatDate(s.start) : `${formatDate(s.start)} 〜 ${formatDate(s.end)}（${span}日間）`,
+    s.due !== undefined && `期限 ${formatDate(s.due)}`,
+    s.late > 0 && `${s.late}日超過`,
+    s.delayed && '依存のため指定の開始日より遅れて開始',
+    s.critical && s.kind !== 'summary' && 'クリティカルパス上（遅れると全体が遅れる）',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  let cls = 'sched ' + s.kind;
+  if (s.critical && s.kind !== 'summary') cls += ' critical';
+  if (header) cls += ' header';
+  return (
+    <>
+      <span class={cls} title={tip}>
+        {s.critical && s.kind !== 'summary' && <span class="crit">★</span>}
+        {range}
+        {s.kind === 'summary' && <span class="span">{span}日</span>}
+        {s.delayed && <span class="delayed">↷</span>}
+        {s.late > 0 && !done && <span class="late">{s.late}日超過</span>}
+      </span>
+      {bad}
+    </>
   );
 }
 

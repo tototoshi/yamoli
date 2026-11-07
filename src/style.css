@@ -22,6 +22,8 @@
   --blocked-bg: #fdf0dc;
   --blocked-fg: #9a5a10;
   --cycle-bg: #fbe5e5;
+  --late-bg: #fbe5e5;
+  --crit: #d08a10;
   --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
@@ -320,6 +322,37 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dep-badge.ready { background: var(--ready-bg); color: var(--ready-fg); }
 .dep-badge.blocked { background: var(--blocked-bg); color: var(--blocked-fg); }
 .dep-badge.cycle { background: var(--cycle-bg); color: var(--danger); }
+
+/* schedule */
+.sched {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sched.summary { opacity: 0.75; }
+.sched .span { font-size: 11px; }
+.sched .crit { color: var(--crit); }
+.sched.critical { color: var(--fg); }
+.sched .delayed { color: var(--blocked-fg); }
+.sched .late {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--late-bg);
+  color: var(--danger);
+  font-size: 11px;
+}
+.sched.unscheduled { font-style: italic; }
+.sched.invalid { color: var(--danger); }
+.sched.header { display: flex; width: fit-content; margin: 6px 0 0; font-size: 13px; }
+.completed .sched { opacity: 0.6; }
 
 .deps { margin: 8px 0 2px; font-size: 13px; }
 .deps-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 1px 0; }

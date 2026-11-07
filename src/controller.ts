@@ -3,6 +3,7 @@
  * commit() saves and asks the App to re-render, optionally moving focus.
  */
 import { DEP_KEY } from './deps';
+import type { ScheduleResult } from './schedule';
 import { UndoHistory } from './history';
 import { linkCandidates, pickerQueryAt } from './links';
 import { OutlineStore } from './model';
@@ -72,6 +73,11 @@ export class Controller {
   picker: LinkPicker | null = null;
   /** Items on a dependency cycle; recomputed by the App on every render. */
   cycles = new Set<string>();
+  /** Computed dates; recomputed by the App on every render. */
+  schedule: ScheduleResult = { byId: new Map(), unscheduled: new Set(), invalid: new Map(), needsJp: false };
+  /** Japanese public holidays (ISO date -> name), loaded on first use. */
+  jpDays: ReadonlyMap<string, string> | null = null;
+  private jpLoading = false;
   private rerender: () => void = () => {};
 
   constructor() {
@@ -200,7 +206,7 @@ export class Controller {
 
   private runSearch(): SearchResult | null {
     this.terms = parseQuery(this.query);
-    return this.terms.length ? searchTree(this.store, this.zoomId, this.terms) : null;
+    return this.terms.length ? searchTree(this.store, this.zoomId, this.terms, this.jpDays) : null;
   }
 
   /**
@@ -320,6 +326,23 @@ export class Controller {
     const d = this.store.addData(id, format);
     this.editing.add(d.id);
     this.commit({ key: 'data:' + d.id, start: 0 });
+  }
+
+  /** Load the Japanese holiday table (a separate chunk) the first time a calendar needs it. */
+  loadJpHolidays() {
+    if (this.jpDays || this.jpLoading) return;
+    this.jpLoading = true;
+    import('@holiday-jp/holiday_jp')
+      .then((m) => {
+        const table = (m.default ?? m).holidays as Record<string, { date: string; name: string }>;
+        this.jpDays = new Map(Object.values(table).map((h) => [h.date, h.name]));
+        this.search = this.runSearch();
+        this.rerender();
+      })
+      .catch((e) => {
+        console.error('Failed to load Japanese holidays', e);
+        this.jpLoading = false;
+      });
   }
 
   /** Start adding a dependency: focus the `after` value with the link picker open. */
