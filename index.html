@@ -4,42 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Outliner</title>
-    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <a class="brand" href="#/">Outliner</a>
-      <nav id="crumbs" class="crumbs"></nav>
-      <span class="spacer"></span>
-      <details class="help">
-        <summary>ショートカット</summary>
-        <dl>
-          <dt>Enter</dt><dd>新しい行（カーソル位置で分割）</dd>
-          <dt>Shift+Enter</dt><dd>行内改行</dd>
-          <dt>Tab / Shift+Tab</dt><dd>インデント / アウトデント</dd>
-          <dt>↑ / ↓</dt><dd>前 / 次の行へ</dd>
-          <dt>Alt(⌘)+Shift+↑↓</dt><dd>行を移動</dd>
-          <dt>⌘/Ctrl+↑ ↓ / ⌘+Enter</dt><dd>折りたたみ / 展開</dd>
-          <dt>Alt+→ / ⌘+.</dt><dd>ズームイン（●クリックでも可）</dd>
-          <dt>Alt+← / ⌘+,</dt><dd>ズームアウト（ブラウザの戻るでも可）</dd>
-          <dt>Alt+A</dt><dd>属性を追加</dd>
-          <dt>Alt+D</dt><dd>データを追加</dd>
-          <dt>Esc / ⌘+Enter</dt><dd>データ編集を終了</dd>
-          <dt>⌘/Ctrl+Shift+Backspace</dt><dd>行を削除（子も含む）</dd>
-        </dl>
-      </details>
-      <button id="btn-import" class="mini">Import</button>
-      <button id="btn-export" class="mini">Export</button>
-      <input id="file-import" type="file" accept="application/json,.json" hidden />
-    </header>
-
-    <main class="page">
-      <section id="zoom-header" class="zoom-header"></section>
-      <section id="outline" class="outline"></section>
-    </main>
-
-    <script src="model.js"></script>
-    <script src="formats.js"></script>
-    <script src="app.js"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

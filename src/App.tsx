@@ -1,0 +1,409 @@
+import type { TargetedEvent, TextareaHTMLAttributes } from 'preact';
+import { createContext } from 'preact';
+import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
+import { applyFocus, Controller, fText } from './controller';
+import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
+import type { Attribute, DataBlock, OutlineNode } from './model';
+import { OutlineStore } from './model';
+import { flush } from './storage';
+
+const Ctx = createContext<Controller>(null!);
+const useCtl = () => useContext(Ctx);
+
+// Keep focus in the text while clicking toolbar-ish buttons.
+const keepFocus = (e: MouseEvent) => e.preventDefault();
+const imeActive = (e: KeyboardEvent) => e.isComposing || e.keyCode === 229;
+
+// ================================================================ app
+
+export function App() {
+  const [ctl] = useState(() => new Controller());
+  const [, rerender] = useReducer((n: number, _: void) => n + 1, 0);
+  ctl.bind(rerender);
+
+  useEffect(() => {
+    const onHash = () => ctl.onHashChange();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target === document.body && e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        ctl.zoomOut();
+      }
+    };
+    window.addEventListener('hashchange', onHash);
+    document.addEventListener('keydown', onKey);
+    const first = ctl.store.node(ctl.zoomId).children[0];
+    if (first) ctl.pendingFocus = fText(first);
+    rerender();
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  // Apply focus requested by the last commit, after the DOM is updated.
+  useLayoutEffect(() => {
+    if (!ctl.pendingFocus) return;
+    applyFocus(ctl.pendingFocus);
+    ctl.pendingFocus = null;
+  });
+
+  const { store, zoomId } = ctl;
+  const zoom = store.node(zoomId);
+  document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Outliner';
+
+  return (
+    <Ctx.Provider value={ctl}>
+      <TopBar />
+      <main class="page">
+        <ZoomHeader node={zoom} />
+        <section class="outline">
+          <ul class="children top">
+            {zoom.children.map((id) => (
+              <NodeItem key={id} id={id} />
+            ))}
+          </ul>
+          {!zoom.children.length && (
+            <button class="add-first" onClick={() => ctl.commit(fText(store.addChild(zoomId).id, 0))}>
+              + 項目を追加
+            </button>
+          )}
+        </section>
+      </main>
+    </Ctx.Provider>
+  );
+}
+
+// ================================================================ top bar
+
+function TopBar() {
+  const ctl = useCtl();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { store, zoomId } = ctl;
+  const ancestors = zoomId === store.rootId ? [] : store.path(zoomId).slice(0, -1);
+
+  const exportJson = () => {
+    flush();
+    const blob = new Blob([JSON.stringify(store.toJSON(), null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `outline-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
+  const importJson = async (e: TargetedEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const next = OutlineStore.fromJSON(JSON.parse(await file.text()));
+      if (confirm('現在のアウトラインを置き換えますか？')) ctl.replaceStore(next);
+    } catch (err) {
+      alert('読み込みに失敗しました: ' + (err as Error).message);
+    }
+  };
+
+  return (
+    <header class="topbar">
+      <a class="brand" href="#/">
+        Outliner
+      </a>
+      <nav class="crumbs">
+        {ancestors.map((id) => (
+          <a key={id} href={ctl.hashFor(id)} class="crumb">
+            {id === store.rootId ? 'Home' : store.node(id).text || '無題'}
+          </a>
+        ))}
+      </nav>
+      <span class="spacer" />
+      <HelpMenu />
+      <button class="mini" onClick={() => fileRef.current?.click()}>
+        Import
+      </button>
+      <button class="mini" onClick={exportJson}>
+        Export
+      </button>
+      <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importJson} />
+    </header>
+  );
+}
+
+const SHORTCUTS: [string, string][] = [
+  ['Enter', '新しい行（カーソル位置で分割）'],
+  ['Shift+Enter', '行内改行'],
+  ['Tab / Shift+Tab', 'インデント / アウトデント'],
+  ['↑ / ↓', '前 / 次の行へ'],
+  ['Alt(⌘)+Shift+↑↓', '行を移動'],
+  ['⌘/Ctrl+↑ ↓ / ⌘+Enter', '折りたたみ / 展開'],
+  ['Alt+→ / ⌘+.', 'ズームイン（●クリックでも可）'],
+  ['Alt+← / ⌘+,', 'ズームアウト（ブラウザの戻るでも可）'],
+  ['Alt+A', '属性を追加'],
+  ['Alt+D', 'データを追加'],
+  ['Esc / ⌘+Enter', 'データ編集を終了'],
+  ['⌘/Ctrl+Shift+Backspace', '行を削除（子も含む）'],
+];
+
+function HelpMenu() {
+  return (
+    <details class="help">
+      <summary>ショートカット</summary>
+      <dl>
+        {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
+      </dl>
+    </details>
+  );
+}
+
+// ================================================================ outline
+
+function ZoomHeader({ node }: { node: OutlineNode }) {
+  const ctl = useCtl();
+  const isRoot = node.id === ctl.store.rootId;
+  return (
+    <section class="zoom-header">
+      {isRoot ? <h1 class="title-static">Home</h1> : <NodeText node={node} title />}
+      <Meta node={node} />
+      <Actions id={node.id} class="header-actions" />
+    </section>
+  );
+}
+
+function NodeItem({ id }: { id: string }) {
+  const ctl = useCtl();
+  const n = ctl.store.node(id);
+  const hasKids = n.children.length > 0;
+  const toggle = () => hasKids && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
+
+  return (
+    <li class={'node' + (hasKids && n.collapsed ? ' collapsed' : '')} data-id={id}>
+      <div class="row">
+        <button
+          class={'toggle' + (hasKids ? '' : ' empty')}
+          tabIndex={-1}
+          title={n.collapsed ? '展開' : '折りたたむ'}
+          onMouseDown={keepFocus}
+          onClick={toggle}
+        >
+          {hasKids ? '▾' : ''}
+        </button>
+        <a class="bullet" href={ctl.hashFor(id)} tabIndex={-1} title="ズームイン">
+          <span class="dot" />
+        </a>
+        <NodeText node={n} />
+        <Actions id={id} class="row-actions" />
+      </div>
+      <Meta node={n} />
+      {hasKids && !n.collapsed && (
+        <ul class="children">
+          {n.children.map((c) => (
+            <NodeItem key={c} id={c} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
+  const ctl = useCtl();
+  return (
+    <AutoTextarea
+      class={'text' + (title ? ' title' : '')}
+      placeholder={title ? '無題' : undefined}
+      data-id={node.id}
+      data-fk={'text:' + node.id}
+      value={node.text}
+      onInput={(e) => {
+        ctl.store.setText(node.id, e.currentTarget.value);
+        ctl.commit();
+      }}
+      onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
+      onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
+    />
+  );
+}
+
+function Actions({ id, class: cls }: { id: string; class: string }) {
+  const ctl = useCtl();
+  return (
+    <span class={cls}>
+      <button class="mini" title="属性を追加 (Alt+A)" onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
+        + 属性
+      </button>
+      <button class="mini" title="データを追加 (Alt+D)" onMouseDown={keepFocus} onClick={() => ctl.addData(id)}>
+        + データ
+      </button>
+    </span>
+  );
+}
+
+// ================================================================ attributes & data
+
+function Meta({ node }: { node: OutlineNode }) {
+  if (!node.attributes.length && !node.data.length) return null;
+  return (
+    <div class="meta">
+      {node.attributes.length > 0 && (
+        <div class="attrs">
+          {node.attributes.map((a) => (
+            <AttributeChip key={a.id} nodeId={node.id} attr={a} />
+          ))}
+        </div>
+      )}
+      {node.data.map((d) => (
+        <DataBlockView key={d.id} nodeId={node.id} data={d} />
+      ))}
+    </div>
+  );
+}
+
+function AttributeChip({ nodeId, attr }: { nodeId: string; attr: Attribute }) {
+  const ctl = useCtl();
+  const field = (name: 'key' | 'value') => (
+    <input
+      class={`attr-input attr-${name}`}
+      placeholder={name}
+      spellcheck={false}
+      size={Math.max(attr[name].length, name.length, 2)}
+      data-id={nodeId}
+      data-attr={attr.id}
+      data-field={name}
+      data-fk={`${name}:${nodeId}:${attr.id}`}
+      value={attr[name]}
+      onInput={(e) => {
+        ctl.store.updateAttribute(nodeId, attr.id, { [name]: e.currentTarget.value });
+        ctl.commit();
+      }}
+      onKeyDown={(e) => !imeActive(e) && ctl.onAttrKeydown(e, e.currentTarget)}
+    />
+  );
+  return (
+    <span class="attr">
+      {field('key')}
+      <span class="attr-sep">:</span>
+      {field('value')}
+      <button
+        class="attr-del"
+        tabIndex={-1}
+        title="属性を削除"
+        onMouseDown={keepFocus}
+        onClick={() => {
+          ctl.store.removeAttribute(nodeId, attr.id);
+          ctl.commit();
+        }}
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+function DataBlockView({ nodeId, data: d }: { nodeId: string; data: DataBlock }) {
+  const ctl = useCtl();
+  const editing = ctl.editing.has(d.id);
+  const html = useMemo(() => renderFormat(d.format, d.content), [d.format, d.content]);
+
+  // Leaving the editor (to anywhere outside this block) switches back to the rendered view.
+  const onBlur = () =>
+    setTimeout(() => {
+      const a = document.activeElement;
+      if (a?.closest(`.data[data-data="${CSS.escape(d.id)}"]`)) return;
+      ctl.stopEditing(nodeId, d.id, false);
+    }, 0);
+
+  return (
+    <div class={'data' + (editing ? ' editing' : '')} data-data={d.id} data-format={d.format}>
+      <div class="data-head">
+        <button
+          class="data-fold"
+          tabIndex={-1}
+          title={d.collapsed ? '展開' : '折りたたむ'}
+          onMouseDown={keepFocus}
+          onClick={() => {
+            ctl.store.updateData(nodeId, d.id, { collapsed: !d.collapsed });
+            ctl.commit();
+          }}
+        >
+          {d.collapsed ? '▸' : '▾'}
+        </button>
+        <select
+          class="data-format"
+          title="フォーマット"
+          value={d.format}
+          onChange={(e) => {
+            ctl.store.updateData(nodeId, d.id, { format: e.currentTarget.value });
+            ctl.commit();
+          }}
+        >
+          {listFormats().map((f) => (
+            <option key={f.name} value={f.name}>
+              {f.label}
+            </option>
+          ))}
+          {!hasFormat(d.format) && <option value={d.format}>{d.format} (未定義)</option>}
+        </select>
+        {d.collapsed && <span class="data-preview">{d.content.split('\n')[0].slice(0, 80)}</span>}
+        <span class="spacer" />
+        <button
+          class="mini"
+          onMouseDown={keepFocus}
+          onClick={() => (editing ? ctl.stopEditing(nodeId, d.id, true) : ctl.startEditing(nodeId, d.id))}
+        >
+          {editing ? '完了' : '編集'}
+        </button>
+        <button
+          class="mini danger"
+          onMouseDown={keepFocus}
+          onClick={() => {
+            ctl.store.removeData(nodeId, d.id);
+            ctl.editing.delete(d.id);
+            ctl.commit(fText(nodeId));
+          }}
+        >
+          削除
+        </button>
+      </div>
+      {!d.collapsed &&
+        (editing ? (
+          <AutoTextarea
+            class="data-editor"
+            spellcheck={false}
+            placeholder={getFormat(d.format).placeholder}
+            data-id={nodeId}
+            data-data={d.id}
+            data-fk={'data:' + d.id}
+            value={d.content}
+            onInput={(e) => {
+              ctl.store.updateData(nodeId, d.id, { content: e.currentTarget.value });
+              ctl.commit();
+            }}
+            onKeyDown={(e) => !imeActive(e) && ctl.onDataKeydown(e, e.currentTarget)}
+            onBlur={onBlur}
+          />
+        ) : (
+          <div
+            class="data-view"
+            title="クリックして編集"
+            dangerouslySetInnerHTML={{ __html: html }}
+            onClick={(e) => {
+              if (!(e.target as Element).closest('a')) ctl.startEditing(nodeId, d.id);
+            }}
+          />
+        ))}
+    </div>
+  );
+}
+
+// ================================================================ helpers
+
+/** A textarea that grows to fit its content. */
+function AutoTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement> & Record<`data-${string}`, string>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const ta = ref.current!;
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  });
+  return <textarea ref={ref} rows={1} {...props} />;
+}
