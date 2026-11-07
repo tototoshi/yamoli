@@ -4,8 +4,8 @@
  */
 import { UndoHistory } from './history';
 import { OutlineStore } from './model';
-import { parseQuery, searchTree, type SearchResult, type Term } from './search';
-import { flush, load, save } from './storage';
+import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
+import { flush, load, loadPrefs, save, savePrefs } from './storage';
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
 export interface Focus {
@@ -51,6 +51,7 @@ export class Controller {
   terms: Term[] = [];
   /** Active search result for the zoomed view, or null when not searching. */
   search: SearchResult | null = null;
+  prefs = loadPrefs();
   /** The one row rendered as an editor; all other rows show formatted text. */
   activeText: string | null = null;
   private rerender: () => void = () => {};
@@ -148,20 +149,54 @@ export class Controller {
     }
   }
 
-  /** Rows on screen in order: filtered (and fully expanded) while searching. */
-  visibleRows(): string[] {
+  // ================================================================ what is on screen
+
+  /** Children of id that are displayed (search and hidden-completed filters applied). */
+  shownChildren(id: string): string[] {
     const { search, store } = this;
-    if (!search) return store.visible(this.zoomId);
+    const hideDone = !this.prefs.showCompleted && !wantsCompleted(this.terms);
+    return store
+      .node(id)
+      .children.filter((c) => (!search || search.shown.has(c)) && !(hideDone && store.node(c).completed));
+  }
+
+  /** Whether id's displayed children are rendered: always while searching. */
+  isExpanded(id: string): boolean {
+    return this.search ? this.shownChildren(id).length > 0 : !this.store.node(id).collapsed;
+  }
+
+  /** Rows on screen in order. */
+  visibleRows(): string[] {
     const out: string[] = [];
     const walk = (id: string) => {
-      for (const c of store.node(id).children) {
-        if (!search.shown.has(c)) continue;
+      for (const c of this.shownChildren(id)) {
         out.push(c);
-        walk(c);
+        if (this.isExpanded(c)) walk(c);
       }
     };
     walk(this.zoomId);
     return out;
+  }
+
+  toggleShowCompleted() {
+    this.prefs = { ...this.prefs, showCompleted: !this.prefs.showCompleted };
+    savePrefs(this.prefs);
+    this.rerender();
+  }
+
+  /** Toggle completion; if completed rows are hidden, focus moves to a neighbour. */
+  toggleComplete(id: string) {
+    const vis = this.visibleRows();
+    const idx = vis.indexOf(id);
+    const n = this.store.node(id);
+    this.store.setCompleted(id, !n.completed);
+    let focus: Focus | null | undefined; // undefined keeps focus where it is
+    if (n.completed && !this.prefs.showCompleted) {
+      // Skip the row's own (now hidden) subtree when choosing the next row.
+      const next = vis.slice(idx + 1).find((r) => !this.store.isAncestor(id, r));
+      focus = next ? fText(next, 0) : vis[idx - 1] ? fText(vis[idx - 1]) : null;
+    }
+    this.commit(focus);
   }
 
   // ================================================================ zoom
@@ -268,13 +303,17 @@ export class Controller {
         return this.commit(fText(id, 0));
       }
       store.setText(id, before);
-      const next = n.children.length && !n.collapsed ? store.addChild(id, 0, after) : store.addSiblingAfter(id, after);
+      const kids = this.shownChildren(id);
+      const next =
+        kids.length && this.isExpanded(id)
+          ? store.addChild(id, store.indexOf(kids[0]), after)
+          : store.addSiblingAfter(id, after);
       return this.commit(fText(next.id, 0));
     }
     if (e.key === 'Tab' && !isMod(e) && !e.altKey) {
       e.preventDefault();
       if (isTitle) return;
-      const ok = e.shiftKey ? store.outdent(id, zoomId) : store.indent(id);
+      const ok = e.shiftKey ? store.outdent(id, zoomId) : this.indentShown(id);
       if (ok) this.commit(fText(id, start, end));
       return;
     }
@@ -304,7 +343,7 @@ export class Controller {
     // ---- move / collapse
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey && (e.altKey || isMod(e))) {
       e.preventDefault();
-      if (!isTitle && store.move(id, e.key === 'ArrowUp' ? -1 : 1)) this.commit(fText(id, start, end));
+      if (!isTitle && this.moveShown(id, e.key === 'ArrowUp' ? -1 : 1)) this.commit(fText(id, start, end));
       return;
     }
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isMod(e) && !e.altKey) {
@@ -314,7 +353,7 @@ export class Controller {
     }
     if (e.key === 'Enter' && isMod(e)) {
       e.preventDefault();
-      if (!isTitle && store.setCollapsed(id, !n.collapsed)) this.commit(fText(id, start, end));
+      if (!isTitle) this.toggleComplete(id);
       return;
     }
 
@@ -358,6 +397,27 @@ export class Controller {
         this.focus(fText(target, start));
       }
     }
+  }
+
+  /** Like store.indent, but under the previous *displayed* sibling. */
+  private indentShown(id: string): boolean {
+    const p = this.store.parentOf(id);
+    if (!p) return false;
+    const sibs = this.shownChildren(p);
+    const prev = sibs[sibs.indexOf(id) - 1];
+    return prev ? this.store.moveTo(id, prev, null) : false;
+  }
+
+  /** Swap places with the previous/next *displayed* sibling. */
+  private moveShown(id: string, delta: -1 | 1): boolean {
+    const p = this.store.parentOf(id);
+    if (!p) return false;
+    const shown = this.shownChildren(p);
+    const other = shown[shown.indexOf(id) + delta];
+    if (!other) return false;
+    if (delta < 0) return this.store.moveTo(id, p, other);
+    const all = this.store.node(p).children;
+    return this.store.moveTo(id, p, all[all.indexOf(other) + 1] ?? null);
   }
 
   onAttrKeydown(e: KeyboardEvent, input: HTMLInputElement) {

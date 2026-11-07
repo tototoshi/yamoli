@@ -19,6 +19,7 @@ export interface OutlineNode {
   id: string;
   text: string;
   collapsed: boolean;
+  completed: boolean;
   children: string[];
   attributes: Attribute[];
   data: DataBlock[];
@@ -35,7 +36,7 @@ export function uid(): string {
 }
 
 function makeNode(text = ''): OutlineNode {
-  return { id: uid(), text, collapsed: false, children: [], attributes: [], data: [] };
+  return { id: uid(), text, collapsed: false, completed: false, children: [], attributes: [], data: [] };
 }
 
 function normalizeNode(id: string, raw: any): OutlineNode {
@@ -44,6 +45,7 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     id,
     text: typeof n.text === 'string' ? n.text : '',
     collapsed: !!n.collapsed,
+    completed: !!n.completed,
     children: Array.isArray(n.children) ? n.children.slice() : [],
     attributes: (Array.isArray(n.attributes) ? n.attributes : []).map((a: Partial<Attribute>) => ({
       id: a.id || uid(),
@@ -252,6 +254,10 @@ export class OutlineStore {
     if (n.collapsed === collapsed) return false;
     n.collapsed = collapsed;
     return true;
+  }
+
+  setCompleted(id: string, completed: boolean) {
+    this.node(id).completed = completed;
   }
 
   /** Append src's text, attributes, data and children to dst, then delete src. */

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { OutlineStore } from './model';
-import { matchNode, parseQuery, searchTree } from './search';
+import { matchNode, parseQuery, searchTree, wantsCompleted } from './search';
 
 test('parseQuery handles words, phrases, attributes and negation', () => {
   expect(parseQuery('foo  -bar "two words" status:進行中 due: -tag:x')).toEqual([
@@ -46,4 +46,20 @@ test('searchTree returns matches with their ancestors, inside collapsed nodes to
   expect(r.shown.has(other.id)).toBe(false);
   // Scoped to the zoomed node: ancestors above the view are not included.
   expect(searchTree(s, b.id, parseQuery('target')).shown).toEqual(new Set([hit.id]));
+});
+
+test('is:done matches completed rows', () => {
+  const s = OutlineStore.create();
+  const n = s.addChild(s.rootId, -1, 'task');
+  expect(matchNode(n, parseQuery('is:done'))).toBe(false);
+  expect(matchNode(n, parseQuery('-is:done'))).toBe(true);
+  s.setCompleted(n.id, true);
+  expect(matchNode(n, parseQuery('is:done task'))).toBe(true);
+  expect(matchNode(n, parseQuery('is:完了'))).toBe(true);
+});
+
+test('wantsCompleted only for a positive is:done term', () => {
+  expect(wantsCompleted(parseQuery('task is:done'))).toBe(true);
+  expect(wantsCompleted(parseQuery('-is:done'))).toBe(false);
+  expect(wantsCompleted(parseQuery('task'))).toBe(false);
 });

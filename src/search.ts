@@ -6,6 +6,7 @@
  *   "two words"    phrase
  *   key:value      an attribute named key whose value contains value
  *   key:           has an attribute named key
+ *   is:done        completed rows (also is:完了)
  *   -term          negation of any of the above
  * Matching ignores case and full-/half-width differences.
  */
@@ -40,7 +41,14 @@ export function parseQuery(q: string): Term[] {
   return terms;
 }
 
+const DONE = new Set(['done', 'completed', '完了']);
+const isDoneTerm = (t: Term) => t.key === 'is' && DONE.has(t.value);
+
+/** The query explicitly asks for completed rows (so they should be shown even if hidden). */
+export const wantsCompleted = (terms: Term[]) => terms.some((t) => isDoneTerm(t) && !t.negate);
+
 function matchTerm(n: OutlineNode, t: Term): boolean {
+  if (isDoneTerm(t)) return n.completed;
   if (t.key !== undefined) {
     return n.attributes.some((a) => norm(a.key) === t.key && (!t.value || norm(a.value).includes(t.value)));
   }

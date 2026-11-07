@@ -1,6 +1,28 @@
 import { OutlineStore } from './model';
 
 const STORAGE_KEY = 'outliner:v1';
+const PREFS_KEY = 'outliner:prefs';
+
+export interface Prefs {
+  showCompleted: boolean;
+}
+
+export function loadPrefs(): Prefs {
+  const defaults: Prefs = { showCompleted: true };
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
+  } catch {
+    return defaults;
+  }
+}
+
+export function savePrefs(prefs: Prefs) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (e) {
+    console.error('Failed to save preferences', e);
+  }
+}
 
 export function load(): OutlineStore {
   try {

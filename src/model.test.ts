@@ -60,6 +60,7 @@ test('JSON round trip and normalization', () => {
   const loose = OutlineStore.fromJSON({ rootId: 'r', nodes: { r: { children: ['x', 'missing'] }, x: { text: 'x' } } });
   expect(loose.node('r').children).toEqual(['x']);
   expect(loose.node('x').attributes).toEqual([]);
+  expect(loose.node('x').completed).toBe(false);
   expect(() => OutlineStore.fromJSON({})).toThrow();
 });
 

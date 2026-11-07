@@ -66,7 +66,7 @@ export function App() {
 
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
-  const rows = search ? zoom.children.filter((c) => search.shown.has(c)) : zoom.children;
+  const rows = ctl.shownChildren(zoomId);
   document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Outliner';
 
   return (
@@ -144,6 +144,14 @@ function TopBar() {
       </nav>
       <span class="spacer" />
       <SearchBox />
+      <button
+        class={'mini' + (ctl.prefs.showCompleted ? '' : ' on')}
+        title="完了した行の表示を切り替え"
+        onMouseDown={keepFocus}
+        onClick={() => ctl.toggleShowCompleted()}
+      >
+        {ctl.prefs.showCompleted ? '完了を隠す' : '完了を表示'}
+      </button>
       <button class="mini" title="元に戻す (⌘/Ctrl+Z)" disabled={!ctl.history.canUndo} onMouseDown={keepFocus} onClick={() => ctl.undo()}>
         ↶
       </button>
@@ -194,7 +202,8 @@ const SHORTCUTS: [string, string][] = [
   ['Tab / Shift+Tab', 'インデント / アウトデント'],
   ['↑ / ↓', '前 / 次の行へ'],
   ['Alt(⌘)+Shift+↑↓', '行を移動'],
-  ['⌘/Ctrl+↑ ↓ / ⌘+Enter', '折りたたみ / 展開'],
+  ['⌘/Ctrl+↑ ↓', '折りたたみ / 展開'],
+  ['⌘/Ctrl+Enter', '完了 / 未完了'],
   ['Alt+→ / ⌘+.', 'ズームイン（●クリックでも可）'],
   ['Alt+← / ⌘+,', 'ズームアウト（ブラウザの戻るでも可）'],
   ['Alt+A', '属性を追加'],
@@ -204,7 +213,7 @@ const SHORTCUTS: [string, string][] = [
   ['● をドラッグ', '行を移動（Esc でキャンセル）'],
   ['⌘/Ctrl+Z', '元に戻す'],
   ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
-  ['⌘/Ctrl+F', '検索（Esc でクリア）'],
+  ['⌘/Ctrl+F', '検索（Esc でクリア、is:done で完了のみ）'],
 ];
 
 function HelpMenu() {
@@ -236,27 +245,27 @@ function NodeItem({ id }: { id: string }) {
   const ctl = useCtl();
   const { search } = ctl;
   const n = ctl.store.node(id);
-  // While searching, show only rows on a path to a match, fully expanded.
-  const kids = search ? n.children.filter((c) => search.shown.has(c)) : n.children;
-  const expanded = search ? kids.length > 0 : !n.collapsed;
-  const hasHidden = n.children.length > 0 && !expanded;
-  const toggle = () => !search && n.children.length && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
+  const kids = ctl.shownChildren(id);
+  const expanded = ctl.isExpanded(id);
+  const canToggle = kids.length > 0 && !search;
+  const toggle = () => canToggle && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
 
   let cls = 'node';
-  if (hasHidden) cls += ' collapsed';
+  if (kids.length && !expanded) cls += ' collapsed';
+  if (n.completed) cls += ' completed';
   if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
 
   return (
     <li class={cls} data-id={id}>
       <div class="row">
         <button
-          class={'toggle' + (n.children.length && !search ? '' : ' empty')}
+          class={'toggle' + (canToggle ? '' : ' empty')}
           tabIndex={-1}
           title={n.collapsed ? '展開' : '折りたたむ'}
           onMouseDown={keepFocus}
           onClick={toggle}
         >
-          {n.children.length && !search ? '▾' : ''}
+          {canToggle ? '▾' : ''}
         </button>
         <a
           class="bullet"
@@ -372,6 +381,11 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
   const ctl = useCtl();
   return (
     <span class={cls}>
+      {id !== ctl.zoomId && (
+        <button class="mini" title="完了 / 未完了 (⌘/Ctrl+Enter)" onMouseDown={keepFocus} onClick={() => ctl.toggleComplete(id)}>
+          ✓
+        </button>
+      )}
       <button class="mini" title="属性を追加 (Alt+A)" onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
         + 属性
       </button>
