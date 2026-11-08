@@ -1,4 +1,5 @@
 import { OutlineStore } from './model';
+import type { View } from './controller';
 import { addGuideSlides, addScheduleSample } from './sample';
 
 const STORAGE_KEY = 'yamoli:v1';
@@ -23,7 +24,7 @@ export interface Prefs {
   /** Show field rows (`key: value`) in the outline. */
   showFields: boolean;
   /** How items were last viewed, when not as an outline. */
-  views: Record<string, 'gantt' | 'slides'>;
+  views: Record<string, Exclude<View, 'outline'>>;
   /** Index into the Gantt chart's day widths. */
   ganttScale: number;
 }

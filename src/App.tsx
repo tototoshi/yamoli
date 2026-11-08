@@ -9,6 +9,7 @@ import { startBulletDrag } from './drag';
 import { Ctx, useCtl } from './context';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
+import { DataView } from './DataView';
 import { SegView } from './InlineText';
 import { shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
@@ -80,7 +81,7 @@ export function App() {
   return (
     <Ctx.Provider value={ctl}>
       <TopBar />
-      <main class={'page' + (ctl.view !== 'outline' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
+      <main class={'page' + (ctl.view === 'gantt' || ctl.view === 'slides' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
         <ZoomHeader node={zoom} />
         <div class="view-bar">
           <ViewSwitch />
@@ -97,6 +98,8 @@ export function App() {
           <GanttView />
         ) : ctl.view === 'slides' ? (
           <SlidesView />
+        ) : ctl.view === 'yaml' || ctl.view === 'json' ? (
+          <DataView format={ctl.view} />
         ) : (
           <section class="outline">
             <ul class="children top">
@@ -365,6 +368,8 @@ function ViewSwitch() {
       {item('outline', 'アウトライン')}
       {item('gantt', 'ガント')}
       {item('slides', 'スライド')}
+      {item('yaml', 'YAML')}
+      {item('json', 'JSON')}
     </div>
   );
 }

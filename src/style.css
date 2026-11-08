@@ -720,3 +720,16 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide-edit:hover { color: var(--accent); }
 .slide-notes { margin-top: 8px; padding: 10px 14px; border: 1px solid var(--faint); border-radius: 6px; white-space: pre-wrap; font-size: 14px; }
 .muted { color: var(--muted); }
+
+/* ================================================================ yaml / json */
+
+.serial-view-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+.serial-view-text {
+  margin: 0;
+  padding: 14px 18px;
+  border: 1px solid var(--faint);
+  border-radius: 6px;
+  font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+  overflow-x: auto;
+}
