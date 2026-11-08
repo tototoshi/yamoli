@@ -1,5 +1,5 @@
 /*
- * Schedule computation from attributes.
+ * Schedule computation from fields.
  *
  *   duration: 3d          makes an item a task (0d = milestone)
  *   start: 2026-11-10     earliest start; inherited by descendants
@@ -15,7 +15,7 @@
  */
 import { parseDate, parseDuration, parseHolidays, parseWorkdays, WorkCalendar, type Day } from './calendar';
 import { dependencies } from './deps';
-import type { OutlineNode, OutlineStore } from './model';
+import type { OutlineStore } from './model';
 
 export interface Sched {
   start: Day;
@@ -40,8 +40,6 @@ export interface ScheduleResult {
   needsJp: boolean;
 }
 
-const attr = (n: OutlineNode, key: string) =>
-  n.attributes.find((a) => a.key.trim().toLowerCase() === key)?.value.trim() || undefined;
 
 export function computeSchedule(
   store: OutlineStore,
@@ -59,14 +57,14 @@ export function computeSchedule(
   /** Nearest value of key on id or an ancestor, with the item that holds it. */
   const inherited = (id: string, key: string) => {
     for (const a of ancestry(id)) {
-      const v = attr(store.node(a), key);
+      const v = store.fieldValue(a, key);
       if (v) return { value: v, owner: a };
     }
     return null;
   };
 
   const dateAttr = (id: string, key: string): Day | undefined => {
-    const v = attr(store.node(id), key);
+    const v = store.fieldValue(id, key);
     if (v === undefined) return undefined;
     const d = parseDate(v);
     if (d === null) res.invalid.set(id, `${key}: ${v}`);
@@ -183,7 +181,7 @@ export function computeSchedule(
   const summary = (id: string): Sched | null => {
     let start: Day | undefined;
     let end: Day | undefined;
-    for (const c of store.node(id).children) {
+    for (const c of store.items(id)) {
       const s = schedOf(c);
       if (!s) continue;
       if (start === undefined || s.start < start) start = s.start;
@@ -197,7 +195,7 @@ export function computeSchedule(
   };
 
   const compute = (id: string): Sched | null => {
-    const raw = attr(store.node(id), 'duration');
+    const raw = store.fieldValue(id, 'duration');
     if (raw !== undefined) {
       const dur = parseDuration(raw);
       if (dur) return task(id, dur);
@@ -207,6 +205,7 @@ export function computeSchedule(
   };
 
   for (const id of Object.keys(store.nodes)) {
+    if (store.isData(id)) continue;
     // Validate dates even on items that end up unscheduled.
     dateAttr(id, 'start');
     dateAttr(id, 'due');
@@ -241,7 +240,7 @@ export function computeSchedule(
 export function calendarAt(store: OutlineStore, id: string, jpDays: ReadonlyMap<string, string> | null = null) {
   const find = (key: string) => {
     for (const a of store.path(id).reverse()) {
-      const v = attr(store.node(a), key);
+      const v = store.fieldValue(a, key);
       if (v) return v;
     }
     return undefined;

@@ -33,10 +33,10 @@ test('working calendar skips weekends and holidays', () => {
 function project() {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'リリース準備');
-  s.addAttribute(p.id, 'start', '2026-11-10');
+  s.addField(p.id, 'start', '2026-11-10');
   const add = (text: string, attrs: Record<string, string>) => {
     const n = s.addChild(p.id, -1, text);
-    for (const [k, v] of Object.entries(attrs)) s.addAttribute(n.id, k, v);
+    for (const [k, v] of Object.entries(attrs)) s.addField(n.id, k, v);
     return n.id;
   };
   const design = add('設計', { duration: '3d' });
@@ -70,7 +70,7 @@ test('tasks are placed after their dependencies on working days', () => {
 
 test('Japanese holidays apply once loaded', () => {
   const { s, p, tst } = project();
-  s.addAttribute(p, 'holidays', 'jp');
+  s.addField(p, 'holidays', 'jp');
   expect(run(s).needsJp).toBe(true);
   const r = run(s, new Map([['2026-11-23', '勤労感謝の日']]));
   expect(dates(r.byId.get(tst))).toEqual(['2026-11-20', '2026-11-24']);
@@ -80,17 +80,17 @@ test('Japanese holidays apply once loaded', () => {
 test('calendar days, delayed starts, phase dependencies, unscheduled and invalid items', () => {
   const { s, p, design, tst } = project();
   const wait = s.addChild(p, -1, '審査待ち');
-  s.addAttribute(wait.id, 'duration', '10cd');
-  s.addAttribute(wait.id, 'after', `[[${design}]]`);
-  s.addAttribute(wait.id, 'start', '2026-11-11'); // earlier than its dependency allows
+  s.addField(wait.id, 'duration', '10cd');
+  s.addField(wait.id, 'after', `[[${design}]]`);
+  s.addField(wait.id, 'start', '2026-11-11'); // earlier than its dependency allows
   // A phase that depends on the test: its children inherit that dependency.
   const phase = s.addChild(s.rootId, -1, '運用フェーズ');
-  s.addAttribute(phase.id, 'after', `[[${tst}]]`);
+  s.addField(phase.id, 'after', `[[${tst}]]`);
   const ops = s.addChild(phase.id, -1, '監視設定');
-  s.addAttribute(ops.id, 'duration', '1d');
+  s.addField(ops.id, 'duration', '1d');
   const lonely = s.addChild(s.rootId, -1, 'いつか');
-  s.addAttribute(lonely.id, 'duration', '2d');
-  s.addAttribute(lonely.id, 'due', 'someday');
+  s.addField(lonely.id, 'duration', '2d');
+  s.addField(lonely.id, 'due', 'someday');
 
   const r = run(s);
   expect(dates(r.byId.get(wait.id))).toEqual(['2026-11-13', '2026-11-22']); // runs through weekends
@@ -103,7 +103,7 @@ test('calendar days, delayed starts, phase dependencies, unscheduled and invalid
 
 test('items on a dependency cycle are not scheduled', () => {
   const { s, design, release } = project();
-  s.addAttribute(design, 'after', `[[${release}]]`);
+  s.addField(design, 'after', `[[${release}]]`);
   const r = run(s);
   expect(r.byId.has(design)).toBe(false);
   expect(r.byId.has(release)).toBe(false);
@@ -144,11 +144,11 @@ test('the sample WBS schedules through phases, holidays and a critical chain', a
 test('work after a milestone starts the same day', () => {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'p');
-  s.addAttribute(p.id, 'start', '2026-11-09');
+  s.addField(p.id, 'start', '2026-11-09');
   const m = s.addChild(p.id, -1, 'kickoff');
-  s.addAttribute(m.id, 'duration', '0d');
+  s.addField(m.id, 'duration', '0d');
   const t = s.addChild(p.id, -1, 'work');
-  s.addAttribute(t.id, 'duration', '1d');
-  s.addAttribute(t.id, 'after', `[[${m.id}]]`);
+  s.addField(t.id, 'duration', '1d');
+  s.addField(t.id, 'after', `[[${m.id}]]`);
   expect(dates(run(s).byId.get(t.id))).toEqual(['2026-11-09', '2026-11-09']);
 });

@@ -10,8 +10,8 @@ import type { OutlineStore } from './model';
 export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = today()): string {
   const monday = now + ((8 - weekday(now)) % 7); // today if Monday, else the next one
   const proj = s.addChild(parentId, -1, 'サンプル: Web サイト リニューアル');
-  s.addAttribute(proj.id, 'start', formatDate(monday));
-  s.addAttribute(proj.id, 'holidays', 'jp');
+  s.addField(proj.id, 'start', formatDate(monday));
+  s.addField(proj.id, 'holidays', 'jp');
   // Notes go in a data block, so every row stays a task.
   s.addData(
     proj.id,
@@ -24,7 +24,7 @@ export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = 
 
   const add = (parent: string, text: string, attrs: Record<string, string> = {}) => {
     const n = s.addChild(parent, -1, text);
-    for (const [k, v] of Object.entries(attrs)) s.addAttribute(n.id, k, v);
+    for (const [k, v] of Object.entries(attrs)) s.addField(n.id, k, v);
     return n.id;
   };
   const after = (...ids: string[]) => ids.map((id) => `[[${id}]]`).join(', ');

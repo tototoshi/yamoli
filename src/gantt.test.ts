@@ -8,13 +8,13 @@ import { computeSchedule } from './schedule';
 function project() {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'p');
-  s.addAttribute(p.id, 'start', '2026-11-25');
+  s.addField(p.id, 'start', '2026-11-25');
   const a = s.addChild(p.id, -1, 'a');
-  s.addAttribute(a.id, 'duration', '3d');
+  s.addField(a.id, 'duration', '3d');
   const b = s.addChild(p.id, -1, 'b');
-  s.addAttribute(b.id, 'duration', '5d');
-  s.addAttribute(b.id, 'after', `[[${a.id}]]`);
-  s.addAttribute(b.id, 'due', '2026-12-01');
+  s.addField(b.id, 'duration', '5d');
+  s.addField(b.id, 'after', `[[${a.id}]]`);
+  s.addField(b.id, 'due', '2026-12-01');
   const c = s.addChild(p.id, -1, 'c'); // unscheduled: no duration, no children
   return { s, rows: [p.id, a.id, b.id, c.id], a: a.id, b: b.id };
 }
@@ -48,7 +48,7 @@ test('rows without a bar say why', () => {
   s.setCompleted(done, true);
   const group = s.addChild(p, -1, 'グループ').id;
   s.addChild(group, -1, '中身');
-  s.addAttribute(c, 'due', 'someday');
+  s.addField(c, 'due', 'someday');
   const sched = computeSchedule(s, findCycles(s));
   const issue = (id: string) => scheduleIssue(s, id, sched, new Set());
   expect(issue(a)).toBeNull(); // has a bar
@@ -57,7 +57,7 @@ test('rows without a bar say why', () => {
   expect(issue(group)).toBeNull();
   expect(issue(c)).toBe('⚠ due: someday');
 
-  s.node(p).attributes = []; // no start anywhere
+  s.remove(s.field(p, 'start')!.id); // no start anywhere
   const unstarted = computeSchedule(s, findCycles(s));
   expect(scheduleIssue(s, a, unstarted, new Set())).toBe('開始日未設定');
 });

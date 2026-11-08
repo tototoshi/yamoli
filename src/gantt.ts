@@ -25,7 +25,7 @@ export function scheduleIssue(store: OutlineStore, id: string, schedule: Schedul
   if (cycles.has(id)) return '⚠ 依存が循環しています';
   if (schedule.unscheduled.has(id)) return '開始日未設定';
   const n = store.node(id);
-  if (!n.children.length && !n.completed) return 'duration 未設定';
+  if (!store.items(id).length && !n.completed) return 'duration 未設定';
   return null;
 }
 

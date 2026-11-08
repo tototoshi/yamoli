@@ -1,0 +1,41 @@
+import { expect, test } from 'vitest';
+import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
+
+const show = (rows: TextRow[]): unknown[] =>
+  rows.map((r) => [r.key === null ? r.text : `${r.key}: ${r.text}`, ...(r.children.length ? [show(r.children)] : [])]);
+
+test('typing `name: ` is recognised, prose and URLs are not', () => {
+  expect('duration: '.match(FIELD_TYPED)?.[1]).toBe('duration');
+  expect('担当: 田中'.match(FIELD_TYPED)?.[1]).toBe('担当');
+  expect('Note to self: x'.match(FIELD_TYPED)).toBeNull();
+  expect('https://example.com'.match(FIELD_TYPED)).toBeNull();
+});
+
+test('YAML-ish text becomes a tree of rows and fields', () => {
+  const yaml = [
+    'duration: 3d',
+    'after: "[[abc]]"',
+    'budget:',
+    '  amount: 1200000',
+    '  currency: JPY',
+    'links:',
+    '  - https://example.com/spec',
+    '  - https://example.com/figma',
+    'members:',
+    '  - name: 田中',
+    '    role: PM',
+    '  - name: 鈴木',
+    '# a comment',
+  ].join('\n');
+  expect(show(parseOutlineText(yaml))).toEqual([
+    ['duration: 3d'],
+    ['after: [[abc]]'],
+    ['budget: ', [['amount: 1200000'], ['currency: JPY']]],
+    ['links: ', [['https://example.com/spec'], ['https://example.com/figma']]],
+    ['members: ', [['', [['name: 田中'], ['role: PM']]], ['', [['name: 鈴木']]]]],
+  ]);
+});
+
+test('a plain nested list keeps its shape', () => {
+  expect(show(parseOutlineText('- a\n  - b\n- c'))).toEqual([['a', [['b']]], ['c']]);
+});

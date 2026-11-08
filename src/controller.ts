@@ -7,6 +7,7 @@ import type { ScheduleResult } from './schedule';
 import { addScheduleSample } from './sample';
 import { UndoHistory } from './history';
 import { linkCandidates, pickerQueryAt } from './links';
+import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs } from './storage';
@@ -19,6 +20,8 @@ export interface Focus {
   start?: number | 'end';
   end?: number | 'end';
 }
+
+export const fKey = (id: string): Focus => ({ key: 'fkey:' + id, start: 'end' });
 
 export const fText = (id: string, start: number | 'end' = 'end', end?: number | 'end'): Focus => ({
   key: 'text:' + id,
@@ -140,7 +143,7 @@ export class Controller {
   private setPendingFocus(f: Focus | null) {
     this.pendingFocus = f;
     if (this.picker && this.picker.key !== f?.key) this.picker = null;
-    if (f && /^(text|value):/.test(f.key)) this.activeField = f.key;
+    if (f && /^(text|fkey):/.test(f.key)) this.activeField = f.key;
   }
 
   // ================================================================ link picker
@@ -186,9 +189,7 @@ export class Controller {
     if (!el) return;
     const link = `[[${targetId}]]`;
     const next = el.value.slice(0, p.from) + link + el.value.slice(el.selectionStart ?? el.value.length);
-    const [kind, nodeId, attrId] = p.key.split(':');
-    if (kind === 'text') this.store.setText(nodeId, next);
-    else this.store.updateAttribute(nodeId, attrId, { value: next });
+    this.store.setText(p.key.slice('text:'.length), next);
     this.picker = null;
     this.commit({ key: p.key, start: p.from + link.length });
   }
@@ -250,13 +251,17 @@ export class Controller {
 
   // ================================================================ what is on screen
 
-  /** Children of id that are displayed (search and hidden-completed filters applied). */
+  /** Children of id that are displayed (search, hidden-completed and hidden-field filters applied). */
   shownChildren(id: string): string[] {
     const { search, store } = this;
     const hideDone = !this.prefs.showCompleted && !wantsCompleted(this.terms);
-    return store
-      .node(id)
-      .children.filter((c) => (!search || search.shown.has(c)) && !(hideDone && store.node(c).completed));
+    const hideFields = !this.prefs.showFields;
+    return store.node(id).children.filter((c) => {
+      const n = store.node(c);
+      if (search && !search.shown.has(c)) return false;
+      if (hideDone && n.completed) return false;
+      return !(hideFields && n.key !== null);
+    });
   }
 
   /** Whether id's displayed children are rendered: always while searching. */
@@ -275,6 +280,12 @@ export class Controller {
     };
     walk(this.zoomId);
     return out;
+  }
+
+  toggleShowFields() {
+    this.prefs = { ...this.prefs, showFields: !this.prefs.showFields };
+    savePrefs(this.prefs);
+    this.rerender();
   }
 
   toggleShowCompleted() {
@@ -442,9 +453,89 @@ export class Controller {
 
   // ================================================================ actions
 
+  /** Add an empty field to id and edit its name. */
   addAttribute(id: string) {
-    const a = this.store.addAttribute(id);
-    this.commit({ key: `key:${id}:${a.id}`, start: 0 });
+    if (!this.prefs.showFields) this.prefs = { ...this.prefs, showFields: true };
+    const f = this.store.addField(id, '');
+    this.commit(fKey(f.id));
+  }
+
+  // ================================================================ fields
+
+  /**
+   * Text typed into a row. Typing `name: ` at the start of an ordinary row
+   * turns it into a field (Backspace at the start of the value turns it back).
+   */
+  onTextInput(id: string, ta: HTMLTextAreaElement) {
+    const { store } = this;
+    const n = store.node(id);
+    const value = ta.value;
+    const m = n.key === null && id !== this.zoomId ? value.match(FIELD_TYPED) : null;
+    if (m && ta.selectionStart === m[1].length + 2 && n.text !== value) {
+      store.setKey(id, m[1]);
+      store.setText(id, value.slice(m[1].length + 2));
+      this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
+      return;
+    }
+    store.setText(id, value);
+    this.updatePicker(ta, id);
+    this.commit(undefined, 'text:' + id);
+  }
+
+  onKeyInput(id: string, input: HTMLInputElement) {
+    const v = input.value;
+    // Typing the colon (YAML habit) moves on to the value.
+    if (v.endsWith(':')) {
+      this.store.setKey(id, v.slice(0, -1));
+      return this.commit(fText(id, 0));
+    }
+    this.store.setKey(id, v);
+    this.commit(undefined, 'fkey:' + id);
+  }
+
+  onKeyKeydown(e: KeyboardEvent, input: HTMLInputElement) {
+    const id = input.dataset.id!;
+    if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Escape') {
+      e.preventDefault();
+      this.focus(fText(id, e.key === 'Escape' ? 'end' : 0));
+    } else if (e.key === 'Backspace' && !input.value) {
+      e.preventDefault();
+      this.unfield(id, 0);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const vis = this.visibleRows();
+      const other = vis[vis.indexOf(id) + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (other) this.focus(fText(other));
+    }
+  }
+
+  /** Leaving a field's name empty turns it back into an ordinary row (or drops it if empty). */
+  onKeyBlur(id: string) {
+    const n = this.store.get(id);
+    this.deactivate('fkey:' + id);
+    if (!n || n.key === null || n.key.trim()) return;
+    if (!n.text && !n.children.length && !n.data.length) this.store.remove(id);
+    else this.store.setKey(id, null);
+    this.commit();
+  }
+
+  /** Menu action: `name: value` row <-> field. */
+  toggleField(id: string) {
+    const n = this.store.node(id);
+    if (n.key !== null) return this.unfield(id);
+    const m = n.text.match(/^([^\s:][^\s:]{0,39}):\s*([\s\S]*)$/);
+    this.store.setKey(id, m ? m[1] : n.text.trim());
+    this.store.setText(id, m ? m[2] : '');
+    this.commit(this.view === 'outline' ? fText(id) : null);
+  }
+
+  /** Turn a field back into the ordinary row `name: value`. */
+  private unfield(id: string, caret?: number) {
+    const n = this.store.node(id);
+    const prefix = n.key ? `${n.key}: ` : '';
+    this.store.setKey(id, null);
+    this.store.setText(id, prefix + n.text);
+    this.commit(fText(id, caret ?? prefix.length));
   }
 
   addData(id: string, format = 'markdown') {
@@ -472,17 +563,17 @@ export class Controller {
 
   /** Start adding a dependency: focus the `after` value with the link picker open. */
   addDependency(id: string) {
-    const n = this.store.node(id);
-    let a = n.attributes.find((x) => x.key.trim().toLowerCase() === DEP_KEY);
-    if (a) {
-      const v = a.value.trimEnd();
-      this.store.updateAttribute(id, a.id, { value: v + (!v || v.endsWith(',') ? ' ' : ', ') + '[[' });
+    if (!this.prefs.showFields) this.prefs = { ...this.prefs, showFields: true };
+    let f = this.store.field(id, DEP_KEY);
+    if (f) {
+      const v = f.text.trimEnd();
+      this.store.setText(f.id, v + (!v || v.endsWith(',') ? '' : ', ') + '[[');
     } else {
-      a = this.store.addAttribute(id, DEP_KEY, '[[');
+      f = this.store.addField(id, DEP_KEY, '[[');
     }
-    const key = `value:${id}:${a.id}`;
+    const key = 'text:' + f.id;
     this.commit({ key, start: 'end' });
-    this.picker = { key, from: a.value.length - 2, candidates: linkCandidates(this.store, '', id), selected: 0 };
+    this.picker = { key, from: f.text.length - 2, candidates: linkCandidates(this.store, '', id), selected: 0 };
     this.rerender();
   }
 
@@ -583,9 +674,13 @@ export class Controller {
       store.remove(id);
       return this.commit(vis[idx - 1] ? fText(vis[idx - 1]) : zoomFocus);
     }
+    if (e.key === 'Backspace' && start === 0 && end === 0 && n.key !== null) {
+      e.preventDefault();
+      return this.unfield(id);
+    }
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && !n.children.length) {
       const prev = vis[idx - 1];
-      const hasMeta = n.attributes.length || n.data.length;
+      const hasMeta = n.data.length > 0;
       if (!ta.value && !hasMeta) {
         e.preventDefault();
         store.remove(id);
@@ -665,7 +760,10 @@ export class Controller {
     if (!p) return false;
     const sibs = this.shownChildren(p);
     const prev = sibs[sibs.indexOf(id) - 1];
-    return prev ? this.store.moveTo(id, prev, null) : false;
+    // A field with a value is a leaf: `owner: [[x]]` can't also hold children.
+    const pn = prev && this.store.node(prev);
+    if (!pn || (pn.key !== null && pn.text.trim())) return false;
+    return this.store.moveTo(id, prev, null);
   }
 
   /** Swap places with the previous/next *displayed* sibling. */
@@ -678,28 +776,6 @@ export class Controller {
     if (delta < 0) return this.store.moveTo(id, p, other);
     const all = this.store.node(p).children;
     return this.store.moveTo(id, p, all[all.indexOf(other) + 1] ?? null);
-  }
-
-  onAttrKeydown(e: KeyboardEvent, input: HTMLInputElement) {
-    if (this.pickerKeydown(e, input)) return;
-    const id = input.dataset.id!;
-    const attrId = input.dataset.attr!;
-    const field = input.dataset.field;
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (field === 'key') this.focus({ key: `value:${id}:${attrId}`, start: 'end' });
-      else this.focus(fText(id));
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      this.focus(fText(id));
-    } else if (e.key === 'Backspace' && field === 'key' && !input.value) {
-      const a = this.store.node(id).attributes.find((x) => x.id === attrId);
-      if (a && !a.value) {
-        e.preventDefault();
-        this.store.removeAttribute(id, attrId);
-        this.commit(fText(id));
-      }
-    }
   }
 
   onDataKeydown(e: KeyboardEvent, ta: HTMLTextAreaElement) {
@@ -716,9 +792,37 @@ export class Controller {
   }
 
   /** Pasting multiple lines into a row creates one sibling per line. */
+  /**
+   * Paste indented text (YAML, a nested list): the rows go after the current
+   * one, keeping their nesting; `key: value` lines become fields.
+   */
+  private pasteTree(e: ClipboardEvent, ta: HTMLTextAreaElement, tree: TextRow[]) {
+    e.preventDefault();
+    const { store } = this;
+    const id = ta.dataset.id!;
+    const add = (parent: string, index: number, r: TextRow): string => {
+      const n = store.addChild(parent, index, r.text);
+      n.key = r.key;
+      r.children.forEach((c) => add(n.id, -1, c));
+      return n.id;
+    };
+    // Into an empty row: it becomes the first pasted row. Under the zoomed item: as its first children.
+    let parent: string;
+    let index: number;
+    if (id === this.zoomId) [parent, index] = [id, 0];
+    else [parent, index] = [store.parentOf(id)!, store.indexOf(id) + 1];
+    const empty = id !== this.zoomId && !ta.value && !store.node(id).children.length;
+    let last = id;
+    tree.forEach((r, i) => (last = add(parent, index + i, r)));
+    if (empty) store.remove(id);
+    this.commit(fText(last));
+  }
+
   onTextPaste(e: ClipboardEvent, ta: HTMLTextAreaElement) {
     const text = e.clipboardData?.getData('text') ?? '';
     if (!text.includes('\n')) return;
+    const tree = parseOutlineText(text);
+    if (tree.some((r) => r.key !== null || r.children.length)) return this.pasteTree(e, ta, tree);
     const lines = text
       .replace(/\r\n?/g, '\n')
       .split('\n')

@@ -2,10 +2,11 @@
  * Search query parsing and matching.
  *
  * Query syntax (terms are ANDed):
- *   word           text, attribute key/value or data content contains word
+ *   word           text, field name or data content contains word
  *   "two words"    phrase
- *   key:value      an attribute named key whose value contains value
- *   key:           has an attribute named key
+ *   key:value      a field named key whose value contains value
+ *                  (key.sub:value looks inside an object field)
+ *   key:           has a field named key
  *   is:done        completed rows (also is:完了)
  *   is:ready       open rows whose dependencies are all done (is:着手可)
  *   is:blocked     open rows waiting on a dependency (is:待ち)
@@ -22,7 +23,7 @@ import { computeSchedule, type Sched } from './schedule';
 
 export interface Term {
   negate: boolean;
-  /** Attribute key for key:value terms; undefined for plain text terms. */
+  /** Field name (or dotted path) for key:value terms; undefined for plain text terms. */
   key?: string;
   value: string;
 }
@@ -76,9 +77,11 @@ const isSchedTerm = (t: Term) => t.key === 'is' && t.value in SCHED;
 export interface MatchContext {
   status: () => DepStatus;
   sched: () => Sched | undefined;
+  /** The texts of the field at a path of names under the node, or null if there is none. */
+  field: (path: string[]) => string[] | null;
 }
 
-const NO_CONTEXT: MatchContext = { status: () => 'none', sched: () => undefined };
+const NO_CONTEXT: MatchContext = { status: () => 'none', sched: () => undefined, field: () => null };
 
 /** The query explicitly asks for completed rows (so they should be shown even if hidden). */
 export const wantsCompleted = (terms: Term[]) => terms.some((t) => isDoneTerm(t) && !t.negate);
@@ -94,11 +97,12 @@ function matchTerm(n: OutlineNode, t: Term, ctx: MatchContext): boolean {
     return !!s && SCHED[t.value](s, n);
   }
   if (t.key !== undefined) {
-    return n.attributes.some((a) => norm(a.key) === t.key && (!t.value || norm(a.value).includes(t.value)));
+    const texts = ctx.field(t.key.split('.'));
+    return !!texts && (!t.value || texts.some((x) => norm(x).includes(t.value)));
   }
   return (
     norm(n.text).includes(t.value) ||
-    n.attributes.some((a) => norm(a.key).includes(t.value) || norm(a.value).includes(t.value)) ||
+    (n.key !== null && norm(n.key).includes(t.value)) ||
     n.data.some((d) => norm(d.content).includes(t.value))
   );
 }
@@ -120,7 +124,14 @@ export function searchTree(
   const schedule = terms.some(isSchedTerm) ? computeSchedule(store, cycles, jpDays) : null;
   const walk = (id: string, ancestors: string[]) => {
     for (const c of store.node(id).children) {
-      const ctx: MatchContext = { status: () => depStatus(store, c, cycles), sched: () => schedule?.byId.get(c) };
+      const ctx: MatchContext = {
+        status: () => depStatus(store, c, cycles),
+        sched: () => schedule?.byId.get(c),
+        field: (path) => {
+          const f = store.fieldAt(c, path);
+          return f ? store.fieldTexts(f.id) : null;
+        },
+      };
       if (matchNode(store.node(c), terms, ctx)) {
         result.matches.add(c);
         result.shown.add(c);

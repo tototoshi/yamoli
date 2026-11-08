@@ -268,17 +268,6 @@ a.ref:hover { text-decoration: underline; }
 a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .placeholder { color: var(--attr-fg); opacity: 0.45; }
 
-.attr-value-view {
-  min-width: 2ch;
-  padding: 1px 0;
-  font-family: var(--mono);
-  font-size: 12px;
-  white-space: pre-wrap;
-  cursor: text;
-  outline: none;
-}
-.attr-value-view a.ref { font-family: var(--font); background: var(--bg); }
-
 .backlinks { margin: 10px 0 4px; font-size: 13px; }
 .backlinks-title { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 .backlinks ul { list-style: none; margin: 0; padding: 0; }
@@ -388,41 +377,33 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .meta { margin: 0 0 6px 26px; }
 .zoom-header .meta { margin-left: 0; }
 
-.attrs { display: flex; flex-wrap: wrap; gap: 4px; margin: 1px 0 4px; }
-.attr {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 2px 0 8px;
-  font-size: 12px;
-  border-radius: 999px;
-  background: var(--attr-bg);
+/* field rows: `name: value` */
+.node.field > .row { font-size: 13px; color: var(--muted); min-height: 22px; }
+.node.field > .row .bullet .dot { width: 4px; height: 4px; opacity: 0.6; }
+.field-name {
+  flex: none;
+  align-self: flex-start;
+  margin-right: 6px;
+  padding-top: 3px;
   color: var(--attr-fg);
-}
-.attr-input {
-  padding: 1px 0;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: inherit;
   font-family: var(--mono);
   font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: text;
+  white-space: nowrap;
 }
-.attr-key { font-weight: 600; }
-.attr-sep { margin: 0 3px; opacity: 0.6; }
-.attr-input::placeholder { color: var(--attr-fg); opacity: 0.45; }
-.attr-del {
-  width: 18px;
-  height: 18px;
-  margin-left: 2px;
+.field-key-input {
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-bottom: 1px solid var(--attr-fg);
   background: none;
   color: inherit;
-  opacity: 0;
-  cursor: pointer;
+  font: inherit;
+  outline: none;
 }
-.attr:hover .attr-del, .attr:focus-within .attr-del { opacity: 0.7; }
+.field-key-input::placeholder { color: var(--attr-fg); opacity: 0.45; }
+.node.field > .row .text { color: var(--fg); }
 
 .data {
   margin: 4px 0 6px;

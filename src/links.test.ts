@@ -7,7 +7,7 @@ function sample() {
   const design = s.addChild(s.rootId, -1, '**設計** レビュー');
   const api = s.addChild(s.rootId, -1, 'API 実装');
   const test = s.addChild(api.id, -1, `テスト ([[${api.id}]] の後)`);
-  s.addAttribute(test.id, 'after', `[[${design.id}]], [[${api.id}]]`);
+  s.addField(test.id, 'after', `[[${design.id}]], [[${api.id}]]`);
   s.addChild(s.rootId, -1, '');
   return { s, design, api, test };
 }

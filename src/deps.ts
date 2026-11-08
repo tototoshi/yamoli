@@ -1,7 +1,9 @@
 /*
- * Dependencies between items, expressed as links in `after` attributes:
+ * Dependencies between items, expressed as links in an `after` field:
  *
  *   after: [[design]], [[api]]   -> this item can start once both are completed
+ *
+ * (or as a list: `after:` with one linked row per dependency)
  *
  * The dependency graph is a DAG unless someone writes a cycle; items on a
  * cycle are reported so the UI can warn about them.
@@ -13,14 +15,13 @@ export const DEP_KEY = 'after';
 
 export type DepStatus = 'none' | 'ready' | 'blocked' | 'cycle';
 
-const isDepKey = (key: string) => key.trim().toLowerCase() === DEP_KEY;
-
 /** Items id depends on (existing, de-duplicated, never itself). */
 export function dependencies(store: OutlineStore, id: string): string[] {
   const out = new Set<string>();
-  for (const a of store.node(id).attributes) {
-    if (!isDepKey(a.key)) continue;
-    for (const ref of refIds(a.value)) if (ref !== id && store.get(ref)) out.add(ref);
+  const f = store.field(id, DEP_KEY);
+  if (!f) return [];
+  for (const text of store.fieldTexts(f.id)) {
+    for (const ref of refIds(text)) if (ref !== id && store.get(ref)) out.add(ref);
   }
   return [...out];
 }

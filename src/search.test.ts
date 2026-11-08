@@ -15,22 +15,26 @@ test('parseQuery handles words, phrases, attributes and negation', () => {
   expect(parseQuery('ＡＢＣ')).toEqual([{ negate: false, key: undefined, value: 'abc' }]);
 });
 
-test('matchNode looks at text, attributes and data', () => {
+test('search looks at text, fields (also nested) and data', () => {
   const s = OutlineStore.create();
   const n = s.addChild(s.rootId, -1, 'Buy Milk');
-  s.addAttribute(n.id, 'Status', '進行中');
+  const status = s.addField(n.id, 'Status', '進行中');
+  const budget = s.addField(n.id, 'budget');
+  s.addField(budget.id, 'amount', '1200');
   s.addData(n.id, 'markdown', '# memo\nsecret word');
-  const m = (q: string) => matchNode(n, parseQuery(q));
-  expect(m('milk')).toBe(true);
-  expect(m('ｍｉｌｋ')).toBe(true);
-  expect(m('secret')).toBe(true);
-  expect(m('進行')).toBe(true);
-  expect(m('status:進行中')).toBe(true);
-  expect(m('status:')).toBe(true);
-  expect(m('status:完了')).toBe(false);
-  expect(m('milk -secret')).toBe(false);
-  expect(m('"buy milk"')).toBe(true);
-  expect(m('"milk buy"')).toBe(false);
+  const found = (q: string) => [...searchTree(s, s.rootId, parseQuery(q)).matches];
+  expect(found('milk')).toEqual([n.id]);
+  expect(found('ｍｉｌｋ')).toEqual([n.id]);
+  expect(found('secret')).toEqual([n.id]);
+  expect(found('進行')).toEqual([status.id]); // the field row itself
+  expect(found('status:進行中')).toEqual([n.id]); // the item that has the field
+  expect(found('status:')).toEqual([n.id]);
+  expect(found('status:完了')).toEqual([]);
+  expect(found('budget.amount:12')).toEqual([n.id]);
+  expect(found('budget:1200')).toEqual([n.id]); // a value anywhere inside the object
+  expect(found('milk -secret')).toEqual([]);
+  expect(found('"buy milk"')).toEqual([n.id]);
+  expect(found('"milk buy"')).toEqual([]);
 });
 
 test('searchTree returns matches with their ancestors, inside collapsed nodes too', () => {
@@ -69,7 +73,7 @@ test('is:ready / is:blocked / is:cycle use dependency status', () => {
   const a = s.addChild(s.rootId, -1, 'a');
   const b = s.addChild(s.rootId, -1, 'b');
   const c = s.addChild(s.rootId, -1, 'c');
-  s.addAttribute(b.id, 'after', `[[${a.id}]]`);
+  s.addField(b.id, 'after', `[[${a.id}]]`);
   const ids = (q: string) => [...searchTree(s, s.rootId, parseQuery(q)).matches];
   expect(ids('is:blocked')).toEqual([b.id]);
   expect(ids('is:ready')).toEqual([]);
@@ -78,7 +82,7 @@ test('is:ready / is:blocked / is:cycle use dependency status', () => {
   expect(ids('is:着手可')).toEqual([b.id]);
   s.setCompleted(b.id, true);
   expect(ids('is:ready')).toEqual([]); // completed rows are neither ready nor blocked
-  s.addAttribute(a.id, 'after', `[[${c.id}]]`);
-  s.addAttribute(c.id, 'after', `[[${a.id}]]`);
+  s.addField(a.id, 'after', `[[${c.id}]]`);
+  s.addField(c.id, 'after', `[[${a.id}]]`);
   expect(ids('is:cycle')).toEqual([a.id, c.id]);
 });

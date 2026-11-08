@@ -8,11 +8,11 @@ function project() {
   const api = s.addChild(s.rootId, -1, 'api');
   const ui = s.addChild(s.rootId, -1, 'ui');
   const release = s.addChild(s.rootId, -1, 'release');
-  s.addAttribute(api.id, 'after', `[[${design.id}]]`);
-  s.addAttribute(ui.id, 'After ', `[[${design.id}]]`); // key match ignores case/spaces
-  s.addAttribute(release.id, 'after', `[[${api.id}]], [[${ui.id}]]`);
-  s.addAttribute(release.id, 'after', `[[${api.id}]] [[missing]] [[${release.id}]]`);
-  s.addAttribute(release.id, 'note', `[[${design.id}]]`); // not a dependency
+  s.addField(api.id, 'after', `[[${design.id}]]`);
+  s.addField(ui.id, 'After ', `[[${design.id}]]`); // key match ignores case/spaces
+  s.addField(release.id, 'after', `[[${api.id}]], [[${ui.id}]]`);
+  s.addField(release.id, 'after', `[[${api.id}]] [[missing]] [[${release.id}]]`);
+  s.addField(release.id, 'note', `[[${design.id}]]`); // not a dependency
   return { s, design, api, ui, release };
 }
 
@@ -41,7 +41,7 @@ test('status follows completion of dependencies', () => {
 test('cycles are detected', () => {
   const { s, design, api, ui, release } = project();
   expect(findCycles(s).size).toBe(0);
-  s.addAttribute(design.id, 'after', `[[${release.id}]]`); // design -> release -> api -> design
+  s.addField(design.id, 'after', `[[${release.id}]]`); // design -> release -> api -> design
   const cycles = findCycles(s);
   expect(cycles).toEqual(new Set([design.id, api.id, ui.id, release.id]));
   expect(depStatus(s, api.id, cycles)).toBe('cycle');

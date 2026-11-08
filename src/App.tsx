@@ -1,6 +1,6 @@
 import type { TargetedEvent, TextareaHTMLAttributes } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { applyFocus, Controller, fText } from './controller';
+import { applyFocus, Controller, fKey, fText } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
 import { highlight, parseInline, type Seg } from './inline';
 import { findBacklinks, nodeLabel } from './links';
@@ -11,7 +11,7 @@ import { GanttView } from './GanttView';
 import { shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
 import { computeSchedule } from './schedule';
-import type { Attribute, DataBlock, OutlineNode } from './model';
+import type { DataBlock, OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { dataFile, flush, saveState } from './storage';
 
@@ -169,6 +169,14 @@ function TopBar() {
         {ctl.prefs.showCompleted ? '完了を隠す' : '完了を表示'}
       </button>
       <button
+        class={'mini' + (ctl.prefs.showFields ? '' : ' on')}
+        title="属性の行（name: value）の表示を切り替え"
+        onMouseDown={keepFocus}
+        onClick={() => ctl.toggleShowFields()}
+      >
+        {ctl.prefs.showFields ? '属性を隠す' : '属性を表示'}
+      </button>
+      <button
         class="mini"
         title="元に戻す (⌘/Ctrl+Z)"
         disabled={!ctl.history.canUndo}
@@ -291,7 +299,8 @@ const SHORTCUTS: [string, string][] = [
   ['⌘/Ctrl+Enter', '完了 / 未完了'],
   ['Alt+→ / ⌘+.', 'ズームイン（●クリックでも可）'],
   ['Alt+← / ⌘+,', 'ズームアウト（ブラウザの戻るでも可）'],
-  ['Alt+A', '属性を追加'],
+  ['name: と入力', '属性の行になる（値の先頭で Backspace で普通の行に戻す）'],
+  ['Alt+A', '属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）'],
   ['Alt+D', 'データを追加'],
   ['[[', '他のアイテムへのリンク（本文・属性の値）'],
   ['Esc / ⌘+Enter', 'データ編集を終了'],
@@ -370,7 +379,9 @@ function NodeItem({ id }: { id: string }) {
   const canToggle = kids.length > 0 && !search;
   const toggle = () => canToggle && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
 
+  const isField = n.key !== null;
   let cls = 'node';
+  if (isField) cls += ' field';
   if (kids.length && !expanded) cls += ' collapsed';
   if (n.completed) cls += ' completed';
   if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
@@ -401,10 +412,15 @@ function NodeItem({ id }: { id: string }) {
         >
           <span class="dot" />
         </a>
+        {isField && <FieldKey node={n} />}
         <NodeText node={n} />
-        <SchedLabel id={id} />
-        <DepBadge id={id} />
-        <Actions id={id} class="row-actions" />
+        {!isField && (
+          <>
+            <SchedLabel id={id} />
+            <DepBadge id={id} />
+            <Actions id={id} class="row-actions" />
+          </>
+        )}
       </div>
       <Meta node={n} />
       {expanded && kids.length > 0 && (
@@ -415,6 +431,46 @@ function NodeItem({ id }: { id: string }) {
         </ul>
       )}
     </li>
+  );
+}
+
+/** The name part of a field row (`name: value`); click to rename. */
+function FieldKey({ node }: { node: OutlineNode }) {
+  const ctl = useCtl();
+  const key = 'fkey:' + node.id;
+  if (ctl.activeField === key) {
+    return (
+      <span class="field-name">
+        <input
+          class="field-key-input"
+          placeholder="key"
+          spellcheck={false}
+          size={Math.max(node.key!.length, 3)}
+          data-id={node.id}
+          data-fk={key}
+          value={node.key!}
+          onInput={(e) => ctl.onKeyInput(node.id, e.currentTarget)}
+          onKeyDown={(e) => !imeActive(e) && ctl.onKeyKeydown(e, e.currentTarget)}
+          onBlur={(e) => {
+            const input = e.currentTarget;
+            setTimeout(() => document.activeElement !== input && ctl.onKeyBlur(node.id), 0);
+          }}
+        />
+        :
+      </span>
+    );
+  }
+  return (
+    <span
+      class="field-name"
+      title="クリックで名前を変更"
+      onMouseDown={(e) => {
+        e.preventDefault();
+        ctl.focus(fKey(node.id));
+      }}
+    >
+      {node.key || 'key'}:
+    </span>
   );
 }
 
@@ -438,11 +494,7 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
       data-id={node.id}
       data-fk={key}
       value={node.text}
-      onInput={(e) => {
-        ctl.store.setText(node.id, e.currentTarget.value);
-        ctl.updatePicker(e.currentTarget, node.id);
-        ctl.commit(undefined, key);
-      }}
+      onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
       onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
       onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
       onBlur={(e) => {
@@ -591,78 +643,13 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
 // ================================================================ attributes & data
 
 function Meta({ node }: { node: OutlineNode }) {
-  if (!node.attributes.length && !node.data.length) return null;
+  if (!node.data.length) return null;
   return (
     <div class="meta">
-      {node.attributes.length > 0 && (
-        <div class="attrs">
-          {node.attributes.map((a) => (
-            <AttributeChip key={a.id} nodeId={node.id} attr={a} />
-          ))}
-        </div>
-      )}
       {node.data.map((d) => (
         <DataBlockView key={d.id} nodeId={node.id} data={d} />
       ))}
     </div>
-  );
-}
-
-function AttributeChip({ nodeId, attr }: { nodeId: string; attr: Attribute }) {
-  const ctl = useCtl();
-  const valueKey = `value:${nodeId}:${attr.id}`;
-  const field = (name: 'key' | 'value') => (
-    <input
-      class={`attr-input attr-${name}`}
-      placeholder={name}
-      spellcheck={false}
-      size={Math.max(attr[name].length, name.length, 2)}
-      data-id={nodeId}
-      data-attr={attr.id}
-      data-field={name}
-      data-fk={`${name}:${nodeId}:${attr.id}`}
-      value={attr[name]}
-      onInput={(e) => {
-        ctl.store.updateAttribute(nodeId, attr.id, { [name]: e.currentTarget.value });
-        if (name === 'value') ctl.updatePicker(e.currentTarget, nodeId);
-        ctl.commit(undefined, `${name}:${attr.id}`);
-      }}
-      onKeyDown={(e) => !imeActive(e) && ctl.onAttrKeydown(e, e.currentTarget)}
-      onBlur={(e) => {
-        if (name !== 'value') return;
-        const input = e.currentTarget;
-        setTimeout(() => document.activeElement !== input && ctl.deactivate(valueKey), 0);
-      }}
-    />
-  );
-  return (
-    <span class="attr">
-      {field('key')}
-      <span class="attr-sep">:</span>
-      {ctl.activeField === valueKey ? (
-        field('value')
-      ) : (
-        <InlineView
-          class="attr-value-view"
-          text={attr.value}
-          placeholder="value"
-          focusable
-          onEdit={(pos) => ctl.focus({ key: valueKey, start: pos })}
-        />
-      )}
-      <button
-        class="attr-del"
-        tabIndex={-1}
-        title="属性を削除"
-        onMouseDown={keepFocus}
-        onClick={() => {
-          ctl.store.removeAttribute(nodeId, attr.id);
-          ctl.commit();
-        }}
-      >
-        ×
-      </button>
-    </span>
   );
 }
 
@@ -912,6 +899,9 @@ function ItemMenuView() {
         <>
           <button role="menuitem" onClick={run(() => ctl.addAttribute(m.id))}>
             属性を追加
+          </button>
+          <button role="menuitem" onClick={run(() => ctl.toggleField(m.id))}>
+            {n.key === null ? '属性の行にする' : '普通の行に戻す'}
           </button>
           <button role="menuitem" onClick={run(() => ctl.addData(m.id))}>
             データを追加

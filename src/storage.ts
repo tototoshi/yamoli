@@ -6,6 +6,8 @@ const PREFS_KEY = 'outliner:prefs';
 
 export interface Prefs {
   showCompleted: boolean;
+  /** Show field rows (`key: value`) in the outline. */
+  showFields: boolean;
   /** Items last viewed as a Gantt chart. */
   ganttItems: string[];
   /** Index into the Gantt chart's day widths. */
@@ -13,7 +15,7 @@ export interface Prefs {
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true, ganttItems: [], ganttScale: 2 };
+  const defaults: Prefs = { showCompleted: true, showFields: true, ganttItems: [], ganttScale: 2 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
   } catch {
@@ -234,8 +236,8 @@ function seed(): OutlineStore {
   s.addChild(welcome.id, -1, 'Alt+A で属性、Alt+D でデータを追加');
 
   const proj = s.addChild(r, -1, 'プロジェクト A');
-  s.addAttribute(proj.id, 'status', '進行中');
-  s.addAttribute(proj.id, 'due', '2026-12-01');
+  s.addField(proj.id, 'status', '進行中');
+  s.addField(proj.id, 'due', '2026-12-01');
   const spec = s.addChild(proj.id, -1, '仕様');
   s.addData(
     spec.id,

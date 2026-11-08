@@ -1,12 +1,20 @@
 /*
  * Outline data model. A flat map of nodes; each node lists its children by id.
+ *
+ * The outline doubles as YAML: a row with a key (`key: value`) is a field of
+ * its parent, its text being the value. A field without a value holds an
+ * object (field children) or a list (plain children):
+ *
+ *   ・project                 project:
+ *     ・start: 2026-11-09       start: 2026-11-09
+ *     ・budget:                 budget:
+ *       ・amount: 1200000         amount: 1200000
+ *     ・links:                  links:
+ *       ・https://…               - https://…
+ *     ・design                (a sub-item, not a field)
+ *
+ * Rows inside a field are data; the rest are items (tasks, notes, …).
  */
-
-export interface Attribute {
-  id: string;
-  key: string;
-  value: string;
-}
 
 export interface DataBlock {
   id: string;
@@ -21,7 +29,8 @@ export interface OutlineNode {
   collapsed: boolean;
   completed: boolean;
   children: string[];
-  attributes: Attribute[];
+  /** Set on field rows: the field's name. null on ordinary rows. */
+  key: string | null;
   data: DataBlock[];
 }
 
@@ -36,7 +45,7 @@ export function uid(): string {
 }
 
 function makeNode(text = ''): OutlineNode {
-  return { id: uid(), text, collapsed: false, completed: false, children: [], attributes: [], data: [] };
+  return { id: uid(), text, collapsed: false, completed: false, children: [], key: null, data: [] };
 }
 
 function normalizeNode(id: string, raw: any): OutlineNode {
@@ -47,11 +56,7 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     collapsed: !!n.collapsed,
     completed: !!n.completed,
     children: Array.isArray(n.children) ? n.children.slice() : [],
-    attributes: (Array.isArray(n.attributes) ? n.attributes : []).map((a: Partial<Attribute>) => ({
-      id: a.id || uid(),
-      key: String(a.key ?? ''),
-      value: String(a.value ?? ''),
-    })),
+    key: typeof n.key === 'string' ? n.key : null,
     data: (Array.isArray(n.data) ? n.data : []).map((d: Partial<DataBlock>) => ({
       id: d.id || uid(),
       format: String(d.format || 'text'),
@@ -84,6 +89,18 @@ export class OutlineStore {
     }
     const nodes: Record<string, OutlineNode> = {};
     for (const [id, raw] of Object.entries(json.nodes)) nodes[id] = normalizeNode(id, raw);
+    // Earlier versions kept attributes on the node: they become field rows
+    // at the top of its children.
+    for (const [id, raw] of Object.entries<any>(json.nodes)) {
+      if (!Array.isArray(raw?.attributes) || !raw.attributes.length) continue;
+      const fields = raw.attributes.map((a: any) => {
+        const f = makeNode(String(a?.value ?? ''));
+        f.key = String(a?.key ?? '').trim();
+        nodes[f.id] = f;
+        return f.id;
+      });
+      nodes[id].children.unshift(...fields);
+    }
     // Drop dangling child references.
     for (const n of Object.values(nodes)) n.children = n.children.filter((c) => nodes[c] && c !== n.id);
     return new OutlineStore({ rootId: json.rootId, nodes });
@@ -211,7 +228,6 @@ export class OutlineStore {
         id: to,
         text: relink(n.text),
         children: n.children.map((c) => ids.get(c)!),
-        attributes: n.attributes.map((a) => ({ id: uid(), key: a.key, value: relink(a.value) })),
         data: n.data.map((d) => ({ ...d, id: uid() })),
       };
       this.parent[to] = from === id ? this.parent[id] : ids.get(this.parent[from])!;
@@ -296,41 +312,85 @@ export class OutlineStore {
     this.node(id).completed = completed;
   }
 
-  /** Append src's text, attributes, data and children to dst, then delete src. */
+  /** Append src's text, data and children to dst, then delete src. */
   mergeInto(srcId: string, dstId: string) {
     const src = this.node(srcId);
     const dst = this.node(dstId);
     dst.text += src.text;
-    dst.attributes.push(...src.attributes);
     dst.data.push(...src.data);
     for (const c of src.children.slice()) {
       this.detach(c);
       this.insert(c, dstId, -1);
     }
-    src.attributes = [];
     src.data = [];
     this.remove(srcId);
   }
 
-  // ---------- attributes
+  // ---------- fields
 
-  addAttribute(id: string, key = '', value = ''): Attribute {
-    const a = { id: uid(), key, value };
-    this.node(id).attributes.push(a);
-    return a;
+  isField(id: string): boolean {
+    return this.node(id).key !== null;
   }
 
-  updateAttribute(id: string, attrId: string, patch: Partial<Omit<Attribute, 'id'>>) {
-    const a = this.node(id).attributes.find((x) => x.id === attrId);
-    if (a) Object.assign(a, patch);
-    return a;
+  /** Inside a field (or one itself): part of a value rather than an item. */
+  isData(id: string): boolean {
+    for (let n: string | undefined = id; n; n = this.parent[n]) if (this.node(n).key !== null) return true;
+    return false;
   }
 
-  removeAttribute(id: string, attrId: string): boolean {
-    const list = this.node(id).attributes;
-    const i = list.findIndex((x) => x.id === attrId);
-    if (i >= 0) list.splice(i, 1);
-    return i >= 0;
+  /** The item a data row belongs to (id itself for items). */
+  owner(id: string): string {
+    let n = id;
+    while (this.isData(n) && this.parent[n]) n = this.parent[n];
+    return n;
+  }
+
+  /** Children that are items rather than fields. */
+  items(id: string): string[] {
+    return this.node(id).children.filter((c) => this.node(c).key === null);
+  }
+
+  /** The field named key directly under id (names compare trimmed, case-insensitively). */
+  field(id: string, key: string): OutlineNode | undefined {
+    const want = key.trim().toLowerCase();
+    for (const c of this.node(id).children) {
+      const k = this.node(c).key;
+      if (k !== null && k.trim().toLowerCase() === want) return this.node(c);
+    }
+    return undefined;
+  }
+
+  /** The field at a path of names, e.g. ['budget', 'amount']. */
+  fieldAt(id: string, path: string[]): OutlineNode | undefined {
+    let n: OutlineNode | undefined = this.node(id);
+    for (const key of path) n = n && this.field(n.id, key);
+    return n;
+  }
+
+  /** A field's trimmed value; undefined when missing or empty. */
+  fieldValue(id: string, key: string): string | undefined {
+    return this.field(id, key)?.text.trim() || undefined;
+  }
+
+  /** The text of a field and everything inside it (for searching and links). */
+  fieldTexts(id: string): string[] {
+    const n = this.node(id);
+    return [n.text, ...n.children.flatMap((c) => [this.node(c).key ?? '', ...this.fieldTexts(c)])];
+  }
+
+  /** Add a field to id, after its existing fields. */
+  addField(id: string, key: string, value = ''): OutlineNode {
+    const kids = this.node(id).children;
+    let at = 0;
+    kids.forEach((c, i) => this.node(c).key !== null && (at = i + 1));
+    const f = this.addChild(id, at, value);
+    f.key = key;
+    return f;
+  }
+
+  /** Turn a row into a field (key) or back into an ordinary row (null). */
+  setKey(id: string, key: string | null) {
+    this.node(id).key = key;
   }
 
   // ---------- data

@@ -24,7 +24,7 @@ export function GanttView() {
   const [scrollLeft, setScrollLeft] = useState(0);
   // The zoomed item itself heads the chart (its span, or its own bar).
   const isRoot = zoomId === store.rootId;
-  const rows = isRoot ? ctl.visibleRows() : [zoomId, ...ctl.visibleRows()];
+  const rows = (isRoot ? ctl.visibleRows() : [zoomId, ...ctl.visibleRows()]).filter((id) => !store.isData(id));
   const scale = Math.min(Math.max(ctl.prefs.ganttScale, 0), GANTT_SCALES.length - 1);
   const dw = GANTT_SCALES[scale];
   const now = today();
@@ -102,7 +102,7 @@ export function GanttView() {
           {rows.map((id) => {
             const n = store.node(id);
             const depth = store.path(id).length - baseDepth;
-            const kids = ctl.shownChildren(id);
+            const kids = ctl.shownChildren(id).filter((c) => !store.isData(c));
             const canToggle = id !== zoomId && kids.length > 0 && !ctl.search;
             let cls = 'gantt-name';
             if (hover === id) cls += ' hover';

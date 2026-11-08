@@ -1,7 +1,7 @@
 /*
- * Links between items. A link is written `[[nodeId]]` in row text or an
- * attribute value; it is displayed with the target's current text, so
- * renaming the target never breaks it.
+ * Links between items. A link is written `[[nodeId]]` in row text (including
+ * field values); it is displayed with the target's current text, so renaming
+ * the target never breaks it.
  */
 import type { OutlineStore } from './model';
 
@@ -14,7 +14,7 @@ export function refIds(text: string): string[] {
 
 export interface Backlink {
   nodeId: string;
-  /** Attribute key the link appears in, or null when it is in the row text. */
+  /** Field the link appears in (on nodeId), or null when it is in the row text. */
   via: string | null;
 }
 
@@ -27,13 +27,21 @@ function* walk(store: OutlineStore, id = store.rootId): Generator<string> {
 /** Nodes that link to id, in outline order. */
 export function findBacklinks(store: OutlineStore, id: string): Backlink[] {
   const out: Backlink[] = [];
+  const seen = new Set<string>();
   for (const nid of walk(store)) {
-    if (nid === id) continue;
-    const n = store.node(nid);
-    if (refIds(n.text).includes(id)) out.push({ nodeId: nid, via: null });
-    for (const a of n.attributes) {
-      if (refIds(a.value).includes(id)) out.push({ nodeId: nid, via: a.key });
+    if (nid === id || !refIds(store.node(nid).text).includes(id)) continue;
+    // A link inside a field counts for the item that owns the field.
+    const owner = store.owner(nid);
+    if (owner === id) continue;
+    let via: string | null = null;
+    if (owner !== nid) {
+      let top = nid;
+      while (store.parentOf(top) !== owner) top = store.parentOf(top)!;
+      via = store.node(top).key;
     }
+    const k = owner + '\0' + via;
+    if (!seen.has(k)) out.push({ nodeId: owner, via });
+    seen.add(k);
   }
   return out;
 }
@@ -51,6 +59,7 @@ export function nodeLabel(store: OutlineStore, id: string, depth = 0): string {
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1')
     .replace(/\*\*([^*]+)\*\*|~~([^~]+)~~|`([^`]+)`|\*([^*\s][^*]*)\*/g, (_, a, b, c, d) => a ?? b ?? c ?? d)
     .trim();
+  if (n.key !== null) return `${n.key}: ${text}`;
   return text || '無題';
 }
 
@@ -63,7 +72,7 @@ export function linkCandidates(store: OutlineStore, query: string, excludeId: st
   let order = 0;
   for (const id of walk(store)) {
     order++;
-    if (id === store.rootId || id === excludeId || !store.node(id).text.trim()) continue;
+    if (id === store.rootId || id === excludeId || !store.node(id).text.trim() || store.isData(id)) continue;
     const label = norm(nodeLabel(store, id));
     const at = q ? label.indexOf(q) : 0;
     if (at < 0) continue;
