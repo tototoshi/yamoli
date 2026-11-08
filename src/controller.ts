@@ -49,6 +49,7 @@ export function applyFocus(f: Focus | null | undefined) {
 }
 
 const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** State of the `[[` link picker attached to one editable field. */
 /** The menu opened by right-clicking an item's bullet. */
@@ -712,6 +713,24 @@ export class Controller {
         return this.commit(fText(prev, pos));
       }
       return;
+    }
+    // Delete (or macOS Ctrl+D) at the end pulls the next row up into this one.
+    const forwardDelete =
+      e.key === 'Delete' || (IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.code === 'KeyD');
+    if (forwardDelete && start === ta.value.length && end === start && !isTitle && n.key === null) {
+      e.preventDefault();
+      const next = vis[idx + 1];
+      if (!next || store.isData(next)) return;
+      if (!ta.value && !n.children.length && !n.data.length) {
+        // An empty row just goes away, so the next row keeps its id (and links to it).
+        store.remove(id);
+        return this.commit(fText(next, 0));
+      }
+      const m = store.node(next);
+      const adopt = !n.children.length && store.parentOf(next) === store.parentOf(id); // its children become ours
+      if (m.data.length || (m.children.length && !adopt)) return;
+      store.mergeInto(next, id);
+      return this.commit(fText(id, start));
     }
 
     // ---- move / collapse
