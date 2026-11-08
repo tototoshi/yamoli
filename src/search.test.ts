@@ -15,24 +15,25 @@ test('parseQuery handles words, phrases, attributes and negation', () => {
   expect(parseQuery('ＡＢＣ')).toEqual([{ negate: false, key: undefined, value: 'abc' }]);
 });
 
-test('search looks at text, fields (also nested) and data', () => {
+test('search looks at text and fields (also nested, and blocks)', () => {
   const s = OutlineStore.create();
   const n = s.addChild(s.rootId, -1, 'Buy Milk');
   const status = s.addField(n.id, 'Status', '進行中');
   const budget = s.addField(n.id, 'budget');
   s.addField(budget.id, 'amount', '1200');
-  s.addData(n.id, 'markdown', '# memo\nsecret word');
+  const memo = s.addBlock(n.id, 'memo', 'markdown', '# memo\nsecret word');
   const found = (q: string) => [...searchTree(s, s.rootId, parseQuery(q)).matches];
   expect(found('milk')).toEqual([n.id]);
   expect(found('ｍｉｌｋ')).toEqual([n.id]);
-  expect(found('secret')).toEqual([n.id]);
+  expect(found('secret')).toEqual([memo.id]); // like any field value, the block row itself
+  expect(found('memo:secret')).toEqual([n.id]);
   expect(found('進行')).toEqual([status.id]); // the field row itself
   expect(found('status:進行中')).toEqual([n.id]); // the item that has the field
   expect(found('status:')).toEqual([n.id]);
   expect(found('status:完了')).toEqual([]);
   expect(found('budget.amount:12')).toEqual([n.id]);
   expect(found('budget:1200')).toEqual([n.id]); // a value anywhere inside the object
-  expect(found('milk -secret')).toEqual([]);
+  expect(found('milk -memo:secret')).toEqual([]);
   expect(found('"buy milk"')).toEqual([n.id]);
   expect(found('"milk buy"')).toEqual([]);
 });

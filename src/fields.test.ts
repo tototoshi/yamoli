@@ -39,3 +39,49 @@ test('YAML-ish text becomes a tree of rows and fields', () => {
 test('a plain nested list keeps its shape', () => {
   expect(show(parseOutlineText('- a\n  - b\n- c'))).toEqual([['a', [['b']]], ['c']]);
 });
+
+test('block scalars become block fields, tagged with their format', () => {
+  const rows = parseOutlineText(
+    [
+      'note: !markdown |',
+      '  # 見出し',
+      '',
+      '  本文: コロンも中身',
+      '    インデントは保つ',
+      'plain: |-',
+      '  a',
+      '  b',
+      'items:',
+      '  - name: x',
+      '    body: !code |',
+      '      let a = 1',
+      '    after: y',
+      'short: !csv a,b',
+      'next: 1',
+    ].join('\n')
+  );
+  const strip = (r: TextRow): unknown => ({ key: r.key, text: r.text, format: r.format, children: r.children.map(strip) });
+  expect(rows.map(strip)).toEqual([
+    { key: 'note', text: '# 見出し\n\n本文: コロンも中身\n  インデントは保つ', format: 'markdown', children: [] },
+    { key: 'plain', text: 'a\nb', format: 'text', children: [] },
+    {
+      key: 'items',
+      text: '',
+      format: undefined,
+      children: [
+        {
+          key: null,
+          text: '',
+          format: undefined,
+          children: [
+            { key: 'name', text: 'x', format: undefined, children: [] },
+            { key: 'body', text: 'let a = 1', format: 'code', children: [] },
+            { key: 'after', text: 'y', format: undefined, children: [] },
+          ],
+        },
+      ],
+    },
+    { key: 'short', text: 'a,b', format: 'csv', children: [] },
+    { key: 'next', text: '1', format: undefined, children: [] },
+  ]);
+});

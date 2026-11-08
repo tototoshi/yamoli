@@ -2,7 +2,7 @@
  * Search query parsing and matching.
  *
  * Query syntax (terms are ANDed):
- *   word           text, field name or data content contains word
+ *   word           text or field name contains word (block contents too)
  *   "two words"    phrase
  *   key:value      a field named key whose value contains value
  *                  (key.sub:value looks inside an object field)
@@ -102,8 +102,7 @@ function matchTerm(n: OutlineNode, t: Term, ctx: MatchContext): boolean {
   }
   return (
     norm(n.text).includes(t.value) ||
-    (n.key !== null && norm(n.key).includes(t.value)) ||
-    n.data.some((d) => norm(d.content).includes(t.value))
+    (n.key !== null && norm(n.key).includes(t.value))
   );
 }
 

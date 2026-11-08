@@ -14,14 +14,10 @@
  *     ・design                (a sub-item, not a field)
  *
  * Rows inside a field are data; the rest are items (tasks, notes, …).
+ *
+ * A field with a format is a block: its value is multi-line text shown as
+ * that format (Markdown, CSV, code, …), YAML's `key: !markdown |`.
  */
-
-export interface DataBlock {
-  id: string;
-  format: string;
-  content: string;
-  collapsed: boolean;
-}
 
 export interface OutlineNode {
   id: string;
@@ -31,7 +27,8 @@ export interface OutlineNode {
   children: string[];
   /** Set on field rows: the field's name. null on ordinary rows. */
   key: string | null;
-  data: DataBlock[];
+  /** Set on block fields: how the multi-line value is shown. */
+  format: string | null;
 }
 
 export interface OutlineJSON {
@@ -45,7 +42,7 @@ export function uid(): string {
 }
 
 function makeNode(text = ''): OutlineNode {
-  return { id: uid(), text, collapsed: false, completed: false, children: [], key: null, data: [] };
+  return { id: uid(), text, collapsed: false, completed: false, children: [], key: null, format: null };
 }
 
 function normalizeNode(id: string, raw: any): OutlineNode {
@@ -57,12 +54,7 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     completed: !!n.completed,
     children: Array.isArray(n.children) ? n.children.slice() : [],
     key: typeof n.key === 'string' ? n.key : null,
-    data: (Array.isArray(n.data) ? n.data : []).map((d: Partial<DataBlock>) => ({
-      id: d.id || uid(),
-      format: String(d.format || 'text'),
-      content: String(d.content ?? ''),
-      collapsed: !!d.collapsed,
-    })),
+    format: typeof n.key === 'string' && typeof n.format === 'string' ? n.format : null,
   };
 }
 
@@ -103,7 +95,26 @@ export class OutlineStore {
     }
     // Drop dangling child references.
     for (const n of Object.values(nodes)) n.children = n.children.filter((c) => nodes[c] && c !== n.id);
-    return new OutlineStore({ rootId: json.rootId, nodes });
+    const store = new OutlineStore({ rootId: json.rootId, nodes });
+    // Earlier versions had data blocks beside the fields: they become blocks
+    // named after their format, and JSON becomes nested fields.
+    for (const [id, raw] of Object.entries<any>(json.nodes)) {
+      if (!nodes[id] || !Array.isArray(raw?.data)) continue;
+      for (const d of raw.data) {
+        const format = String(d?.format || 'text');
+        const content = String(d?.content ?? '');
+        const key = store.freeKey(id, format);
+        let parsed: unknown;
+        try {
+          parsed = format === 'json' ? JSON.parse(content) : undefined;
+        } catch {
+          // not JSON after all: kept as code below
+        }
+        if (parsed !== undefined) addValue(store, store.addField(id, key).id, parsed);
+        else store.addBlock(id, key, format === 'json' ? 'code' : format, content).collapsed = !!d?.collapsed;
+      }
+    }
+    return store;
   }
 
   toJSON(): OutlineJSON {
@@ -228,7 +239,6 @@ export class OutlineStore {
         id: to,
         text: relink(n.text),
         children: n.children.map((c) => ids.get(c)!),
-        data: n.data.map((d) => ({ ...d, id: uid() })),
       };
       this.parent[to] = from === id ? this.parent[id] : ids.get(this.parent[from])!;
     }
@@ -302,7 +312,7 @@ export class OutlineStore {
 
   setCollapsed(id: string, collapsed: boolean): boolean {
     const n = this.node(id);
-    if (!n.children.length && collapsed) return false;
+    if (!n.children.length && n.format === null && collapsed) return false; // a block folds its text
     if (n.collapsed === collapsed) return false;
     n.collapsed = collapsed;
     return true;
@@ -317,12 +327,10 @@ export class OutlineStore {
     const src = this.node(srcId);
     const dst = this.node(dstId);
     dst.text += src.text;
-    dst.data.push(...src.data);
     for (const c of src.children.slice()) {
       this.detach(c);
       this.insert(c, dstId, -1);
     }
-    src.data = [];
     this.remove(srcId);
   }
 
@@ -393,28 +401,33 @@ export class OutlineStore {
     this.node(id).key = key;
   }
 
-  // ---------- data
-
-  addData(id: string, format = 'markdown', content = ''): DataBlock {
-    const d = { id: uid(), format, content, collapsed: false };
-    this.node(id).data.push(d);
-    return d;
+  /** Add a block (a multi-line field) to id, after its existing fields. */
+  addBlock(id: string, key: string, format = 'markdown', content = ''): OutlineNode {
+    const f = this.addField(id, key, content);
+    f.format = format;
+    return f;
   }
 
-  getData(id: string, dataId: string): DataBlock | undefined {
-    return this.nodes[id]?.data.find((x) => x.id === dataId);
+  /** A field name like key that id doesn't use yet: note, note2, … */
+  freeKey(id: string, key: string): string {
+    let k = key;
+    for (let i = 2; this.field(id, k); i++) k = key + i;
+    return k;
   }
 
-  updateData(id: string, dataId: string, patch: Partial<Omit<DataBlock, 'id'>>) {
-    const d = this.getData(id, dataId);
-    if (d) Object.assign(d, patch);
-    return d;
+  /** Make a field a block of the given format, or a plain field (null). */
+  setFormat(id: string, format: string | null) {
+    this.node(id).format = format;
   }
+}
 
-  removeData(id: string, dataId: string): boolean {
-    const list = this.node(id).data;
-    const i = list.findIndex((x) => x.id === dataId);
-    if (i >= 0) list.splice(i, 1);
-    return i >= 0;
+/** Write a JSON value into the field or row id as YAML-style rows. */
+function addValue(store: OutlineStore, id: string, v: unknown) {
+  if (Array.isArray(v)) {
+    for (const x of v) addValue(store, store.addChild(id, -1).id, x);
+  } else if (v && typeof v === 'object') {
+    for (const [k, x] of Object.entries(v)) addValue(store, store.addField(id, k).id, x);
+  } else {
+    store.setText(id, v === null ? '' : String(v));
   }
 }

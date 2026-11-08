@@ -251,21 +251,27 @@ function seed(): OutlineStore {
   const welcome = s.addChild(r, -1, 'Yamoli へようこそ');
   s.addChild(welcome.id, -1, 'Enter で新しい行、Tab / Shift+Tab でインデント');
   s.addChild(welcome.id, -1, '左の ● をクリックするとその項目にズームイン（パンくずでズームアウト）');
-  s.addChild(welcome.id, -1, 'Alt+A で属性、Alt+D でデータを追加');
+  s.addChild(welcome.id, -1, 'Alt+A で属性、Alt+D でブロック（Markdown などの複数行）を追加');
 
   const proj = s.addChild(r, -1, 'プロジェクト A');
   s.addField(proj.id, 'status', '進行中');
   s.addField(proj.id, 'due', '2026-12-01');
   const spec = s.addChild(proj.id, -1, '仕様');
-  s.addData(
+  s.addBlock(
     spec.id,
+    'body',
     'markdown',
-    '## 概要\n\nアウトラインの各行は **属性** と **データ** を持てます。\n\n- 属性: key / value のペア\n- データ: フォーマット付きの本文\n  - Markdown, JSON, CSV, Code, Text\n\n| 項目 | 状態 |\n| --- | :---: |\n| zoom | 済 |\n| attribute | 済 |'
+    '## 概要\n\nアウトラインの各行は **属性** を持てます。\n\n- 1行の値: `status: 進行中`\n- 入れ子: 属性の下に属性（オブジェクト）や行（リスト）\n- ブロック: フォーマット付きの複数行\n  - Markdown, CSV, Code, Text\n\n| 項目 | 状態 |\n| --- | :---: |\n| zoom | 済 |\n| attribute | 済 |'
   );
+  // Settings are plain nested fields: an object and a list.
   const conf = s.addChild(proj.id, -1, '設定');
-  s.addData(conf.id, 'json', '{"theme":"auto","fontSize":15,"tags":["outline","notes"],"beta":true}');
+  s.addField(conf.id, 'theme', 'auto');
+  s.addField(conf.id, 'fontSize', '15');
+  const tags = s.addField(conf.id, 'tags');
+  ['outline', 'notes'].forEach((t) => s.addChild(tags.id, -1, t));
+  s.addField(conf.id, 'beta', 'true');
   const sales = s.addChild(proj.id, -1, '売上');
-  s.addData(sales.id, 'csv', 'month,amount\n2026-09,120\n2026-10,135\n2026-11,150');
+  s.addBlock(sales.id, 'table', 'csv', 'month,amount\n2026-09,120\n2026-10,135\n2026-11,150');
 
   const sample = addScheduleSample(s, r);
   s.setCollapsed(addGuideSlides(s, r, sample), true);

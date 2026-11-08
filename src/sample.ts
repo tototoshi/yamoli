@@ -12,14 +12,15 @@ export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = 
   const proj = s.addChild(parentId, -1, 'サンプル: Web サイト リニューアル');
   s.addField(proj.id, 'start', formatDate(monday));
   s.addField(proj.id, 'holidays', 'jp');
-  // Notes go in a data block, so every row stays a task.
-  s.addData(
+  // Notes go in a block, so every row stays a task.
+  s.addBlock(
     proj.id,
+    'note',
     'markdown',
     '日付は `duration` / `start` / `after` / `due` 属性から自動で計算されます。\n\n' +
       '- ★ はクリティカルパス（遅れると全体が遅れる作業）\n' +
       '- 「ガント」に切り替えると線表で見られます\n' +
-      '- 説明やメモは行ではなくデータ（Alt+D）に書くと、作業と混ざりません'
+      '- 説明やメモは行ではなくブロック（Alt+D）に書くと、作業と混ざりません'
   );
 
   const add = (parent: string, text: string, attrs: Record<string, string> = {}) => {
@@ -99,7 +100,7 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
     'YAML の貼り付けもそのまま',
     '属性で日程・スライドなどの振る舞いが変わる',
   ]);
-  s.addData(yaml, 'code', 'start: 2026-11-09\nduration: 3d\nbudget:\n  amount: 1200000\n  currency: JPY\nlinks:\n  - https://example.com');
+  s.addBlock(yaml, 'example', 'code', 'start: 2026-11-09\nduration: 3d\nbudget:\n  amount: 1200000\n  currency: JPY\nlinks:\n  - https://example.com');
 
   slide('リンクと依存', {}, [
     ['`[[` で他の項目へのリンク', ['リンク先には「被リンク」として表示される']],

@@ -198,7 +198,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .node.drag-source { opacity: 0.35; }
 .node.completed > .row .text { text-decoration: line-through; color: var(--muted); }
 .node.completed > .row .bullet .dot { background: var(--muted); }
-.node.completed > .meta, .node.completed > ul.children { opacity: 0.55; }
+.node.completed > .block, .node.completed > ul.children { opacity: 0.55; }
 .mini.on { color: var(--accent); border-color: var(--accent); }
 .drop-indicator {
   position: fixed;
@@ -375,8 +375,6 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 /* ---------------------------------------------------------------- meta */
 
-.meta { margin: 0 0 6px 26px; }
-.zoom-header .meta { margin-left: 0; }
 
 /* field rows: `name: value` */
 .node.field > .row { font-size: 13px; color: var(--muted); min-height: 22px; }
@@ -406,32 +404,16 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .field-key-input::placeholder { color: var(--attr-fg); opacity: 0.45; }
 .node.field > .row .text { color: var(--fg); }
 
-.data {
-  margin: 4px 0 6px;
+.block {
+  margin: 2px 0 6px 28px;
   border: 1px solid var(--faint);
   border-radius: 8px;
   background: var(--data-bg);
   overflow: hidden;
 }
-.data.editing { border-color: var(--accent); }
-.data-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  font-size: 12px;
-  color: var(--muted);
-  border-bottom: 1px solid var(--faint);
-}
-.data-fold {
-  width: 16px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-}
-.data-format {
+.block.editing { border-color: var(--accent); }
+.block-head { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--muted); }
+.block-format {
   padding: 0 2px;
   font-size: 12px;
   border: 0;
@@ -440,12 +422,11 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   color: var(--muted);
   cursor: pointer;
 }
-.data-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.data-head .mini { opacity: 0; }
-.data:hover .data-head .mini, .data.editing .data-head .mini { opacity: 1; }
+.block-format:hover { background: var(--hover); }
+.block-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 .data-view { padding: 8px 12px; cursor: text; overflow-x: auto; }
-.data-editor {
+.block-editor {
   display: block;
   width: 100%;
   min-height: 4.8em;

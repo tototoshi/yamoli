@@ -13,7 +13,7 @@ import { SegView } from './InlineText';
 import { shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
 import { computeSchedule } from './schedule';
-import type { DataBlock, OutlineNode } from './model';
+import type { OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { dataFile, flush, saveState } from './storage';
 
@@ -305,9 +305,9 @@ const SHORTCUTS: [string, string][] = [
   ['Alt+← / ⌘+,', 'ズームアウト（ブラウザの戻るでも可）'],
   ['name: と入力', '属性の行になる（値の先頭で Backspace で普通の行に戻す）'],
   ['Alt+A', '属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）'],
-  ['Alt+D', 'データを追加'],
+  ['Alt+D', 'ブロック（Markdown・CSV・コードなど複数行の値）を追加'],
   ['[[', '他のアイテムへのリンク（本文・属性の値）'],
-  ['Esc / ⌘+Enter', 'データ編集を終了'],
+  ['Esc / ⌘+Enter', 'ブロックの編集を終了'],
   ['Delete / Ctrl+D（行末）', '次の行を結合（空の行なら行を削除）'],
   ['⌘/Ctrl+Shift+Backspace', '行を削除（子も含む）'],
   ['● をドラッグ', '行を移動（Esc でキャンセル）'],
@@ -375,7 +375,6 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
   return (
     <section class="zoom-header">
       {isRoot ? <h1 class="title-static">Home</h1> : <NodeText node={node} title />}
-      <Meta node={node} />
       <Actions id={node.id} class="header-actions" />
       {!isRoot && <SchedLabel id={node.id} header />}
       {!isRoot && <DependencyPanel id={node.id} />}
@@ -390,13 +389,15 @@ function NodeItem({ id }: { id: string }) {
   const n = ctl.store.node(id);
   const kids = ctl.shownChildren(id);
   const expanded = ctl.isExpanded(id);
-  const canToggle = kids.length > 0 && !search;
+  const isField = n.key !== null;
+  const isBlock = n.format !== null;
+  const canToggle = (kids.length > 0 || isBlock) && !search;
   const toggle = () => canToggle && ctl.store.setCollapsed(id, !n.collapsed) && ctl.commit();
 
-  const isField = n.key !== null;
   let cls = 'node';
   if (isField) cls += ' field';
-  if (kids.length && !expanded) cls += ' collapsed';
+  if (isBlock) cls += ' block-field';
+  if ((kids.length && !expanded) || (isBlock && n.collapsed)) cls += ' collapsed';
   if (n.completed) cls += ' completed';
   if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
 
@@ -427,7 +428,7 @@ function NodeItem({ id }: { id: string }) {
           <span class="dot" />
         </a>
         {isField && <FieldKey node={n} />}
-        <NodeText node={n} />
+        {isBlock ? <BlockHead node={n} /> : <NodeText node={n} />}
         {!isField && (
           <>
             <SchedLabel id={id} />
@@ -436,7 +437,7 @@ function NodeItem({ id }: { id: string }) {
           </>
         )}
       </div>
-      <Meta node={n} />
+      {isBlock && <BlockBody node={n} />}
       {expanded && kids.length > 0 && (
         <ul class="children">
           {kids.map((c) => (
@@ -595,8 +596,13 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
       <button class="mini" title="属性を追加 (Alt+A)" onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
         + 属性
       </button>
-      <button class="mini" title="データを追加 (Alt+D)" onMouseDown={keepFocus} onClick={() => ctl.addData(id)}>
-        + データ
+      <button
+        class="mini"
+        title="ブロック（Markdown・CSV・コードなど複数行の値）を追加 (Alt+D)"
+        onMouseDown={keepFocus}
+        onClick={() => ctl.addBlock(id)}
+      >
+        + ブロック
       </button>
       {id !== ctl.store.rootId && (
         <button
@@ -612,111 +618,66 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
   );
 }
 
-// ================================================================ attributes & data
+// ================================================================ blocks
 
-function Meta({ node }: { node: OutlineNode }) {
-  if (!node.data.length) return null;
+/** A block's format, and its first line while folded. */
+function BlockHead({ node }: { node: OutlineNode }) {
+  const ctl = useCtl();
   return (
-    <div class="meta">
-      {node.data.map((d) => (
-        <DataBlockView key={d.id} nodeId={node.id} data={d} />
-      ))}
-    </div>
+    <span class="block-head">
+      <select
+        class="block-format"
+        title="フォーマット"
+        value={node.format!}
+        onChange={(e) => {
+          ctl.store.setFormat(node.id, e.currentTarget.value);
+          ctl.commit();
+        }}
+      >
+        {listFormats().map((f) => (
+          <option key={f.name} value={f.name}>
+            {f.label}
+          </option>
+        ))}
+        {!hasFormat(node.format!) && <option value={node.format!}>{node.format} (未定義)</option>}
+      </select>
+      {node.collapsed && <span class="block-preview">{node.text.split('\n')[0].slice(0, 80)}</span>}
+    </span>
   );
 }
 
-function DataBlockView({ nodeId, data: d }: { nodeId: string; data: DataBlock }) {
+/** A block's text: rendered in its format, or the editor once clicked. */
+function BlockBody({ node }: { node: OutlineNode }) {
   const ctl = useCtl();
-  const editing = ctl.editing.has(d.id);
-  const html = useMemo(() => renderFormat(d.format, d.content), [d.format, d.content]);
-
-  // Leaving the editor (to anywhere outside this block) switches back to the rendered view.
-  const onBlur = () =>
-    setTimeout(() => {
-      const a = document.activeElement;
-      if (a?.closest(`.data[data-data="${CSS.escape(d.id)}"]`)) return;
-      ctl.stopEditing(nodeId, d.id, false);
-    }, 0);
-
+  const key = 'text:' + node.id;
+  const editing = ctl.activeField === key;
+  const html = useMemo(() => renderFormat(node.format!, node.text), [node.format, node.text]);
+  if (node.collapsed && !editing) return null;
   return (
-    <div class={'data' + (editing ? ' editing' : '')} data-data={d.id} data-format={d.format}>
-      <div class="data-head">
-        <button
-          class="data-fold"
-          tabIndex={-1}
-          title={d.collapsed ? '展開' : '折りたたむ'}
-          onMouseDown={keepFocus}
-          onClick={() => {
-            ctl.store.updateData(nodeId, d.id, { collapsed: !d.collapsed });
-            ctl.commit();
+    <div class={'block' + (editing ? ' editing' : '')} data-format={node.format}>
+      {editing ? (
+        <AutoTextarea
+          class="block-editor"
+          spellcheck={false}
+          placeholder={getFormat(node.format!).placeholder}
+          data-id={node.id}
+          data-fk={key}
+          value={node.text}
+          onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
+          onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
+          onBlur={(e) => {
+            const ta = e.currentTarget;
+            setTimeout(() => document.activeElement !== ta && ctl.deactivate(key), 0);
           }}
-        >
-          {d.collapsed ? '▸' : '▾'}
-        </button>
-        <select
-          class="data-format"
-          title="フォーマット"
-          value={d.format}
-          onChange={(e) => {
-            ctl.store.updateData(nodeId, d.id, { format: e.currentTarget.value });
-            ctl.commit();
-          }}
-        >
-          {listFormats().map((f) => (
-            <option key={f.name} value={f.name}>
-              {f.label}
-            </option>
-          ))}
-          {!hasFormat(d.format) && <option value={d.format}>{d.format} (未定義)</option>}
-        </select>
-        {d.collapsed && <span class="data-preview">{d.content.split('\n')[0].slice(0, 80)}</span>}
-        <span class="spacer" />
-        <button
-          class="mini"
-          onMouseDown={keepFocus}
-          onClick={() => (editing ? ctl.stopEditing(nodeId, d.id, true) : ctl.startEditing(nodeId, d.id))}
-        >
-          {editing ? '完了' : '編集'}
-        </button>
-        <button
-          class="mini danger"
-          onMouseDown={keepFocus}
-          onClick={() => {
-            ctl.store.removeData(nodeId, d.id);
-            ctl.editing.delete(d.id);
-            ctl.commit(fText(nodeId));
-          }}
-        >
-          削除
-        </button>
-      </div>
-      {!d.collapsed &&
-        (editing ? (
-          <AutoTextarea
-            class="data-editor"
-            spellcheck={false}
-            placeholder={getFormat(d.format).placeholder}
-            data-id={nodeId}
-            data-data={d.id}
-            data-fk={'data:' + d.id}
-            value={d.content}
-            onInput={(e) => {
-              ctl.store.updateData(nodeId, d.id, { content: e.currentTarget.value });
-              ctl.commit(undefined, 'data:' + d.id);
-            }}
-            onKeyDown={(e) => !imeActive(e) && ctl.onDataKeydown(e, e.currentTarget)}
-            onBlur={onBlur}
-          />
-        ) : (
-          <div
-            class="data-view"
-            title="クリックして編集"
-            dangerouslySetInnerHTML={{ __html: html }}
-            onClick={(e) => {
-              if (!(e.target as Element).closest('a')) ctl.startEditing(nodeId, d.id);
-            }}
-          />
-        ))}
+        />
+      ) : (
+        <div
+          class="data-view"
+          title="クリックして編集（Esc で終了）"
+          dangerouslySetInnerHTML={{ __html: html }}
+          onClick={(e) => !(e.target as Element).closest('a') && ctl.focus(fText(node.id, 'end'))}
+        />
+      )}
     </div>
   );
 }
@@ -875,8 +836,8 @@ function ItemMenuView() {
           <button role="menuitem" onClick={run(() => ctl.toggleField(m.id))}>
             {n.key === null ? '属性の行にする' : '普通の行に戻す'}
           </button>
-          <button role="menuitem" onClick={run(() => ctl.addData(m.id))}>
-            データを追加
+          <button role="menuitem" onClick={run(() => ctl.addBlock(m.id))}>
+            ブロックを追加
           </button>
           <button role="menuitem" onClick={run(() => ctl.addDependency(m.id))}>
             依存を追加

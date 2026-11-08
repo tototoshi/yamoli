@@ -78,7 +78,6 @@ export class Controller {
   store: OutlineStore = load();
   zoomId!: string; // set from the URL in the constructor
   /** ids of data blocks currently showing their editor */
-  editing = new Set<string>();
   pendingFocus: Focus | null = null;
   history = new UndoHistory<Focus | null>(this.snapshot());
   query = '';
@@ -213,7 +212,6 @@ export class Controller {
   private restore(entry: { state: string; meta: Focus | null } | null) {
     if (!entry) return;
     this.store = OutlineStore.fromJSON(JSON.parse(entry.state));
-    this.editing.clear();
     if (!this.store.get(this.zoomId)) {
       this.zoomId = this.store.rootId;
       window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
@@ -264,7 +262,7 @@ export class Controller {
       const n = store.node(c);
       if (search && !search.shown.has(c)) return false;
       if (hideDone && n.completed) return false;
-      return !(hideFields && n.key !== null);
+      return !(hideFields && n.key !== null && n.format === null); // blocks are content, kept
     });
   }
 
@@ -447,7 +445,6 @@ export class Controller {
       this.focus(first ? fText(first) : null);
       return;
     }
-    this.editing.clear();
     this.slide = 0;
     this.search = this.runSearch();
     const zoom = store.node(this.zoomId);
@@ -526,8 +523,8 @@ export class Controller {
     const n = this.store.get(id);
     this.deactivate('fkey:' + id);
     if (!n || n.key === null || n.key.trim()) return;
-    if (!n.text && !n.children.length && !n.data.length) this.store.remove(id);
-    else this.store.setKey(id, null);
+    if (!n.text && !n.children.length) this.store.remove(id);
+    else this.unfield(id);
     this.commit();
   }
 
@@ -546,14 +543,16 @@ export class Controller {
     const n = this.store.node(id);
     const prefix = n.key ? `${n.key}: ` : '';
     this.store.setKey(id, null);
+    this.store.setFormat(id, null);
     this.store.setText(id, prefix + n.text);
     this.commit(fText(id, caret ?? prefix.length));
   }
 
-  addData(id: string, format = 'markdown') {
-    const d = this.store.addData(id, format);
-    this.editing.add(d.id);
-    this.commit({ key: 'data:' + d.id, start: 0 });
+  /** Add a block (multi-line field, Markdown by default) and start writing in it. */
+  addBlock(id: string, format = 'markdown') {
+    if (!this.prefs.showFields) this.prefs = { ...this.prefs, showFields: true };
+    const f = this.store.addBlock(id, this.store.freeKey(id, 'note'), format);
+    this.commit(fText(f.id, 0));
   }
 
   /** Load the Japanese holiday table (a separate chunk) the first time a calendar needs it. */
@@ -589,17 +588,6 @@ export class Controller {
     this.rerender();
   }
 
-  startEditing(nodeId: string, dataId: string) {
-    this.store.updateData(nodeId, dataId, { collapsed: false });
-    this.editing.add(dataId);
-    this.commit({ key: 'data:' + dataId, start: 'end' });
-  }
-
-  stopEditing(nodeId: string, dataId: string, refocusNode: boolean) {
-    if (!this.editing.delete(dataId)) return;
-    this.commit(refocusNode ? fText(nodeId) : undefined);
-  }
-
   moveNode(id: string, parentId: string, beforeId: string | null) {
     if (this.store.moveTo(id, parentId, beforeId)) this.commit();
   }
@@ -622,7 +610,6 @@ export class Controller {
   /** Show an outline someone else saved (undoable, not saved back). */
   private applyExternal(next: OutlineStore) {
     this.store = next;
-    this.editing.clear();
     if (!next.get(this.zoomId)) {
       this.zoomId = next.rootId;
       window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
@@ -639,7 +626,6 @@ export class Controller {
 
   replaceStore(next: OutlineStore) {
     this.store = next;
-    this.editing.clear();
     if (!next.get(this.zoomId)) {
       this.zoomId = next.rootId;
       window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
@@ -662,6 +648,7 @@ export class Controller {
     const vis = this.visibleRows();
     const idx = vis.indexOf(id);
     const zoomFocus = zoomId !== store.rootId ? fText(zoomId) : null;
+    if (n.format !== null && !isTitle && this.blockKeydown(e, ta, n.id)) return;
 
     // ---- structure
     if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !isMod(e)) {
@@ -700,13 +687,12 @@ export class Controller {
     }
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && !n.children.length) {
       const prev = vis[idx - 1];
-      const hasMeta = n.data.length > 0;
-      if (!ta.value && !hasMeta) {
+      if (!ta.value) {
         e.preventDefault();
         store.remove(id);
         return this.commit(prev ? fText(prev) : zoomFocus);
       }
-      if (prev && !hasMeta) {
+      if (prev && store.node(prev).format === null) {
         e.preventDefault();
         const pos = store.node(prev).text.length;
         store.mergeInto(id, prev);
@@ -721,14 +707,14 @@ export class Controller {
       e.preventDefault();
       const next = vis[idx + 1];
       if (!next || store.isData(next)) return;
-      if (!ta.value && !n.children.length && !n.data.length) {
+      if (!ta.value && !n.children.length) {
         // An empty row just goes away, so the next row keeps its id (and links to it).
         store.remove(id);
         return this.commit(fText(next, 0));
       }
       const m = store.node(next);
       const adopt = !n.children.length && store.parentOf(next) === store.parentOf(id); // its children become ours
-      if (m.data.length || (m.children.length && !adopt)) return;
+      if (m.children.length && !adopt) return;
       store.mergeInto(next, id);
       return this.commit(fText(id, start));
     }
@@ -769,7 +755,7 @@ export class Controller {
     }
     if (e.altKey && !isMod(e) && e.code === 'KeyD') {
       e.preventDefault();
-      return this.addData(id);
+      return this.addBlock(id);
     }
 
     // ---- cursor movement between rows
@@ -816,18 +802,38 @@ export class Controller {
     return this.store.moveTo(id, p, all[all.indexOf(other) + 1] ?? null);
   }
 
-  onDataKeydown(e: KeyboardEvent, ta: HTMLTextAreaElement) {
+  /**
+   * Keys inside a block, which is multi-line text: Enter and Tab type, Esc
+   * (or ⌘/Ctrl+Enter) leaves it, Backspace in an empty block removes it.
+   * Returns false to let the usual row keys (moving, ↑ ↓ past the ends …) run.
+   */
+  private blockKeydown(e: KeyboardEvent, ta: HTMLTextAreaElement, id: string): boolean {
     if (e.key === 'Escape' || (e.key === 'Enter' && isMod(e))) {
       e.preventDefault();
-      this.stopEditing(ta.dataset.id!, ta.dataset.data!, true);
-    } else if (e.key === 'Tab' && !e.shiftKey) {
+      this.focus(fText(this.store.parentOf(id)!));
+      return true;
+    }
+    if (e.key === 'Enter' && !e.altKey) return true; // a newline
+    if (e.key === 'Tab' && !isMod(e) && !e.altKey) {
       e.preventDefault();
-      if (!document.execCommand('insertText', false, '  ')) {
+      if (!e.shiftKey && !document.execCommand('insertText', false, '  ')) {
         ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end');
         ta.dispatchEvent(new Event('input', { bubbles: true }));
       }
+      return true;
     }
+    if (e.key === 'Backspace' && !isMod(e) && ta.selectionStart === 0 && ta.selectionEnd === 0) {
+      e.preventDefault();
+      if (ta.value) return true;
+      const vis = this.visibleRows();
+      const prev = vis[vis.indexOf(id) - 1];
+      this.store.remove(id);
+      this.commit(prev ? fText(prev) : null);
+      return true;
+    }
+    return false;
   }
+
 
   /** Pasting multiple lines into a row creates one sibling per line. */
   /**
@@ -841,6 +847,7 @@ export class Controller {
     const add = (parent: string, index: number, r: TextRow): string => {
       const n = store.addChild(parent, index, r.text);
       n.key = r.key;
+      n.format = r.key !== null ? (r.format ?? null) : null;
       r.children.forEach((c) => add(n.id, -1, c));
       return n.id;
     };

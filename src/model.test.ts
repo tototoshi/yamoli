@@ -39,11 +39,11 @@ test('remove deletes subtree; merge moves meta', () => {
   const b = s.addChild(a.id, -1, 'b');
   const c = s.addSiblingAfter(a.id, 'c');
   s.addField(c.id, 'k', 'v');
-  s.addData(c.id, 'json', '{}');
+  s.addBlock(c.id, 'memo', 'markdown', '# hi');
   s.mergeInto(c.id, a.id);
   expect(a.text).toBe('ac');
   expect(s.fieldValue(a.id, 'k')).toBe('v');
-  expect(a.data[0].format).toBe('json');
+  expect(s.field(a.id, 'memo')?.format).toBe('markdown');
   expect(s.get(c.id)).toBeUndefined();
   s.remove(a.id);
   expect(s.get(b.id)).toBeUndefined();
@@ -54,7 +54,7 @@ test('JSON round trip and normalization', () => {
   const s = OutlineStore.create();
   const a = s.addChild(s.rootId, -1, 'a');
   s.addField(a.id, 'status', 'done');
-  s.addData(a.id, 'markdown', '# hi');
+  s.addBlock(a.id, 'note', 'markdown', '# hi');
   const back = OutlineStore.fromJSON(JSON.parse(JSON.stringify(s.toJSON())));
   expect(back.toJSON()).toEqual(s.toJSON());
   const loose = OutlineStore.fromJSON({ rootId: 'r', nodes: { r: { children: ['x', 'missing'] }, x: { text: 'x' } } });
@@ -96,18 +96,18 @@ test('duplicate copies a subtree after the original and relinks inside it', () =
   const a = s.addChild(p.id, -1, 'a');
   const b = s.addChild(p.id, -1, 'b');
   s.addField(b.id, 'after', `[[${a.id}]], [[${other.id}]]`);
-  s.addData(a.id, 'markdown', 'note');
+  s.addBlock(a.id, 'note', 'markdown', 'note');
 
   const copy = s.duplicate(p.id)!;
   expect(s.node(s.rootId).children).toEqual([p.id, copy.id, other.id]);
   expect(copy.text).toBe('project');
-  expect(s.descendantCount(copy.id)).toBe(3); // a, b and b's `after` field
+  expect(s.descendantCount(copy.id)).toBe(4); // a, its note, b and b's `after` field
   const [a2, b2] = copy.children;
   expect(a2).not.toBe(a.id);
   expect(s.parentOf(b2)).toBe(copy.id);
   expect(s.fieldValue(b2, 'after')).toBe(`[[${a2}]], [[${other.id}]]`);
-  expect(s.node(a2).data[0].content).toBe('note');
-  expect(s.node(a2).data[0].id).not.toBe(s.node(a.id).data[0].id);
+  expect(s.field(a2, 'note')).toMatchObject({ text: 'note', format: 'markdown' });
+  expect(s.field(a2, 'note')!.id).not.toBe(s.field(a.id, 'note')!.id);
   // The original is untouched.
   expect(s.fieldValue(b.id, 'after')).toBe(`[[${a.id}]], [[${other.id}]]`);
   expect(s.duplicate(s.rootId)).toBeNull();
@@ -145,4 +145,35 @@ test('attributes from older files become field rows', () => {
   expect(b).toBe('b');
   expect(s.node(f)).toMatchObject({ key: 'due', text: '2026-12-01' });
   expect(s.fieldValue('a', 'due')).toBe('2026-12-01');
+});
+
+test('data blocks from older files become blocks; JSON becomes fields', () => {
+  const s = OutlineStore.fromJSON({
+    rootId: 'r',
+    nodes: {
+      r: { children: ['a'] },
+      a: {
+        text: 'a',
+        children: ['b'],
+        key: null,
+        data: [
+          { id: 'd1', format: 'markdown', content: '# memo', collapsed: true },
+          { id: 'd2', format: 'markdown', content: 'more' },
+          { id: 'd3', format: 'json', content: '{"theme":"auto","size":15,"tags":["x","y"],"opt":{"on":true}}' },
+          { id: 'd4', format: 'json', content: '{broken' },
+        ],
+      },
+      b: { text: 'b' },
+    },
+  });
+  const a = s.node('a');
+  expect(a.children.map((c) => s.node(c).key)).toEqual(['markdown', 'markdown2', 'json', 'json2', null]);
+  expect(s.field('a', 'markdown')).toMatchObject({ text: '# memo', format: 'markdown', collapsed: true });
+  expect(s.field('a', 'json2')).toMatchObject({ text: '{broken', format: 'code' });
+  const json = s.field('a', 'json')!;
+  expect(json.format).toBeNull();
+  expect(s.fieldValue(json.id, 'size')).toBe('15');
+  expect(s.fieldTexts(s.field(json.id, 'tags')!.id)).toEqual(['', '', 'x', '', 'y']);
+  expect(s.fieldAt('a', ['json', 'opt', 'on'])?.text).toBe('true');
+  expect('data' in a).toBe(false);
 });

@@ -1,6 +1,6 @@
 /*
  * Slides from an outline: the zoomed item is the deck, each item under it a
- * slide (its text the title, its sub-items the bullets, its data blocks the
+ * slide (its text the title, its sub-items the bullets, its blocks the
  * content). Fields the slides view understands:
  *
  *   on the deck:   subtitle: …         shown on the title slide

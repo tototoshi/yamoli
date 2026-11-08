@@ -142,7 +142,11 @@ function SlideBody({ slide }: { slide: Slide }) {
     );
   }
 
-  const data = n.data.map((d) => <DataHtml key={d.id} format={d.format} content={d.content} />);
+  // Blocks are the slide's content (notes aside, shown under the slide).
+  const data = n.children
+    .map((c) => store.node(c))
+    .filter((c) => c.format !== null && c.key?.trim().toLowerCase() !== 'notes')
+    .map((c) => <DataHtml key={c.id} format={c.format!} content={c.text} />);
   // Two columns: bullets beside the data blocks, or the bullets split in half.
   const twoColumn = slide.layout === 'two-column';
   const body =
