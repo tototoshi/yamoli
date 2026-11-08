@@ -75,7 +75,7 @@ export function App() {
   ctl.schedule = computeSchedule(store, ctl.cycles, ctl.jpDays);
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
-  document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Outliner';
+  document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Yamoli';
 
   return (
     <Ctx.Provider value={ctl}>
@@ -153,7 +153,7 @@ function TopBar() {
   return (
     <header class="topbar">
       <a class="brand" href="#/">
-        Outliner
+        Yamoli
       </a>
       <nav class="crumbs">
         {ancestors.map((id) => (

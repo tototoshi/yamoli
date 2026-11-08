@@ -1,8 +1,22 @@
 import { OutlineStore } from './model';
 import { addGuideSlides, addScheduleSample } from './sample';
 
-const STORAGE_KEY = 'outliner:v1';
-const PREFS_KEY = 'outliner:prefs';
+const STORAGE_KEY = 'yamoli:v1';
+const PREFS_KEY = 'yamoli:prefs';
+
+// Keys from before the app was renamed to Yamoli.
+for (const [from, to] of [
+  ['outliner:v1', STORAGE_KEY],
+  ['outliner:prefs', PREFS_KEY],
+]) {
+  try {
+    const old = localStorage.getItem(from);
+    if (old !== null && localStorage.getItem(to) === null) localStorage.setItem(to, old);
+    localStorage.removeItem(from);
+  } catch {
+    // storage unavailable: nothing to move
+  }
+}
 
 export interface Prefs {
   showCompleted: boolean;
@@ -96,7 +110,7 @@ export async function init(): Promise<void> {
   } catch {
     res = new Response(null, { status: 404 });
   }
-  const file = res.headers.get('X-Outliner-File');
+  const file = res.headers.get('X-Yamoli-File');
   if (!file || (res.status !== 200 && res.status !== 204)) {
     initial = loadLocal();
     return;
@@ -234,7 +248,7 @@ window.addEventListener('beforeunload', (e) => {
 function seed(): OutlineStore {
   const s = OutlineStore.create();
   const r = s.rootId;
-  const welcome = s.addChild(r, -1, 'Outliner へようこそ');
+  const welcome = s.addChild(r, -1, 'Yamoli へようこそ');
   s.addChild(welcome.id, -1, 'Enter で新しい行、Tab / Shift+Tab でインデント');
   s.addChild(welcome.id, -1, '左の ● をクリックするとその項目にズームイン（パンくずでズームアウト）');
   s.addChild(welcome.id, -1, 'Alt+A で属性、Alt+D でデータを追加');

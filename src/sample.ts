@@ -71,7 +71,7 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
     s.items(parentId).find((id) => s.node(id).text.startsWith('サンプル: ')) ??
     addScheduleSample(s, parentId);
 
-  const deck = s.addChild(parentId, -1, 'Outliner の使い方');
+  const deck = s.addChild(parentId, -1, 'Yamoli の使い方');
   s.addField(deck.id, 'subtitle', 'アウトライン × YAML × プロジェクト管理');
   s.addField(deck.id, 'notes', '「スライド」表示で開くとプレゼンになります。← → でページ送り、F で全画面。');
 
@@ -119,7 +119,7 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
   ]);
 
   slide('保存', {}, [
-    ['開発サーバーでは `~/outliner/data.json` に保存', ['毎日のバックアップは `backups/` に 30 日分']],
+    ['開発サーバーでは `~/yamoli/data.json` に保存', ['毎日のバックアップは `backups/` に 30 日分']],
     '別のタブや外部で変更されたら、読み込むか上書きするか選べる',
     'サーバーがないときはブラウザ（localStorage）に保存',
   ]);

@@ -10,7 +10,7 @@
  * each day keeps a copy of the previous contents in backups/.
  */
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -18,7 +18,31 @@ import { basename, dirname, join } from 'node:path';
 export const API_PATH = '/api/data';
 const KEEP_BACKUPS = 30;
 
-export const defaultDataPath = () => process.env.OUTLINER_DATA || join(homedir(), 'outliner', 'data.json');
+export const defaultDataPath = () => process.env.YAMOLI_DATA || join(homedir(), 'yamoli', 'data.json');
+/** Where the file lived before the app was renamed to Yamoli. */
+export const legacyDataPath = () => join(homedir(), 'outliner', 'data.json');
+
+/**
+ * Move a file from the legacy location to `path` when only the old one exists:
+ * the whole folder (backups too) when the new folder isn't there yet, else
+ * just the file. Returns whether anything moved.
+ */
+export async function migrateDataFile(path: string, legacy: string): Promise<boolean> {
+  if ((await exists(path)) || !(await exists(legacy))) return false;
+  if (await exists(dirname(path))) {
+    await rename(legacy, path);
+  } else {
+    await mkdir(dirname(dirname(path)), { recursive: true });
+    await rename(dirname(legacy), dirname(path));
+  }
+  return true;
+}
+
+const exists = (path: string) =>
+  stat(path).then(
+    () => true,
+    () => false
+  );
 
 const etagOf = (text: string) => '"' + createHash('sha1').update(text).digest('hex') + '"';
 
@@ -91,7 +115,7 @@ export function dataMiddleware(path: string) {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     if (req.url?.split('?')[0] !== API_PATH) return next();
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Outliner-File', encodeURIComponent(path));
+    res.setHeader('X-Yamoli-File', encodeURIComponent(path));
     try {
       if (req.method === 'GET') {
         const data = await readData(path);
@@ -107,7 +131,7 @@ export function dataMiddleware(path: string) {
         res.writeHead(405, { Allow: 'GET, PUT' }).end();
       }
     } catch (e) {
-      console.error('[outliner] data file error', e);
+      console.error('[yamoli] data file error', e);
       res.writeHead(500).end(String(e));
     }
   };

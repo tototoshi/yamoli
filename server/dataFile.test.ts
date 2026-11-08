@@ -1,14 +1,14 @@
 // @vitest-environment node
-import { mkdtemp, readdir, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { readData, writeData } from './dataFile';
+import { migrateDataFile, readData, writeData } from './dataFile';
 
 const outline = (text: string) => JSON.stringify({ rootId: 'r', nodes: { r: { id: 'r', text, children: [] } } });
 
 test('create, update with the current ETag, and reject stale writes', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'outliner-'));
+  const dir = await mkdtemp(join(tmpdir(), 'yamoli-'));
   const path = join(dir, 'sub', 'data.json');
   expect(await readData(path)).toBeNull();
 
@@ -31,8 +31,29 @@ test('create, update with the current ETag, and reject stale writes', async () =
 });
 
 test('rejects bodies that are not outlines', async () => {
-  const path = join(await mkdtemp(join(tmpdir(), 'outliner-')), 'data.json');
+  const path = join(await mkdtemp(join(tmpdir(), 'yamoli-')), 'data.json');
   expect((await writeData(path, 'nope', '*')).status).toBe(400);
   expect((await writeData(path, '{"rootId":"r","nodes":{}}', '*')).status).toBe(400);
   expect(await readData(path)).toBeNull();
+});
+
+test('moves data from the legacy folder, backups and all, unless the new file exists', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'yamoli-'));
+  const legacy = join(home, 'outliner', 'data.json');
+  const path = join(home, 'yamoli', 'data.json');
+  expect(await migrateDataFile(path, legacy)).toBe(false); // nothing to move
+
+  await mkdir(join(home, 'outliner', 'backups'), { recursive: true });
+  await writeFile(legacy, outline('old'));
+  await writeFile(join(home, 'outliner', 'backups', 'data-2026-11-07.json'), outline('older'));
+  expect(await migrateDataFile(path, legacy)).toBe(true);
+  expect(JSON.parse(await readFile(path, 'utf8')).nodes.r.text).toBe('old');
+  expect(await readdir(join(home, 'yamoli', 'backups'))).toEqual(['data-2026-11-07.json']);
+  expect(await readdir(home)).toEqual(['yamoli']);
+
+  // Never overwrites: with a file at the new place the legacy one stays put.
+  await mkdir(join(home, 'outliner'));
+  await writeFile(legacy, outline('stale'));
+  expect(await migrateDataFile(path, legacy)).toBe(false);
+  expect(JSON.parse(await readFile(path, 'utf8')).nodes.r.text).toBe('old');
 });
