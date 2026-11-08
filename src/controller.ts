@@ -4,7 +4,7 @@
  */
 import { DEP_KEY } from './deps';
 import type { ScheduleResult } from './schedule';
-import { addScheduleSample } from './sample';
+import { addGuideSlides, addScheduleSample } from './sample';
 import { UndoHistory } from './history';
 import { linkCandidates, pickerQueryAt } from './links';
 import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
@@ -12,7 +12,8 @@ import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs } from './storage';
 
-export type View = 'outline' | 'gantt';
+export type View = 'outline' | 'gantt' | 'slides';
+const VIEWS: View[] = ['outline', 'gantt', 'slides'];
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
 export interface Focus {
@@ -95,6 +96,8 @@ export class Controller {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** How the zoomed item's contents are shown. */
   view: View = 'outline';
+  /** The slide on screen in the slides view (clamped by the view). */
+  slide = 0;
   /** Items on a dependency cycle; recomputed by the App on every render. */
   cycles = new Set<string>();
   /** Computed dates; recomputed by the App on every render. */
@@ -381,22 +384,24 @@ export class Controller {
     const m = location.hash.match(/^#\/([^?]*)(?:\?(.*))?$/);
     const raw = m?.[1] ? decodeURIComponent(m[1]) : this.store.rootId;
     this.zoomId = this.store.get(raw) ? raw : this.store.rootId;
-    const asked = new URLSearchParams(m?.[2] ?? '').get('view');
-    if (asked === 'gantt' || asked === 'outline') {
+    const asked = new URLSearchParams(m?.[2] ?? '').get('view') as View | null;
+    if (asked && VIEWS.includes(asked)) {
       this.view = asked;
       this.rememberView();
     } else {
-      this.view = this.prefs.ganttItems.includes(this.zoomId) ? 'gantt' : 'outline';
-      if (this.view === 'gantt') window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
+      const remembered = this.prefs.views[this.zoomId];
+      this.view = remembered ?? 'outline';
+      if (remembered) window.history.replaceState(null, '', this.hashFor(this.zoomId, remembered));
     }
   }
 
   private rememberView() {
-    const { ganttItems } = this.prefs;
-    const isGantt = this.view === 'gantt';
-    if (ganttItems.includes(this.zoomId) === isGantt) return;
-    const others = ganttItems.filter((id) => id !== this.zoomId && this.store.get(id));
-    this.prefs = { ...this.prefs, ganttItems: isGantt ? [...others, this.zoomId] : others };
+    const current = this.prefs.views[this.zoomId] ?? 'outline';
+    if (current === this.view) return;
+    const views = Object.fromEntries(Object.entries(this.prefs.views).filter(([id]) => this.store.get(id)));
+    if (this.view === 'outline') delete views[this.zoomId];
+    else views[this.zoomId] = this.view;
+    this.prefs = { ...this.prefs, views };
     savePrefs(this.prefs);
   }
 
@@ -408,6 +413,11 @@ export class Controller {
   /** Switch how the zoomed item is shown (remembered for next time). */
   setView(view: View) {
     location.hash = this.hashFor(this.zoomId, view);
+  }
+
+  setSlide(index: number) {
+    this.slide = Math.max(0, index);
+    this.rerender();
   }
 
   setGanttScale(scale: number) {
@@ -437,6 +447,7 @@ export class Controller {
       return;
     }
     this.editing.clear();
+    this.slide = 0;
     this.search = this.runSearch();
     const zoom = store.node(this.zoomId);
     let focus: Focus | null = null;
@@ -597,6 +608,14 @@ export class Controller {
     const id = addScheduleSample(this.store, this.store.rootId);
     this.commit(null);
     this.zoomTo(id);
+  }
+
+  /** Add the usage guide deck and open it as slides. */
+  addGuide() {
+    const id = addGuideSlides(this.store, this.store.rootId);
+    this.commit(null);
+    this.slide = 0;
+    location.hash = this.hashFor(id, 'slides');
   }
 
   /** Show an outline someone else saved (undoable, not saved back). */

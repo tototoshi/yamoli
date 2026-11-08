@@ -1,5 +1,5 @@
 import { OutlineStore } from './model';
-import { addScheduleSample } from './sample';
+import { addGuideSlides, addScheduleSample } from './sample';
 
 const STORAGE_KEY = 'outliner:v1';
 const PREFS_KEY = 'outliner:prefs';
@@ -8,16 +8,20 @@ export interface Prefs {
   showCompleted: boolean;
   /** Show field rows (`key: value`) in the outline. */
   showFields: boolean;
-  /** Items last viewed as a Gantt chart. */
-  ganttItems: string[];
+  /** How items were last viewed, when not as an outline. */
+  views: Record<string, 'gantt' | 'slides'>;
   /** Index into the Gantt chart's day widths. */
   ganttScale: number;
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true, showFields: true, ganttItems: [], ganttScale: 2 };
+  const defaults: Prefs = { showCompleted: true, showFields: true, views: {}, ganttScale: 2 };
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
+    const { ganttItems, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    const prefs: Prefs = { ...defaults, ...saved };
+    // Earlier versions only remembered Gantt charts.
+    if (Array.isArray(ganttItems)) for (const id of ganttItems) prefs.views[id] ??= 'gantt';
+    return prefs;
   } catch {
     return defaults;
   }
@@ -249,7 +253,8 @@ function seed(): OutlineStore {
   const sales = s.addChild(proj.id, -1, '売上');
   s.addData(sales.id, 'csv', 'month,amount\n2026-09,120\n2026-10,135\n2026-11,150');
 
-  addScheduleSample(s, r);
+  const sample = addScheduleSample(s, r);
+  s.setCollapsed(addGuideSlides(s, r, sample), true);
 
   const shop = s.addChild(r, -1, '買い物リスト');
   ['牛乳', '卵', 'パン'].forEach((t) => s.addChild(shop.id, -1, t));

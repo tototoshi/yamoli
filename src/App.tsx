@@ -1,13 +1,15 @@
 import type { TargetedEvent, TextareaHTMLAttributes } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { applyFocus, Controller, fKey, fText } from './controller';
+import { applyFocus, Controller, fKey, fText, type View } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
-import { highlight, parseInline, type Seg } from './inline';
+import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
 import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
 import { startBulletDrag } from './drag';
 import { Ctx, useCtl } from './context';
 import { GanttView } from './GanttView';
+import { SlidesView } from './SlidesView';
+import { SegView } from './InlineText';
 import { shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
 import { computeSchedule } from './schedule';
@@ -78,7 +80,7 @@ export function App() {
   return (
     <Ctx.Provider value={ctl}>
       <TopBar />
-      <main class={'page' + (ctl.view === 'gantt' ? ' wide' : '')}>
+      <main class={'page' + (ctl.view !== 'outline' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
         <ZoomHeader node={zoom} />
         <div class="view-bar">
           <ViewSwitch />
@@ -93,6 +95,8 @@ export function App() {
         </div>
         {ctl.view === 'gantt' ? (
           <GanttView />
+        ) : ctl.view === 'slides' ? (
+          <SlidesView />
         ) : (
           <section class="outline">
             <ul class="children top">
@@ -313,6 +317,8 @@ const SHORTCUTS: [string, string][] = [
   ['is:late / is:critical', '期限超過 / クリティカルパス上の作業を検索'],
   ['duration: 3d / 2w / 10cd', '作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）'],
   ['start / due', '開始日（子にも継承）/ 期限 — 例 2026-11-10'],
+  ['スライド表示で ← →', 'ページ送り（F 全画面、N ノート、Home / End）'],
+  ['layout / notes / theme', 'スライドの属性（center・two-column・title / ノート / dark）'],
   ['workdays / holidays', '稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）'],
 ];
 
@@ -328,6 +334,12 @@ function HelpMenu() {
           </button>
           依存関係・日程計算・ガントの例
         </dd>
+        <dd class="help-sample">
+          <button class="mini" onClick={() => ctl.addGuide()}>
+            使い方スライドを追加
+          </button>
+          このアプリの使い方（スライドの例）
+        </dd>
         {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
       </dl>
     </details>
@@ -338,7 +350,7 @@ function HelpMenu() {
 
 function ViewSwitch() {
   const ctl = useCtl();
-  const item = (view: 'outline' | 'gantt', label: string) => (
+  const item = (view: View, label: string) => (
     <button
       class={ctl.view === view ? 'on' : ''}
       onMouseDown={keepFocus}
@@ -351,6 +363,7 @@ function ViewSwitch() {
     <div class="view-switch" role="group" aria-label="表示">
       {item('outline', 'アウトライン')}
       {item('gantt', 'ガント')}
+      {item('slides', 'スライド')}
     </div>
   );
 }
@@ -562,48 +575,6 @@ function InlineView({
       {!text && placeholder && <span class="placeholder">{placeholder}</span>}
     </div>
   );
-}
-
-function SegView({ seg }: { seg: Seg }) {
-  const ctl = useCtl();
-  const pieces = highlight(seg.text, ctl.terms).map((p) => (
-    <span key={p.offset} data-o={seg.start + p.offset} class={p.mark ? 'hl' : undefined}>
-      {p.text}
-    </span>
-  ));
-  switch (seg.kind) {
-    case 'code':
-      return <code>{pieces}</code>;
-    case 'strong':
-      return <strong>{pieces}</strong>;
-    case 'em':
-      return <em>{pieces}</em>;
-    case 'del':
-      return <del>{pieces}</del>;
-    case 'tag':
-      return (
-        <span class="tag" title="このタグで検索">
-          {pieces}
-        </span>
-      );
-    case 'ref': {
-      const target = ctl.store.get(seg.refId!);
-      if (!target) return <>{pieces}</>; // unknown id: show the raw text
-      return (
-        <a class={'ref' + (target.completed ? ' done' : '')} href={ctl.hashFor(target.id)} title="クリックで移動">
-          {nodeLabel(ctl.store, target.id)}
-        </a>
-      );
-    }
-    case 'link':
-      return (
-        <a href={seg.href} target="_blank" rel="noopener noreferrer">
-          {pieces}
-        </a>
-      );
-    default:
-      return <>{pieces}</>;
-  }
 }
 
 function Actions({ id, class: cls }: { id: string; class: string }) {

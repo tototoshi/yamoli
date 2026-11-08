@@ -7,6 +7,7 @@ import { today, type Day } from './calendar';
 import { useCtl } from './context';
 import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
 import { nodeLabel } from './links';
+import type { OutlineStore } from './model';
 import { calendarAt, type Sched } from './schedule';
 
 const ROW = 28;
@@ -15,16 +16,22 @@ const MONTH_H = 20;
 /** Pixels per day, from zoomed out to zoomed in. */
 export const GANTT_SCALES = [6, 12, 22, 34];
 
-export function GanttView() {
+/**
+ * The chart for the zoomed item, or (embedded, e.g. in a slide) for rootId
+ * with its expanded rows and without the toolbar.
+ */
+export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: boolean }) {
   const ctl = useCtl();
-  const { store, schedule, zoomId } = ctl;
+  const { store, schedule } = ctl;
+  const zoomId = rootId ?? ctl.zoomId;
   const [hover, setHover] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   // The zoomed item itself heads the chart (its span, or its own bar).
   const isRoot = zoomId === store.rootId;
-  const rows = (isRoot ? ctl.visibleRows() : [zoomId, ...ctl.visibleRows()]).filter((id) => !store.isData(id));
+  const below = embedded ? expandedRows(store, zoomId) : ctl.visibleRows();
+  const rows = (isRoot ? below : [zoomId, ...below]).filter((id) => !store.isData(id));
   const scale = Math.min(Math.max(ctl.prefs.ganttScale, 0), GANTT_SCALES.length - 1);
   const dw = GANTT_SCALES[scale];
   const now = today();
@@ -73,30 +80,32 @@ export function GanttView() {
   const labelEvery = dw >= 16 ? 1 : 7;
 
   return (
-    <div class="gantt-wrap">
-      <div class="gantt-tools">
-        <button class="mini" title="縮小" disabled={scale === 0} onClick={() => ctl.setGanttScale(scale - 1)}>
-          −
-        </button>
-        <button
-          class="mini"
-          title="拡大"
-          disabled={scale === GANTT_SCALES.length - 1}
-          onClick={() => ctl.setGanttScale(scale + 1)}
-        >
-          ＋
-        </button>
-        <button class="mini" disabled={now < range.from || now > range.to} onClick={scrollToToday}>
-          今日
-        </button>
-        <span class="gantt-legend">
-          <i class="lg task" />
-          作業 <i class="lg critical" />
-          クリティカルパス <i class="lg late" />
-          期限超過 <i class="lg due" />
-          期限
-        </span>
-      </div>
+    <div class={'gantt-wrap' + (embedded ? ' embedded' : '')}>
+      {!embedded && (
+        <div class="gantt-tools">
+          <button class="mini" title="縮小" disabled={scale === 0} onClick={() => ctl.setGanttScale(scale - 1)}>
+            −
+          </button>
+          <button
+            class="mini"
+            title="拡大"
+            disabled={scale === GANTT_SCALES.length - 1}
+            onClick={() => ctl.setGanttScale(scale + 1)}
+          >
+            ＋
+          </button>
+          <button class="mini" disabled={now < range.from || now > range.to} onClick={scrollToToday}>
+            今日
+          </button>
+          <span class="gantt-legend">
+            <i class="lg task" />
+            作業 <i class="lg critical" />
+            クリティカルパス <i class="lg late" />
+            期限超過 <i class="lg due" />
+            期限
+          </span>
+        </div>
+      )}
       <div class="gantt" onMouseLeave={() => setHover(null)}>
         <div class="gantt-names" style={{ paddingTop: `${HEAD}px` }}>
           {rows.map((id) => {
@@ -259,6 +268,11 @@ export function GanttView() {
       </div>
     </div>
   );
+}
+
+/** Items under id in outline order, skipping collapsed subtrees. */
+function expandedRows(store: OutlineStore, id: string): string[] {
+  return store.items(id).flatMap((c) => [c, ...(store.node(c).collapsed ? [] : expandedRows(store, c))]);
 }
 
 function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
