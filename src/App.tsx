@@ -18,7 +18,7 @@ import { toValue, toYaml } from './serialize';
 import { computeSchedule } from './schedule';
 import type { OutlineNode } from './model';
 import { OutlineStore } from './model';
-import { dataFile, flush, saveState } from './storage';
+import { dataFile, flush, saveState, type FieldsMode } from './storage';
 
 // Keep focus in the text while clicking toolbar-ish buttons.
 const keepFocus = (e: MouseEvent) => e.preventDefault();
@@ -434,9 +434,13 @@ function ViewToggles() {
         {t('完了', 'Completed')}
       </label>
       {view !== 'gantt' && (
-        <label title={t('属性の行（name: value）を表示', 'Show field rows (name: value)')}>
-          <input type="checkbox" checked={prefs.showFields} onChange={() => ctl.toggleShowFields()} />
+        <label title={t('属性の行（name: value）の表示', 'How field rows (name: value) are shown')}>
           {t('属性', 'Fields')}
+          <select value={prefs.fields} onChange={(e) => ctl.setFieldsMode(e.currentTarget.value as FieldsMode)}>
+            <option value="show">{t('表示', 'Show')}</option>
+            <option value="fold">{t('畳む', 'Fold')}</option>
+            <option value="hide">{t('隠す', 'Hide')}</option>
+          </select>
         </label>
       )}
     </div>
@@ -510,6 +514,7 @@ function NodeItem({ id }: { id: string }) {
         {isField && !isBlock && <DatePick node={n} />}
         {!isField && (
           <>
+            <FieldsSummary id={id} />
             <SchedLabel id={id} />
             <DepBadge id={id} />
             <Actions id={id} class="row-actions" />
@@ -525,6 +530,36 @@ function NodeItem({ id }: { id: string }) {
         </ul>
       )}
     </li>
+  );
+}
+
+/**
+ * With fields folded: the row's fields in one line (`duration: 3d · after: Kickoff`),
+ * which opens them below; ▾ closes them again.
+ */
+function FieldsSummary({ id }: { id: string }) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  if (ctl.prefs.fields !== 'fold') return null;
+  const fields = store.node(id).children.filter((c) => store.isField(c) && store.node(c).format === null);
+  if (!fields.length) return null;
+  const open = ctl.fieldsShown(id);
+  const summary = fields
+    .map((f) => (store.node(f).children.length ? `${store.node(f).key} …` : nodeLabel(store, f)))
+    .join(' · ');
+  return (
+    <button
+      class={'fields-summary' + (open ? ' open' : '')}
+      tabIndex={-1}
+      title={open ? t('属性を畳む', 'Fold the fields') : summary}
+      onMouseDown={keepFocus}
+      onClick={() => ctl.toggleFieldsOpen(id)}
+    >
+      <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
+        <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      {!open && <span>{summary}</span>}
+    </button>
   );
 }
 

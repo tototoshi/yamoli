@@ -417,6 +417,32 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* ---------------------------------------------------------------- meta */
 
 
+/* folded fields: one line right after the row's text (clear of the buttons at the far end) */
+.row:has(> .fields-summary) > .text { flex: 0 1 auto; field-sizing: content; min-width: 2em; }
+.fields-summary {
+  flex: 0 1 auto;
+  margin-right: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 45%;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.fields-summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fields-summary svg { flex: none; transition: transform 0.1s; }
+.fields-summary.open svg { transform: rotate(90deg); }
+.fields-summary:hover { color: var(--fg); background: var(--faint); }
+
 /* field rows: `name: value` */
 .date-pick {
   position: relative;
@@ -566,6 +592,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .view-toggles { order: 2; margin-left: auto; display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
 .view-toggles label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .view-toggles input { margin: 0; }
+.view-toggles select { font-size: 12px; padding: 0 2px; border: 1px solid var(--faint); border-radius: 4px; background: var(--bg); color: var(--fg); }
 .view-switch { display: inline-flex; border: 1px solid var(--faint); border-radius: 6px; overflow: hidden; }
 .view-switch button {
   padding: 2px 12px;

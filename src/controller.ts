@@ -11,7 +11,7 @@ import { linkCandidates, pickerQueryAt } from './links';
 import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
-import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs } from './storage';
+import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs, type FieldsMode } from './storage';
 
 export type View = 'outline' | 'gantt' | 'slides' | 'text' | 'yaml' | 'json';
 const VIEWS: View[] = ['outline', 'gantt', 'slides', 'text', 'yaml', 'json'];
@@ -96,6 +96,8 @@ export class Controller {
    * rendered as an editor; all others show formatted text.
    */
   activeField: string | null = null;
+  /** Rows whose folded fields were opened by hand (fold mode). */
+  openFields = new Set<string>();
   picker: LinkPicker | null = null;
   menu: ItemMenu | null = null;
   toast: Toast | null = null;
@@ -274,7 +276,7 @@ export class Controller {
   shownChildren(id: string): string[] {
     const { search, store } = this;
     const hideDone = !this.prefs.showCompleted && !wantsCompleted(this.terms);
-    const hideFields = !this.prefs.showFields;
+    const hideFields = !this.fieldsShown(id);
     return store.node(id).children.filter((c) => {
       const n = store.node(c);
       if (search && !search.shown.has(c)) return false;
@@ -310,10 +312,34 @@ export class Controller {
     this.rerender();
   }
 
-  toggleShowFields() {
-    this.prefs = { ...this.prefs, showFields: !this.prefs.showFields };
+  setFieldsMode(fields: FieldsMode) {
+    this.prefs = { ...this.prefs, fields };
+    this.openFields.clear();
     savePrefs(this.prefs);
     this.rerender();
+  }
+
+  /** Whether id's field rows are on screen: always, never, or when folded, if opened, zoomed into or being edited. */
+  fieldsShown(id: string): boolean {
+    const mode = this.prefs.fields;
+    if (mode !== 'fold') return mode === 'show';
+    if (id === this.zoomId || this.openFields.has(id)) return true; // zoomed in: its own fields are the point
+    const editing = this.activeField?.replace(/^\w+:/, '');
+    return !!editing && editing !== id && !!this.store.get(editing) && this.store.owner(editing) === id;
+  }
+
+  /** Open or close one row's folded fields. */
+  toggleFieldsOpen(id: string) {
+    if (this.openFields.delete(id)) return this.rerender();
+    this.openFields.add(id);
+    // A collapsed row shows no children at all, fields included.
+    if (this.store.setCollapsed(id, false)) this.commit();
+    else this.rerender();
+  }
+
+  /** Before adding a field: make sure it will be seen (hidden fields become folded, and this one is edited). */
+  private revealFields() {
+    if (this.prefs.fields === 'hide') this.setFieldsMode('fold');
   }
 
   toggleShowCompleted() {
@@ -497,7 +523,7 @@ export class Controller {
 
   /** Add an empty field to id and edit its name. */
   addAttribute(id: string) {
-    if (!this.prefs.showFields) this.prefs = { ...this.prefs, showFields: true };
+    this.revealFields();
     const f = this.store.addField(id, '');
     this.commit(fKey(f.id));
   }
@@ -608,7 +634,7 @@ export class Controller {
 
   /** Add a block (multi-line field, Markdown by default) and start writing in it. */
   addBlock(id: string, format = 'markdown') {
-    if (!this.prefs.showFields) this.prefs = { ...this.prefs, showFields: true };
+    this.revealFields();
     const f = this.store.addBlock(id, this.store.freeKey(id, 'note'), format);
     this.commit(fText(f.id, 0));
   }
@@ -632,7 +658,7 @@ export class Controller {
 
   /** Start adding a dependency: focus the `after` value with the link picker open. */
   addDependency(id: string) {
-    if (!this.prefs.showFields) this.prefs = { ...this.prefs, showFields: true };
+    this.revealFields();
     let f = this.store.field(id, DEP_KEY);
     if (f) {
       const v = f.text.trimEnd();

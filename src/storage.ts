@@ -20,10 +20,12 @@ for (const [from, to] of [
   }
 }
 
+export type FieldsMode = 'show' | 'fold' | 'hide';
+
 export interface Prefs {
   showCompleted: boolean;
-  /** Show field rows (`key: value`) in the outline. */
-  showFields: boolean;
+  /** Field rows (`key: value`) in the outline: shown, folded into a summary per row, or hidden. */
+  fields: FieldsMode;
   /** How items were last viewed, when not as an outline. */
   views: Record<string, Exclude<View, 'outline'>>;
   /** Index into the Gantt chart's day widths. */
@@ -33,10 +35,12 @@ export interface Prefs {
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true, showFields: true, views: {}, ganttScale: 2 };
+  const defaults: Prefs = { showCompleted: true, fields: 'show', views: {}, ganttScale: 2 };
   try {
-    const { ganttItems, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    const { ganttItems, showFields, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
     const prefs: Prefs = { ...defaults, ...saved };
+    // Earlier versions could only show or hide fields.
+    if (showFields === false && !saved.fields) prefs.fields = 'hide';
     // Earlier versions only remembered Gantt charts.
     if (Array.isArray(ganttItems)) for (const id of ganttItems) prefs.views[id] ??= 'gantt';
     return prefs;

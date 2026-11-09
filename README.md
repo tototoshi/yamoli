@@ -44,6 +44,7 @@ A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/y
 - A **block** (Alt+D) is a field with a multi-line value: Markdown, CSV, code or plain text. In YAML it is written as `note: !markdown |`.
 - Pasted YAML comes in as fields, nesting and blocks.
 - `[[` inserts a link to another item.
+- The **Fields** setting in the view bar shows field rows, folds each row's fields into a one-line summary (click it to open them), or hides them.
 
 The **?** at the top right lists the keyboard shortcuts.
 
