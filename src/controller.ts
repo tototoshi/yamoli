@@ -6,6 +6,7 @@ import { DEP_KEY } from './deps';
 import type { ScheduleResult } from './schedule';
 import { addGuideSlides, addScheduleSample } from './sample';
 import { UndoHistory } from './history';
+import { browserLang, setLang, t, type Lang } from './i18n';
 import { linkCandidates, pickerQueryAt } from './links';
 import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
@@ -284,6 +285,15 @@ export class Controller {
     return out;
   }
 
+  /** Switch the UI language (null: follow the browser). */
+  setLanguage(l: Lang | null) {
+    const { lang: _, ...rest } = this.prefs;
+    this.prefs = l ? { ...rest, lang: l } : rest;
+    savePrefs(this.prefs);
+    setLang(l ?? browserLang());
+    this.rerender();
+  }
+
   toggleShowFields() {
     this.prefs = { ...this.prefs, showFields: !this.prefs.showFields };
     savePrefs(this.prefs);
@@ -339,11 +349,15 @@ export class Controller {
     const vis = this.visibleRows();
     const idx = vis.indexOf(id);
     const next = vis.slice(idx + 1).find((r) => !store.isAncestor(id, r)) ?? vis[idx - 1];
-    const label = store.node(id).text.split('\n')[0].trim() || '無題';
+    const label = store.node(id).text.split('\n')[0].trim() || t('無題', 'Untitled');
     const below = store.descendantCount(id);
     store.remove(id);
     this.commit(this.view === 'outline' && next ? fText(next) : null);
-    this.showToast(`「${label.length > 20 ? label.slice(0, 20) + '…' : label}」を削除しました${below ? `（中の ${below} 件も）` : ''}`, true);
+    const short = label.length > 20 ? label.slice(0, 20) + '…' : label;
+    this.showToast(
+      t(`「${short}」を削除しました${below ? `（中の ${below} 件も）` : ''}`, `Deleted “${short}”${below ? ` and ${below} below it` : ''}`),
+      true
+    );
   }
 
   duplicateItem(id: string) {
@@ -354,8 +368,11 @@ export class Controller {
   /** Put a [[link]] to id on the clipboard, to paste into text or an `after`. */
   copyLink(id: string) {
     navigator.clipboard.writeText(`[[${id}]]`).then(
-      () => this.showToast('リンクをコピーしました。本文や属性の値に貼り付けると参照になります'),
-      () => this.showToast('クリップボードにコピーできませんでした')
+      () =>
+        this.showToast(
+          t('リンクをコピーしました。本文や属性の値に貼り付けると参照になります', 'Link copied. Paste it into a row or a field value to refer to this item')
+        ),
+      () => this.showToast(t('クリップボードにコピーできませんでした', 'Couldn’t copy to the clipboard'))
     );
   }
 

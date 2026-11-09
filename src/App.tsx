@@ -1,7 +1,8 @@
 import type { ComponentChildren, TargetedEvent, TextareaHTMLAttributes } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { applyFocus, Controller, fKey, fText, type View } from './controller';
-import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
+import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
+import { lang, t } from './i18n';
 import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
 import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
@@ -77,7 +78,7 @@ export function App() {
   ctl.schedule = computeSchedule(store, ctl.cycles, ctl.jpDays);
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
-  document.title = (zoomId === store.rootId ? 'Home' : zoom.text || '無題') + ' – Yamoli';
+  document.title = (zoomId === store.rootId ? 'Home' : zoom.text || t('無題', 'Untitled')) + ' – Yamoli';
 
   return (
     <Ctx.Provider value={ctl}>
@@ -89,9 +90,9 @@ export function App() {
           <ViewToggles />
           {search && (
             <div class="search-info">
-              {search.matches.size ? `${search.matches.size} 件` : '見つかりません'}
+              {search.matches.size ? t(`${search.matches.size} 件`, `${search.matches.size} found`) : t('見つかりません', 'No matches')}
               <button class="mini" onClick={() => ctl.setQuery('')}>
-                検索をクリア
+                {t('検索をクリア', 'Clear search')}
               </button>
             </div>
           )}
@@ -111,7 +112,7 @@ export function App() {
             </ul>
             {!search && !zoom.children.length && (
               <button class="add-first" onClick={() => ctl.commit(fText(store.addChild(zoomId).id, 0))}>
-                + 項目を追加
+                {t('+ 項目を追加', '+ Add an item')}
               </button>
             )}
           </section>
@@ -139,7 +140,7 @@ function TopBar() {
       <nav class="crumbs">
         {ancestors.map((id) => (
           <a key={id} href={ctl.hashFor(id)} class="crumb">
-            {store.node(id).text || '無題'}
+            {store.node(id).text || t('無題', 'Untitled')}
           </a>
         ))}
       </nav>
@@ -197,15 +198,15 @@ function MoreMenu() {
     if (!file) return;
     try {
       const next = OutlineStore.fromJSON(JSON.parse(await file.text()));
-      if (confirm('現在のアウトラインを置き換えますか？（元に戻すで取り消せます）')) ctl.replaceStore(next);
+      if (confirm(t('現在のアウトラインを置き換えますか？（元に戻すで取り消せます）', 'Replace the current outline? (Undo brings it back)'))) ctl.replaceStore(next);
     } catch (err) {
-      alert('読み込みに失敗しました: ' + (err as Error).message);
+      alert(t('読み込みに失敗しました: ', 'Couldn’t load the file: ') + (err as Error).message);
     }
   };
 
   return (
     <>
-      <Popup label="⋯" title="その他の操作">
+      <Popup label="⋯" title={t('その他の操作', 'More')}>
         {(close) => {
           const run = (f: () => void) => () => {
             close();
@@ -214,38 +215,42 @@ function MoreMenu() {
           return (
             <div class="menu-list" role="menu">
               <button role="menuitem" disabled={!ctl.history.canUndo} onClick={run(() => ctl.undo())}>
-                元に戻す<kbd>⌘Z</kbd>
+                {t('元に戻す', 'Undo')}<kbd>⌘Z</kbd>
               </button>
               <button role="menuitem" disabled={!ctl.history.canRedo} onClick={run(() => ctl.redo())}>
-                やり直す<kbd>⇧⌘Z</kbd>
+                {t('やり直す', 'Redo')}<kbd>⇧⌘Z</kbd>
               </button>
               <hr />
               <button
                 role="menuitem"
-                title="全体を YAML で保存（読み込みには使えません）"
+                title={t('全体を YAML で保存（読み込みには使えません）', 'Save everything as YAML (can’t be loaded back)')}
                 onClick={run(() => download(`yamoli-${day()}.yaml`, toYaml(toValue(ctl.store, ctl.store.rootId)), 'text/yaml'))}
               >
-                YAML で書き出す
+                {t('YAML で書き出す', 'Export as YAML')}
               </button>
               <button
                 role="menuitem"
-                title="全体をそのまま保存（読み込みで復元できます）"
+                title={t('全体をそのまま保存（読み込みで復元できます）', 'Save everything as is (load it to restore)')}
                 onClick={run(() => {
                   flush();
                   download(`yamoli-${day()}.json`, JSON.stringify(ctl.store.toJSON(), null, 2), 'application/json');
                 })}
               >
-                バックアップを書き出す（JSON）
+                {t('バックアップを書き出す（JSON）', 'Export a backup (JSON)')}
               </button>
               <button role="menuitem" onClick={run(() => fileRef.current?.click())}>
-                バックアップから読み込む…
+                {t('バックアップから読み込む…', 'Restore from a backup…')}
               </button>
               <hr />
-              <button role="menuitem" title="依存関係・日程計算・ガントの例" onClick={run(() => ctl.addSample())}>
-                サンプルプロジェクトを追加
+              <button role="menuitem" title={t('依存関係・日程計算・ガントの例', 'Dependencies, scheduling and the Gantt chart')} onClick={run(() => ctl.addSample())}>
+                {t('サンプルプロジェクトを追加', 'Add the sample project')}
               </button>
-              <button role="menuitem" title="このアプリの使い方（スライドの例）" onClick={run(() => ctl.addGuide())}>
-                使い方スライドを追加
+              <button role="menuitem" title={t('このアプリの使い方（スライドの例）', 'How to use this app (as slides)')} onClick={run(() => ctl.addGuide())}>
+                {t('使い方スライドを追加', 'Add the guide slides')}
+              </button>
+              <hr />
+              <button role="menuitem" onClick={run(() => ctl.setLanguage(lang() === 'ja' ? 'en' : 'ja'))}>
+                {lang() === 'ja' ? 'English' : '日本語'}
               </button>
             </div>
           );
@@ -262,7 +267,7 @@ function SearchBox() {
     <input
       class="search"
       type="search"
-      placeholder="検索 (⌘F)　例: status:進行中"
+      placeholder={t('検索 (⌘F)　例: status:進行中', 'Search (⌘F)  e.g. status:active')}
       spellcheck={false}
       value={ctl.query}
       onInput={(e) => ctl.setQuery(e.currentTarget.value)}
@@ -286,27 +291,30 @@ function SearchBox() {
 function SaveIndicator() {
   const ctl = useCtl();
   const s = saveState();
-  const where = dataFile ? `保存先: ${dataFile}` : '';
+  const where = dataFile ? t(`保存先: ${dataFile}`, `Saved to ${dataFile}`) : '';
   switch (s.kind) {
     case 'local':
       return (
         <span
           class="save-state"
-          title="ファイル保存用のサーバーが見つからないため、このブラウザ内に保存しています（URL ごとに別のデータになります）"
+          title={t(
+            'ファイル保存用のサーバーが見つからないため、このブラウザ内に保存しています（URL ごとに別のデータになります）',
+            'No file server found, so the outline is saved in this browser (separately for each URL)'
+          )}
         >
-          ブラウザに保存
+          {t('ブラウザに保存', 'Saved in browser')}
         </span>
       );
     case 'saved':
       return (
         <span class="save-state" title={where}>
-          保存済み
+          {t('保存済み', 'Saved')}
         </span>
       );
     case 'saving':
       return (
         <span class="save-state" title={where}>
-          保存中…
+          {t('保存中…', 'Saving…')}
         </span>
       );
     case 'error':
@@ -318,62 +326,62 @@ function SaveIndicator() {
     case 'conflict':
       return (
         <span class="save-state conflict" title={where}>
-          ⚠ 他の画面でファイルが更新されました
+          ⚠ {t('他の画面でファイルが更新されました', 'The file was changed elsewhere')}
           <button
             class="mini"
-            title="こちらの未保存の変更を捨てて、ファイルの内容を表示します"
+            title={t('こちらの未保存の変更を捨てて、ファイルの内容を表示します', 'Drop the changes here and show the file')}
             onClick={() => ctl.resolveConflict('file')}
           >
-            ファイルを読み込む
+            {t('ファイルを読み込む', 'Load the file')}
           </button>
           <button
             class="mini"
-            title="ファイルをこの画面の内容で上書きします"
+            title={t('ファイルをこの画面の内容で上書きします', 'Overwrite the file with what is shown here')}
             onClick={() => ctl.resolveConflict('mine')}
           >
-            こちらで上書き
+            {t('こちらで上書き', 'Keep mine')}
           </button>
         </span>
       );
   }
 }
 
-const SHORTCUTS: [string, string][] = [
-  ['Enter', '新しい行（カーソル位置で分割）'],
-  ['Shift+Enter', '行内改行'],
-  ['Tab / Shift+Tab', 'インデント / アウトデント'],
-  ['↑ / ↓', '前 / 次の行へ'],
-  ['Alt(⌘)+Shift+↑↓', '行を移動'],
-  ['⌘/Ctrl+↑ ↓', '折りたたみ / 展開'],
-  ['⌘/Ctrl+Enter', '完了 / 未完了'],
-  ['Alt+→ / ⌘+.', 'ズームイン（●クリックでも可）'],
-  ['Alt+← / ⌘+,', 'ズームアウト（ブラウザの戻るでも可）'],
-  ['name: と入力', '属性の行になる（値の先頭で Backspace で普通の行に戻す）'],
-  ['Alt+A', '属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）'],
-  ['Alt+D', 'ブロック（Markdown・CSV・コードなど複数行の値）を追加'],
-  ['[[', '他のアイテムへのリンク（本文・属性の値）'],
-  ['Esc / ⌘+Enter', 'ブロックの編集を終了'],
-  ['Delete / Ctrl+D（行末）', '次の行を結合（空の行なら行を削除）'],
-  ['⌘/Ctrl+Shift+Backspace', '行を削除（子も含む）'],
-  ['● をドラッグ', '行を移動（Esc でキャンセル）'],
-  ['⌘/Ctrl+Z', '元に戻す'],
-  ['⌘/Ctrl+Shift+Z / Ctrl+Y', 'やり直す'],
-  ['⌘/Ctrl+F', '検索（Esc でクリア、is:done で完了のみ）'],
-  ['is:ready / is:blocked', '着手可 / 待ち の行を検索（after 属性の依存）'],
-  ['is:late / is:critical', '期限超過 / クリティカルパス上の作業を検索'],
-  ['duration: 3d / 2w / 10cd', '作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）'],
-  ['start / due', '開始日（子にも継承）/ 期限 — 例 2026-11-10'],
-  ['スライド表示で ← →', 'ページ送り（F 全画面、N ノート、Home / End）'],
-  ['layout / notes / theme', 'スライドの属性（center・two-column・title / ノート / dark）'],
-  ['workdays / holidays', '稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）'],
+const shortcuts = (): [string, string][] => [
+  ['Enter', t('新しい行（カーソル位置で分割）', 'New row (splits at the caret)')],
+  ['Shift+Enter', t('行内改行', 'Line break within a row')],
+  ['Tab / Shift+Tab', t('インデント / アウトデント', 'Indent / outdent')],
+  ['↑ / ↓', t('前 / 次の行へ', 'Previous / next row')],
+  ['Alt(⌘)+Shift+↑↓', t('行を移動', 'Move the row')],
+  ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
+  ['⌘/Ctrl+Enter', t('完了 / 未完了', 'Complete / reopen')],
+  ['Alt+→ / ⌘+.', t('ズームイン（●クリックでも可）', 'Zoom in (or click the ●)')],
+  ['Alt+← / ⌘+,', t('ズームアウト（ブラウザの戻るでも可）', 'Zoom out (or the browser’s Back)')],
+  [t('name: と入力', 'Type name: '), t('属性の行になる（値の先頭で Backspace で普通の行に戻す）', 'Makes a field (Backspace at the value’s start undoes it)')],
+  ['Alt+A', t('属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）', 'Add a field (Tab under a field nests an object or list)')],
+  ['Alt+D', t('ブロック（Markdown・CSV・コードなど複数行の値）を追加', 'Add a block: a multi-line value (Markdown, CSV, code …)')],
+  ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
+  ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
+  [t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'), t('次の行を結合（空の行なら行を削除）', 'Join the next row (removes an empty row)')],
+  ['⌘/Ctrl+Shift+Backspace', t('行を削除（子も含む）', 'Delete the row and what’s below it')],
+  [t('● をドラッグ', 'Drag a ●'), t('行を移動（Esc でキャンセル）', 'Move the row (Esc cancels)')],
+  ['⌘/Ctrl+Z', t('元に戻す', 'Undo')],
+  ['⌘/Ctrl+Shift+Z / Ctrl+Y', t('やり直す', 'Redo')],
+  ['⌘/Ctrl+F', t('検索（Esc でクリア、is:done で完了のみ）', 'Search (Esc clears; is:done for completed rows)')],
+  ['is:ready / is:blocked', t('着手可 / 待ち の行を検索（after 属性の依存）', 'Rows ready to start / waiting (after dependencies)')],
+  ['is:late / is:critical', t('期限超過 / クリティカルパス上の作業を検索', 'Late work / work on the critical path')],
+  ['duration: 3d / 2w / 10cd', t('作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）', 'Length in working days / weeks / calendar days (0d: milestone)')],
+  ['start / due', t('開始日（子にも継承）/ 期限 — 例 2026-11-10', 'Start (inherited by children) / deadline — e.g. 2026-11-10')],
+  [t('スライド表示で ← →', '← → in slides'), t('ページ送り（F 全画面、N ノート、Home / End）', 'Page through (F full screen, N notes, Home / End)')],
+  ['layout / notes / theme', t('スライドの属性（center・two-column・title / ノート / dark）', 'Slide fields (center, two-column, title / speaker notes / dark)')],
+  ['workdays / holidays', t('稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）', 'Working days (default mon-fri) / days off (jp: Japanese holidays, a..b: a range)')],
 ];
 
 function HelpMenu() {
   return (
-    <Popup label="?" title="ショートカット">
+    <Popup label="?" title={t('ショートカット', 'Shortcuts')}>
       {() => (
         <dl class="shortcuts">
-          {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
+          {shortcuts().map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
         </dl>
       )}
     </Popup>
@@ -394,10 +402,10 @@ function ViewSwitch() {
     </button>
   );
   return (
-    <div class="view-switch" role="group" aria-label="表示">
-      {item('outline', 'アウトライン')}
-      {item('gantt', 'ガント')}
-      {item('slides', 'スライド')}
+    <div class="view-switch" role="group" aria-label={t('表示', 'View')}>
+      {item('outline', t('アウトライン', 'Outline'))}
+      {item('gantt', t('ガント', 'Gantt'))}
+      {item('slides', t('スライド', 'Slides'))}
       {item('yaml', 'YAML')}
       {item('json', 'JSON')}
     </div>
@@ -411,14 +419,14 @@ function ViewToggles() {
   if (view !== 'outline' && view !== 'gantt') return null;
   return (
     <div class="view-toggles">
-      <label title="完了した行を表示">
+      <label title={t('完了した行を表示', 'Show completed rows')}>
         <input type="checkbox" checked={prefs.showCompleted} onChange={() => ctl.toggleShowCompleted()} />
-        完了
+        {t('完了', 'Completed')}
       </label>
       {view === 'outline' && (
-        <label title="属性の行（name: value）を表示">
+        <label title={t('属性の行（name: value）を表示', 'Show field rows (name: value)')}>
           <input type="checkbox" checked={prefs.showFields} onChange={() => ctl.toggleShowFields()} />
-          属性
+          {t('属性', 'Fields')}
         </label>
       )}
     </div>
@@ -463,7 +471,7 @@ function NodeItem({ id }: { id: string }) {
         <button
           class={'toggle' + (canToggle ? '' : ' empty')}
           tabIndex={-1}
-          title={n.collapsed ? '展開' : '折りたたむ'}
+          title={n.collapsed ? t('展開', 'Expand') : t('折りたたむ', 'Collapse')}
           onMouseDown={keepFocus}
           onClick={toggle}
         >
@@ -473,7 +481,7 @@ function NodeItem({ id }: { id: string }) {
           class="bullet"
           href={ctl.hashFor(id)}
           tabIndex={-1}
-          title="クリックでズームイン / ドラッグで移動 / 右クリックでメニュー"
+          title={t('クリックでズームイン / ドラッグで移動 / 右クリックでメニュー', 'Click to zoom in / drag to move / right-click for the menu')}
           draggable={false}
           onPointerDown={(e) => e.button === 0 && startBulletDrag(e, id, ctl)}
           onContextMenu={(e) => {
@@ -534,7 +542,7 @@ function FieldKey({ node }: { node: OutlineNode }) {
   return (
     <span
       class="field-name"
-      title="クリックで名前を変更"
+      title={t('クリックで名前を変更', 'Click to rename')}
       onMouseDown={(e) => {
         e.preventDefault();
         ctl.focus(fKey(node.id));
@@ -561,7 +569,7 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
   return (
     <AutoTextarea
       class={'text' + (title ? ' title' : '')}
-      placeholder={title ? '無題' : undefined}
+      placeholder={title ? t('無題', 'Untitled') : undefined}
       data-id={node.id}
       data-fk={key}
       value={node.text}
@@ -642,32 +650,32 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
       {id !== ctl.zoomId && (
         <button
           class="mini"
-          title="完了 / 未完了 (⌘/Ctrl+Enter)"
+          title={t('完了 / 未完了 (⌘/Ctrl+Enter)', 'Complete / reopen (⌘/Ctrl+Enter)')}
           onMouseDown={keepFocus}
           onClick={() => ctl.toggleComplete(id)}
         >
           ✓
         </button>
       )}
-      <button class="mini" title="属性を追加 (Alt+A)" onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
-        + 属性
+      <button class="mini" title={t('属性を追加 (Alt+A)', 'Add a field (Alt+A)')} onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
+        {t('+ 属性', '+ Field')}
       </button>
       <button
         class="mini"
-        title="ブロック（Markdown・CSV・コードなど複数行の値）を追加 (Alt+D)"
+        title={t('ブロック（Markdown・CSV・コードなど複数行の値）を追加 (Alt+D)', 'Add a block: a multi-line value such as Markdown, CSV or code (Alt+D)')}
         onMouseDown={keepFocus}
         onClick={() => ctl.addBlock(id)}
       >
-        + ブロック
+        {t('+ ブロック', '+ Block')}
       </button>
       {id !== ctl.store.rootId && (
         <button
           class="mini"
-          title="依存先を追加（after 属性）"
+          title={t('依存先を追加（after 属性）', 'Add a dependency (after field)')}
           onMouseDown={keepFocus}
           onClick={() => ctl.addDependency(id)}
         >
-          + 依存
+          {t('+ 依存', '+ After')}
         </button>
       )}
     </span>
@@ -683,7 +691,7 @@ function BlockHead({ node }: { node: OutlineNode }) {
     <span class="block-head">
       <select
         class="block-format"
-        title="フォーマット"
+        title={t('フォーマット', 'Format')}
         value={node.format!}
         onChange={(e) => {
           ctl.store.setFormat(node.id, e.currentTarget.value);
@@ -695,7 +703,7 @@ function BlockHead({ node }: { node: OutlineNode }) {
             {f.label}
           </option>
         ))}
-        {!hasFormat(node.format!) && <option value={node.format!}>{node.format} (未定義)</option>}
+        {!hasFormat(node.format!) && <option value={node.format!}>{node.format} {t('(未定義)', '(unknown)')}</option>}
       </select>
       {node.collapsed && <span class="block-preview">{node.text.split('\n')[0].slice(0, 80)}</span>}
     </span>
@@ -715,7 +723,7 @@ function BlockBody({ node }: { node: OutlineNode }) {
         <AutoTextarea
           class="block-editor"
           spellcheck={false}
-          placeholder={getFormat(node.format!).placeholder}
+          placeholder={placeholderOf(getFormat(node.format!))}
           data-id={node.id}
           data-fk={key}
           value={node.text}
@@ -729,7 +737,7 @@ function BlockBody({ node }: { node: OutlineNode }) {
       ) : (
         <div
           class="data-view"
-          title="クリックして編集（Esc で終了）"
+          title={t('クリックして編集（Esc で終了）', 'Click to edit (Esc to finish)')}
           dangerouslySetInnerHTML={{ __html: html }}
           onClick={(e) => !(e.target as Element).closest('a') && ctl.focus(fText(node.id, 'end'))}
         />
@@ -748,7 +756,7 @@ function Backlinks({ id }: { id: string }) {
   if (!links.length) return null;
   return (
     <div class="backlinks">
-      <div class="backlinks-title">被リンク {links.length}</div>
+      <div class="backlinks-title">{t('被リンク', 'Linked from')} {links.length}</div>
       <ul>
         {links.map((b, i) => {
           const path = store
@@ -759,7 +767,7 @@ function Backlinks({ id }: { id: string }) {
           return (
             <li key={`${b.nodeId}:${b.via ?? ''}:${i}`}>
               <a href={ctl.hashFor(b.nodeId)}>{nodeLabel(store, b.nodeId)}</a>
-              {b.via !== null && <span class="via">{b.via || '(属性)'}</span>}
+              {b.via !== null && <span class="via">{b.via || t('(属性)', '(field)')}</span>}
               {path && <span class="bl-path">{path}</span>}
             </li>
           );
@@ -807,7 +815,7 @@ function LinkPickerMenu() {
           </li>
         ))
       ) : (
-        <li class="empty">一致するアイテムがありません</li>
+        <li class="empty">{t('一致するアイテムがありません', 'No matching items')}</li>
       )}
     </ul>
   );
@@ -871,44 +879,46 @@ function ItemMenuView() {
 
   return (
     <div ref={ref} class="item-menu" role="menu" onKeyDown={onKeyDown} onContextMenu={(e) => e.preventDefault()}>
-      <div class="item-menu-title">{nodeLabel(store, m.id) || '無題'}</div>
+      <div class="item-menu-title">{nodeLabel(store, m.id)}</div>
       <button role="menuitem" onClick={run(() => (location.hash = ctl.hashFor(m.id, outline ? undefined : 'gantt')))}>
-        ズームイン
+        {t('ズームイン', 'Zoom in')}
       </button>
       {outline && n.children.length > 0 && (
         <button role="menuitem" onClick={run(() => (location.hash = ctl.hashFor(m.id, 'gantt')))}>
-          ガントで開く
+          {t('ガントで開く', 'Open as Gantt')}
         </button>
       )}
       <hr />
       <button role="menuitem" onClick={run(() => ctl.toggleComplete(m.id))}>
-        {n.completed ? '未完了に戻す' : '完了にする'}
+        {n.completed ? t('未完了に戻す', 'Reopen') : t('完了にする', 'Complete')}
       </button>
       {outline && (
         <>
           <button role="menuitem" onClick={run(() => ctl.addAttribute(m.id))}>
-            属性を追加
+            {t('属性を追加', 'Add a field')}
           </button>
           <button role="menuitem" onClick={run(() => ctl.toggleField(m.id))}>
-            {n.key === null ? '属性の行にする' : '普通の行に戻す'}
+            {n.key === null ? t('属性の行にする', 'Make it a field') : t('普通の行に戻す', 'Make it an ordinary row')}
           </button>
           <button role="menuitem" onClick={run(() => ctl.addBlock(m.id))}>
-            ブロックを追加
+            {t('ブロックを追加', 'Add a block')}
           </button>
           <button role="menuitem" onClick={run(() => ctl.addDependency(m.id))}>
-            依存を追加
+            {t('依存を追加', 'Add a dependency')}
           </button>
         </>
       )}
       <button role="menuitem" onClick={run(() => ctl.duplicateItem(m.id))}>
-        複製{below ? `（中の ${below} 件も）` : ''}
+        {t('複製', 'Duplicate')}
+        {below ? t(`（中の ${below} 件も）`, ` (with ${below} below)`) : ''}
       </button>
       <button role="menuitem" onClick={run(() => ctl.copyLink(m.id))}>
-        リンクをコピー
+        {t('リンクをコピー', 'Copy link')}
       </button>
       <hr />
       <button role="menuitem" class="danger" onClick={run(() => ctl.deleteItem(m.id))}>
-        削除{below ? `（中の ${below} 件も）` : ''}
+        {t('削除', 'Delete')}
+        {below ? t(`（中の ${below} 件も）`, ` (with ${below} below)`) : ''}
       </button>
     </div>
   );
@@ -916,22 +926,22 @@ function ItemMenuView() {
 
 function ToastView() {
   const ctl = useCtl();
-  const t = ctl.toast;
-  if (!t) return null;
+  const toast = ctl.toast;
+  if (!toast) return null;
   return (
     <div class="toast" role="status" onMouseEnter={() => ctl.holdToast(true)} onMouseLeave={() => ctl.holdToast(false)}>
-      {t.message}
-      {t.undo && (
+      {toast.message}
+      {toast.undo && (
         <button
           onClick={() => {
             ctl.undo();
             ctl.hideToast();
           }}
         >
-          元に戻す
+          {t('元に戻す', 'Undo')}
         </button>
       )}
-      <button class="close" title="閉じる" onClick={() => ctl.hideToast()}>
+      <button class="close" title={t('閉じる', 'Close')} onClick={() => ctl.hideToast()}>
         ×
       </button>
     </div>
@@ -948,22 +958,22 @@ function DepBadge({ id }: { id: string }) {
   if (status === 'none' || (store.node(id).completed && status !== 'cycle')) return null;
   if (status === 'ready') {
     return (
-      <span class="dep-badge ready" title="前提がすべて完了しています">
-        着手可
+      <span class="dep-badge ready" title={t('前提がすべて完了しています', 'Everything it waits for is done')}>
+        {t('着手可', 'Ready')}
       </span>
     );
   }
   if (status === 'cycle') {
     return (
-      <span class="dep-badge cycle" title="依存関係が循環しています">
-        循環
+      <span class="dep-badge cycle" title={t('依存関係が循環しています', 'Dependency cycle')}>
+        {t('循環', 'Cycle')}
       </span>
     );
   }
   const waiting = blockers(store, id);
   return (
-    <span class="dep-badge blocked" title={'待っている: ' + waiting.map((w) => nodeLabel(store, w)).join('、')}>
-      待ち {waiting.length}
+    <span class="dep-badge blocked" title={t('待っている: ', 'Waiting for: ') + waiting.map((w) => nodeLabel(store, w)).join(t('、', ', '))}>
+      {t('待ち', 'Waiting')} {waiting.length}
     </span>
   );
 }
@@ -983,14 +993,14 @@ function DependencyPanel({ id }: { id: string }) {
     <div class="deps">
       {before.length > 0 && (
         <div class="deps-row">
-          <span class="deps-title">前提</span>
+          <span class="deps-title">{t('前提', 'After')}</span>
           {before.map(chip)}
           <DepBadge id={id} />
         </div>
       )}
       {after.length > 0 && (
         <div class="deps-row">
-          <span class="deps-title">後続</span>
+          <span class="deps-title">{t('後続', 'Before')}</span>
           {after.map(chip)}
         </div>
       )}
@@ -1005,15 +1015,15 @@ function SchedLabel({ id, header }: { id: string; header?: boolean }) {
   const { schedule, store } = useCtl();
   const invalid = schedule.invalid.get(id);
   const bad = invalid && (
-    <span class="sched invalid" title="この値を解釈できません">
+    <span class="sched invalid" title={t('この値を解釈できません', 'Can’t read this value')}>
       ⚠ {invalid}
     </span>
   );
   if (schedule.unscheduled.has(id)) {
     return (
       <>
-        <span class="sched unscheduled" title="start がこの行にも親にもなく、日程を計算できる依存もありません">
-          開始日未設定
+        <span class="sched unscheduled" title={t('start がこの行にも親にもなく、日程を計算できる依存もありません', 'No start on this row or above it, and no scheduled dependency')}>
+          {t('開始日未設定', 'No start date')}
         </span>
         {bad}
       </>
@@ -1035,9 +1045,9 @@ function SchedLabel({ id, header }: { id: string; header?: boolean }) {
       <span class={cls} title={tip}>
         {s.critical && s.kind !== 'summary' && <span class="crit">★</span>}
         {range}
-        {s.kind === 'summary' && <span class="span">{span}日</span>}
+        {s.kind === 'summary' && <span class="span">{t(`${span}日`, `${span}d`)}</span>}
         {s.delayed && <span class="delayed">↷</span>}
-        {s.late > 0 && !done && <span class="late">{s.late}日超過</span>}
+        {s.late > 0 && !done && <span class="late">{t(`${s.late}日超過`, `${s.late}d late`)}</span>}
       </span>
       {bad}
     </>

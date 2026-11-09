@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { today, type Day } from './calendar';
 import { useCtl } from './context';
+import { lang, t } from './i18n';
 import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
 import { nodeLabel } from './links';
 import type { OutlineStore } from './model';
@@ -60,8 +61,17 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   if (!rows.length) {
     return (
       <p class="gantt-empty">
-        日程のある作業がありません。作業に <code>duration</code>（例 3d）を、プロジェクトに <code>start</code>（例
-        2026-11-10）を設定すると表示されます。
+        {lang() === 'en' ? (
+          <>
+            Nothing is scheduled yet. Give tasks a <code>duration</code> (e.g. 3d) and the project a <code>start</code> (e.g.
+            2026-11-10).
+          </>
+        ) : (
+          <>
+            日程のある作業がありません。作業に <code>duration</code>（例 3d）を、プロジェクトに <code>start</code>（例
+            2026-11-10）を設定すると表示されます。
+          </>
+        )}
       </p>
     );
   }
@@ -83,26 +93,26 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
     <div class={'gantt-wrap' + (embedded ? ' embedded' : '')}>
       {!embedded && (
         <div class="gantt-tools">
-          <button class="mini" title="縮小" disabled={scale === 0} onClick={() => ctl.setGanttScale(scale - 1)}>
+          <button class="mini" title={t('縮小', 'Narrower days')} disabled={scale === 0} onClick={() => ctl.setGanttScale(scale - 1)}>
             −
           </button>
           <button
             class="mini"
-            title="拡大"
+            title={t('拡大', 'Wider days')}
             disabled={scale === GANTT_SCALES.length - 1}
             onClick={() => ctl.setGanttScale(scale + 1)}
           >
             ＋
           </button>
           <button class="mini" disabled={now < range.from || now > range.to} onClick={scrollToToday}>
-            今日
+            {t('今日', 'Today')}
           </button>
           <span class="gantt-legend">
             <i class="lg task" />
-            作業 <i class="lg critical" />
-            クリティカルパス <i class="lg late" />
-            期限超過 <i class="lg due" />
-            期限
+            {t('作業', 'Task')} <i class="lg critical" />
+            {t('クリティカルパス', 'Critical path')} <i class="lg late" />
+            {t('期限超過', 'Late')} <i class="lg due" />
+            {t('期限', 'Due')}
           </span>
         </div>
       )}
@@ -136,7 +146,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                   {canToggle ? (ctl.isExpanded(id) ? '▾' : '▸') : ''}
                 </button>
                 <a href={ctl.hashFor(id, 'gantt')} title={nodeLabel(store, id)}>
-                  {nodeLabel(store, id) || '無題'}
+                  {nodeLabel(store, id)}
                 </a>
               </div>
             );

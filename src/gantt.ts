@@ -5,7 +5,10 @@
 import { formatDate, type Day } from './calendar';
 import { dependencies } from './deps';
 import type { OutlineStore } from './model';
+import { t } from './i18n';
 import type { Sched, ScheduleResult } from './schedule';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export interface DayRange {
   from: Day;
@@ -22,10 +25,10 @@ export function scheduleIssue(store: OutlineStore, id: string, schedule: Schedul
   if (schedule.byId.has(id)) return null;
   const invalid = schedule.invalid.get(id);
   if (invalid) return `⚠ ${invalid}`;
-  if (cycles.has(id)) return '⚠ 依存が循環しています';
-  if (schedule.unscheduled.has(id)) return '開始日未設定';
+  if (cycles.has(id)) return t('⚠ 依存が循環しています', '⚠ Dependency cycle');
+  if (schedule.unscheduled.has(id)) return t('開始日未設定', 'No start date');
   const n = store.node(id);
-  if (!store.items(id).length && !n.completed) return 'duration 未設定';
+  if (!store.items(id).length && !n.completed) return t('duration 未設定', 'No duration');
   return null;
 }
 
@@ -52,14 +55,14 @@ export interface MonthBand {
   label: string;
 }
 
-/** Month bands within the range, labelled "2026年11月". */
+/** Month bands within the range, labelled "2026年11月" (or "Nov 2026"). */
 export function monthBands({ from, to }: DayRange): MonthBand[] {
   const bands: MonthBand[] = [];
   for (let d = from; d <= to; ) {
     const [y, m] = formatDate(d).split('-').map(Number);
     const nextMonth = Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 1) / 86_400_000;
     const end = Math.min(nextMonth - 1, to);
-    bands.push({ start: d, end, label: `${y}年${m}月` });
+    bands.push({ start: d, end, label: t(`${y}年${m}月`, `${MONTHS[m - 1]} ${y}`) });
     d = end + 1;
   }
   return bands;
@@ -89,12 +92,14 @@ export function dependencyLinks(store: OutlineStore, rows: string[], schedule: S
 export function schedTooltip(s: Sched): string {
   const span = s.end - s.start + 1;
   return [
-    s.kind === 'summary' ? '子の作業の期間' : s.kind === 'milestone' ? 'マイルストーン' : '作業',
-    s.kind === 'milestone' ? formatDate(s.start) : `${formatDate(s.start)} 〜 ${formatDate(s.end)}（${span}日間）`,
-    s.due !== undefined && `期限 ${formatDate(s.due)}`,
-    s.late > 0 && `${s.late}日超過`,
-    s.delayed && '依存のため指定の開始日より遅れて開始',
-    s.critical && s.kind !== 'summary' && 'クリティカルパス上（遅れると全体が遅れる）',
+    s.kind === 'summary' ? t('子の作業の期間', 'Span of the work below') : s.kind === 'milestone' ? t('マイルストーン', 'Milestone') : t('作業', 'Task'),
+    s.kind === 'milestone'
+      ? formatDate(s.start)
+      : t(`${formatDate(s.start)} 〜 ${formatDate(s.end)}（${span}日間）`, `${formatDate(s.start)} – ${formatDate(s.end)} (${span} days)`),
+    s.due !== undefined && t(`期限 ${formatDate(s.due)}`, `Due ${formatDate(s.due)}`),
+    s.late > 0 && t(`${s.late}日超過`, `${s.late} days late`),
+    s.delayed && t('依存のため指定の開始日より遅れて開始', 'Starts after its start date because of dependencies'),
+    s.critical && s.kind !== 'summary' && t('クリティカルパス上（遅れると全体が遅れる）', 'On the critical path (a delay delays everything)'),
   ]
     .filter(Boolean)
     .join('\n');

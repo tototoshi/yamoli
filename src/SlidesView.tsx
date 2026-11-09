@@ -4,6 +4,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
+import { t } from './i18n';
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
@@ -68,7 +69,10 @@ export function SlidesView() {
   if (!slide) {
     return (
       <p class="slides-empty">
-        スライドがありません。この項目の下に行を追加すると、1 行が 1 枚のスライドになります（子の行は箇条書き）。
+        {t(
+          'スライドがありません。この項目の下に行を追加すると、1 行が 1 枚のスライドになります（子の行は箇条書き）。',
+          'No slides yet. Each row under this item becomes a slide (rows under it are its bullets).'
+        )}
       </p>
     );
   }
@@ -99,26 +103,26 @@ export function SlidesView() {
           </div>
         </div>
         <div class="slide-controls">
-          <button class="mini" disabled={index === 0} onClick={() => go(index - 1)} title="前へ (←)">
+          <button class="mini" disabled={index === 0} onClick={() => go(index - 1)} title={t('前へ (←)', 'Previous (←)')}>
             ◀
           </button>
           <span class="slide-count">
             {index + 1} / {count}
           </span>
-          <button class="mini" disabled={index === count - 1} onClick={() => go(index + 1)} title="次へ (→)">
+          <button class="mini" disabled={index === count - 1} onClick={() => go(index + 1)} title={t('次へ (→)', 'Next (→)')}>
             ▶
           </button>
-          <button class={'mini' + (showNotes ? ' on' : '')} onClick={() => setShowNotes(!showNotes)} title="ノート (N)">
-            ノート
+          <button class={'mini' + (showNotes ? ' on' : '')} onClick={() => setShowNotes(!showNotes)} title={t('ノート (N)', 'Notes (N)')}>
+            {t('ノート', 'Notes')}
           </button>
-          <button class="mini" onClick={fullscreen} title="全画面 (F、Esc で戻る)">
-            全画面
+          <button class="mini" onClick={fullscreen} title={t('全画面 (F、Esc で戻る)', 'Full screen (F, Esc to leave)')}>
+            {t('全画面', 'Full screen')}
           </button>
           <a class="slide-edit" href={ctl.hashFor(slide.id, 'outline')}>
-            このスライドを編集
+            {t('このスライドを編集', 'Edit this slide')}
           </a>
         </div>
-        {showNotes && <div class="slide-notes">{slide.notes || <span class="muted">（notes: でノートを書けます）</span>}</div>}
+        {showNotes && <div class="slide-notes">{slide.notes || <span class="muted">{t('（notes: でノートを書けます）', '(write notes in a notes: field)')}</span>}</div>}
       </div>
     </div>
   );

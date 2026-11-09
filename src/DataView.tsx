@@ -4,6 +4,7 @@
  */
 import { useState } from 'preact/hooks';
 import { useCtl } from './context';
+import { t } from './i18n';
 import { toValue, toYaml } from './serialize';
 
 export function DataView({ format }: { format: 'yaml' | 'json' }) {
@@ -22,9 +23,9 @@ export function DataView({ format }: { format: 'yaml' | 'json' }) {
     <section class="serial-view">
       <div class="serial-view-tools">
         <button class="mini" onClick={copy}>
-          {copied ? 'コピーしました' : 'コピー'}
+          {copied ? t('コピーしました', 'Copied') : t('コピー', 'Copy')}
         </button>
-        <span class="muted">読み取り専用 — 編集はアウトラインで</span>
+        <span class="muted">{t('読み取り専用 — 編集はアウトラインで', 'Read-only — edit in the outline')}</span>
       </div>
       <pre class={'serial-view-text fmt-' + format}>{text}</pre>
     </section>

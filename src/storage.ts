@@ -1,5 +1,6 @@
 import { OutlineStore } from './model';
 import type { View } from './controller';
+import { lang, t, type Lang } from './i18n';
 import { addGuideSlides, addScheduleSample } from './sample';
 
 const STORAGE_KEY = 'yamoli:v1';
@@ -27,6 +28,8 @@ export interface Prefs {
   views: Record<string, Exclude<View, 'outline'>>;
   /** Index into the Gantt chart's day widths. */
   ganttScale: number;
+  /** The UI language the user picked; the browser's when unset. */
+  lang?: Lang;
 }
 
 export function loadPrefs(): Prefs {
@@ -133,7 +136,13 @@ export async function init(): Promise<void> {
     console.error('Failed to read the outline file', e);
     dataFile = null;
     initial = loadLocal();
-    setState({ kind: 'error', message: 'ファイルを読み込めませんでした。ブラウザ内のデータを表示しています（ファイルには保存しません）' });
+    setState({
+      kind: 'error',
+      message: t(
+        'ファイルを読み込めませんでした。ブラウザ内のデータを表示しています（ファイルには保存しません）',
+        'Couldn’t read the file. Showing the copy in this browser (not saved to the file)'
+      ),
+    });
   }
 }
 
@@ -191,7 +200,10 @@ function push() {
     })
     .catch((e) => {
       console.error('Failed to save outline file', e);
-      setState({ kind: 'error', message: 'ファイルに保存できません（サーバーが止まっている？）。自動で再試行します' });
+      setState({
+        kind: 'error',
+        message: t('ファイルに保存できません（サーバーが止まっている？）。自動で再試行します', 'Can’t save to the file (is the server down?). Retrying'),
+      });
       retryTimer = setTimeout(push, 5000);
     })
     .finally(() => {
@@ -219,7 +231,7 @@ async function checkExternal() {
 export async function resolveConflict(keep: 'file' | 'mine', mine: OutlineStore) {
   const res = await fetch(API, { cache: 'no-store' }).catch(() => null);
   if (!res || (res.status !== 200 && res.status !== 204)) {
-    setState({ kind: 'error', message: 'ファイルを確認できませんでした' });
+    setState({ kind: 'error', message: t('ファイルを確認できませんでした', 'Couldn’t check the file') });
     return;
   }
   etag = res.headers.get('ETag');
@@ -249,36 +261,47 @@ window.addEventListener('beforeunload', (e) => {
 function seed(): OutlineStore {
   const s = OutlineStore.create();
   const r = s.rootId;
-  const welcome = s.addChild(r, -1, 'Yamoli へようこそ');
-  s.addChild(welcome.id, -1, 'Enter で新しい行、Tab / Shift+Tab でインデント');
-  s.addChild(welcome.id, -1, '左の ● をクリックするとその項目にズームイン（パンくずでズームアウト）');
-  s.addChild(welcome.id, -1, 'Alt+A で属性、Alt+D でブロック（Markdown などの複数行）を追加');
+  const welcome = s.addChild(r, -1, t('Yamoli へようこそ', 'Welcome to Yamoli'));
+  s.addChild(welcome.id, -1, t('Enter で新しい行、Tab / Shift+Tab でインデント', 'Enter for a new row, Tab / Shift+Tab to indent'));
+  s.addChild(
+    welcome.id,
+    -1,
+    t('左の ● をクリックするとその項目にズームイン（パンくずでズームアウト）', 'Click the ● on the left to zoom into an item (the breadcrumbs zoom out)')
+  );
+  s.addChild(
+    welcome.id,
+    -1,
+    t('Alt+A で属性、Alt+D でブロック（Markdown などの複数行）を追加', 'Alt+A adds a field, Alt+D a block (multi-line Markdown and such)')
+  );
 
-  const proj = s.addChild(r, -1, 'プロジェクト A');
-  s.addField(proj.id, 'status', '進行中');
+  const proj = s.addChild(r, -1, t('プロジェクト A', 'Project A'));
+  s.addField(proj.id, 'status', t('進行中', 'active'));
   s.addField(proj.id, 'due', '2026-12-01');
-  const spec = s.addChild(proj.id, -1, '仕様');
+  const spec = s.addChild(proj.id, -1, t('仕様', 'Spec'));
   s.addBlock(
     spec.id,
     'body',
     'markdown',
-    '## 概要\n\nアウトラインの各行は **属性** を持てます。\n\n- 1行の値: `status: 進行中`\n- 入れ子: 属性の下に属性（オブジェクト）や行（リスト）\n- ブロック: フォーマット付きの複数行\n  - Markdown, CSV, Code, Text\n\n| 項目 | 状態 |\n| --- | :---: |\n| zoom | 済 |\n| attribute | 済 |'
+    t(
+      '## 概要\n\nアウトラインの各行は **属性** を持てます。\n\n- 1行の値: `status: 進行中`\n- 入れ子: 属性の下に属性（オブジェクト）や行（リスト）\n- ブロック: フォーマット付きの複数行\n  - Markdown, CSV, Code, Text\n\n| 項目 | 状態 |\n| --- | :---: |\n| zoom | 済 |\n| attribute | 済 |',
+      '## Overview\n\nEach row of the outline can have **fields**.\n\n- A one-line value: `status: active`\n- Nesting: fields (an object) or rows (a list) under a field\n- Blocks: multi-line values with a format\n  - Markdown, CSV, Code, Text\n\n| Feature | Status |\n| --- | :---: |\n| zoom | done |\n| fields | done |'
+    )
   );
   // Settings are plain nested fields: an object and a list.
-  const conf = s.addChild(proj.id, -1, '設定');
+  const conf = s.addChild(proj.id, -1, t('設定', 'Settings'));
   s.addField(conf.id, 'theme', 'auto');
   s.addField(conf.id, 'fontSize', '15');
   const tags = s.addField(conf.id, 'tags');
-  ['outline', 'notes'].forEach((t) => s.addChild(tags.id, -1, t));
+  ['outline', 'notes'].forEach((tag) => s.addChild(tags.id, -1, tag));
   s.addField(conf.id, 'beta', 'true');
-  const sales = s.addChild(proj.id, -1, '売上');
+  const sales = s.addChild(proj.id, -1, t('売上', 'Sales'));
   s.addBlock(sales.id, 'table', 'csv', 'month,amount\n2026-09,120\n2026-10,135\n2026-11,150');
 
   const sample = addScheduleSample(s, r);
   s.setCollapsed(addGuideSlides(s, r, sample), true);
 
-  const shop = s.addChild(r, -1, '買い物リスト');
-  ['牛乳', '卵', 'パン'].forEach((t) => s.addChild(shop.id, -1, t));
+  const shop = s.addChild(r, -1, t('買い物リスト', 'Shopping list'));
+  (lang() === 'ja' ? ['牛乳', '卵', 'パン'] : ['Milk', 'Eggs', 'Bread']).forEach((item) => s.addChild(shop.id, -1, item));
   s.setCollapsed(shop.id, true);
   return s;
 }

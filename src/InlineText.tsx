@@ -5,6 +5,7 @@
  */
 import { useMemo } from 'preact/hooks';
 import { useCtl } from './context';
+import { t } from './i18n';
 import { highlight, parseInline, type Seg } from './inline';
 import { nodeLabel } from './links';
 
@@ -38,7 +39,7 @@ export function SegView({ seg }: { seg: Seg }) {
       return <del>{pieces}</del>;
     case 'tag':
       return (
-        <span class="tag" title="このタグで検索">
+        <span class="tag" title={t('このタグで検索', 'Search for this tag')}>
           {pieces}
         </span>
       );
@@ -46,7 +47,7 @@ export function SegView({ seg }: { seg: Seg }) {
       const target = ctl.store.get(seg.refId!);
       if (!target) return <>{pieces}</>; // unknown id: show the raw text
       return (
-        <a class={'ref' + (target.completed ? ' done' : '')} href={ctl.hashFor(target.id)} title="クリックで移動">
+        <a class={'ref' + (target.completed ? ' done' : '')} href={ctl.hashFor(target.id)} title={t('クリックで移動', 'Go to this item')}>
           {nodeLabel(ctl.store, target.id)}
         </a>
       );

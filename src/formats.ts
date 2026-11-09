@@ -14,11 +14,13 @@
  */
 import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
+import { t } from './i18n';
 
 export interface Format {
   name: string;
   label: string;
-  placeholder: string;
+  /** Hint in the empty editor (a function when it depends on the language). */
+  placeholder: string | (() => string);
   render: (content: string) => string;
 }
 
@@ -27,13 +29,14 @@ export const escapeHtml = (s: string) => String(s).replace(/[&<>"']/g, (c) => ES
 
 const registry = new Map<string, Format>();
 
-export function registerFormat(name: string, def: Omit<Format, 'name' | 'placeholder'> & { placeholder?: string }) {
+export function registerFormat(name: string, def: Omit<Format, 'name' | 'placeholder'> & { placeholder?: Format['placeholder'] }) {
   registry.set(name, { name, placeholder: '', ...def });
 }
 
 export const hasFormat = (name: string) => registry.has(name);
 export const getFormat = (name: string): Format => registry.get(name) ?? registry.get('text')!;
 export const listFormats = () => [...registry.values()];
+export const placeholderOf = (f: Format) => (typeof f.placeholder === 'function' ? f.placeholder() : f.placeholder);
 
 // Links open in a new tab.
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -44,7 +47,7 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 });
 
 export function renderFormat(name: string, content: string): string {
-  if (!content.trim()) return '<div class="fmt-empty">(空 — クリックして編集)</div>';
+  if (!content.trim()) return `<div class="fmt-empty">${t('(空 — クリックして編集)', '(empty — click to edit)')}</div>`;
   let html: string;
   try {
     html = getFormat(name).render(content);
@@ -58,7 +61,7 @@ export function renderFormat(name: string, content: string): string {
 
 registerFormat('text', {
   label: 'Text',
-  placeholder: 'プレーンテキスト',
+  placeholder: () => t('プレーンテキスト', 'Plain text'),
   render: (c) => `<div class="fmt-text">${escapeHtml(c)}</div>`,
 });
 
@@ -70,7 +73,7 @@ export const markdown = (src: string) => md.parse(src) as string;
 
 registerFormat('markdown', {
   label: 'Markdown',
-  placeholder: '# 見出し\n\n- **太字** や `code` が使えます',
+  placeholder: () => t('# 見出し\n\n- **太字** や `code` が使えます', '# Heading\n\n- **bold** and `code` work'),
   render: (c) => `<div class="fmt-markdown">${markdown(c)}</div>`,
 });
 
@@ -128,7 +131,7 @@ export function parseCsv(src: string): string[][] {
 }
 
 registerFormat('csv', {
-  label: 'CSV (表)',
+  label: 'CSV',
   placeholder: 'name,qty\napple,3',
   render: (c) => {
     const [head, ...body] = parseCsv(c);

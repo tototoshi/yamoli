@@ -3,6 +3,7 @@
  * field values); it is displayed with the target's current text, so renaming
  * the target never breaks it.
  */
+import { t } from './i18n';
 import type { OutlineStore } from './model';
 
 const REF_RE = /\[\[([^[\]\s]+)\]\]/g;
@@ -60,7 +61,7 @@ export function nodeLabel(store: OutlineStore, id: string, depth = 0): string {
     .replace(/\*\*([^*]+)\*\*|~~([^~]+)~~|`([^`]+)`|\*([^*\s][^*]*)\*/g, (_, a, b, c, d) => a ?? b ?? c ?? d)
     .trim();
   if (n.key !== null) return `${n.key}: ${text}`;
-  return text || '無題';
+  return text || t('無題', 'Untitled');
 }
 
 const norm = (s: string) => s.normalize('NFKC').toLowerCase();
