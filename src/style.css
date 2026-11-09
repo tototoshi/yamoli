@@ -124,10 +124,11 @@ button, select, input, textarea { font: inherit; color: inherit; }
   margin: 0;
   padding: 8px 10px;
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* Keys as wide as they need, up to a limit past which a long one wraps (at its spaces). */
+  grid-template-columns: fit-content(170px) 1fr;
   gap: 4px 12px;
 }
-.shortcuts dt { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.shortcuts dt { font-family: var(--mono); font-size: 12px; }
 .shortcuts dd { margin: 0; }
 .menu-list { min-width: 240px; }
 .menu-list button {
