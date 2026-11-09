@@ -163,7 +163,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- page */
 
-.page { max-width: 860px; margin: 0 auto; padding: 24px 16px 40vh; }
+.page { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40vh; }
 .page.wide { max-width: 1400px; }
 .page.slides-page { padding-bottom: 24px; }
 
@@ -186,7 +186,9 @@ ul.children ul.children {
   border-left: 1px solid var(--faint);
 }
 
-.row { position: relative; display: flex; align-items: flex-start; }
+.row { position: relative; display: flex; align-items: flex-start; border-radius: 4px; }
+/* The row under the pointer, so its buttons at the far end read as its own. */
+.row:hover { background: var(--hover); }
 
 .toggle {
   flex: none;
@@ -394,14 +396,19 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .deps .dep-badge { margin: 0; }
 
 .row-actions {
-  flex: none;
+  /* Laid over the end of the row, so they take no width from the text. */
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   gap: 4px;
-  padding-top: 2px;
+  padding: 2px 0 2px 24px;
+  background: linear-gradient(to right, transparent, var(--hover) 20px);
   opacity: 0;
-  transition: opacity 0.1s;
+  visibility: hidden;
+  transition: opacity 0.1s, visibility 0.1s;
 }
-.row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
+.row:hover > .row-actions { opacity: 1; visibility: visible; }
 
 /* ---------------------------------------------------------------- meta */
 
