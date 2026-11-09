@@ -265,7 +265,7 @@ textarea.text {
   background: transparent;
   line-height: 1.6;
 }
-textarea.text.title { padding: 0; }
+textarea.text.title { padding: 0; width: 100%; } /* not in a flex row, so it would keep the default 20 columns */
 
 .text-view {
   flex: 1;
