@@ -24,6 +24,13 @@ import { dataFile, flush, saveState } from './storage';
 const keepFocus = (e: MouseEvent) => e.preventDefault();
 const imeActive = (e: KeyboardEvent) => e.isComposing || e.keyCode === 229;
 
+/**
+ * Whether the editor for key has focus. Checked by key, not element: moving a
+ * row (Tab, Alt+Shift+↑↓) re-creates its editor, and the old one's blur must
+ * not close the new one.
+ */
+const hasFocus = (key: string) => (document.activeElement as HTMLElement | null)?.dataset?.fk === key;
+
 // ================================================================ app
 
 export function App() {
@@ -532,10 +539,7 @@ function FieldKey({ node }: { node: OutlineNode }) {
           value={node.key!}
           onInput={(e) => ctl.onKeyInput(node.id, e.currentTarget)}
           onKeyDown={(e) => !imeActive(e) && ctl.onKeyKeydown(e, e.currentTarget)}
-          onBlur={(e) => {
-            const input = e.currentTarget;
-            setTimeout(() => document.activeElement !== input && ctl.onKeyBlur(node.id), 0);
-          }}
+          onBlur={() => setTimeout(() => !hasFocus(key) && ctl.onKeyBlur(node.id), 0)}
         />
         :
       </span>
@@ -578,10 +582,7 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
       onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
       onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
       onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
-      onBlur={(e) => {
-        const ta = e.currentTarget;
-        setTimeout(() => document.activeElement !== ta && ctl.deactivate(key), 0);
-      }}
+      onBlur={() => setTimeout(() => !hasFocus(key) && ctl.deactivate(key), 0)}
     />
   );
 }
@@ -731,10 +732,7 @@ function BlockBody({ node }: { node: OutlineNode }) {
           value={node.text}
           onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
           onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
-          onBlur={(e) => {
-            const ta = e.currentTarget;
-            setTimeout(() => document.activeElement !== ta && ctl.deactivate(key), 0);
-          }}
+          onBlur={() => setTimeout(() => !hasFocus(key) && ctl.deactivate(key), 0)}
         />
       ) : (
         <div
