@@ -1,4 +1,4 @@
-import type { TargetedEvent, TextareaHTMLAttributes } from 'preact';
+import type { ComponentChildren, TargetedEvent, TextareaHTMLAttributes } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { applyFocus, Controller, fKey, fText, type View } from './controller';
 import { hasFormat, listFormats, getFormat, renderFormat } from './formats';
@@ -13,6 +13,7 @@ import { DataView } from './DataView';
 import { SegView } from './InlineText';
 import { shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
+import { toValue, toYaml } from './serialize';
 import { computeSchedule } from './schedule';
 import type { OutlineNode } from './model';
 import { OutlineStore } from './model';
@@ -85,6 +86,7 @@ export function App() {
         <ZoomHeader node={zoom} />
         <div class="view-bar">
           <ViewSwitch />
+          <ViewToggles />
           {search && (
             <div class="search-info">
               {search.matches.size ? `${search.matches.size} 件` : '見つかりません'}
@@ -126,19 +128,67 @@ export function App() {
 
 function TopBar() {
   const ctl = useCtl();
-  const fileRef = useRef<HTMLInputElement>(null);
   const { store, zoomId } = ctl;
-  const ancestors = zoomId === store.rootId ? [] : store.path(zoomId).slice(0, -1);
+  // The brand is the way home, so the crumbs start below it.
+  const ancestors = zoomId === store.rootId ? [] : store.path(zoomId).slice(1, -1);
+  return (
+    <header class="topbar">
+      <a class="brand" href="#/" title="Home">
+        Yamoli
+      </a>
+      <nav class="crumbs">
+        {ancestors.map((id) => (
+          <a key={id} href={ctl.hashFor(id)} class="crumb">
+            {store.node(id).text || '無題'}
+          </a>
+        ))}
+      </nav>
+      <span class="spacer" />
+      <SearchBox />
+      <SaveIndicator />
+      <HelpMenu />
+      <MoreMenu />
+    </header>
+  );
+}
 
-  const exportJson = () => {
-    flush();
-    const blob = new Blob([JSON.stringify(store.toJSON(), null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `outline-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  };
+/** A button in the top bar opening a panel; closes on Esc or a click elsewhere. */
+function Popup({ label, title, children }: { label: string; title: string; children: (close: () => void) => ComponentChildren }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  const [open, setOpen] = useState(false);
+  const close = () => ref.current?.removeAttribute('open');
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <details class="popup" ref={ref} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary title={title}>{label}</summary>
+      {open && <div class="popup-panel">{children(close)}</div>}
+    </details>
+  );
+}
+
+function download(name: string, text: string, type: string) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** Less frequent actions: undo, files, samples. */
+function MoreMenu() {
+  const ctl = useCtl();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const day = () => new Date().toLocaleDateString('sv-SE');
 
   const importJson = async (e: TargetedEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
@@ -147,70 +197,62 @@ function TopBar() {
     if (!file) return;
     try {
       const next = OutlineStore.fromJSON(JSON.parse(await file.text()));
-      if (confirm('現在のアウトラインを置き換えますか？')) ctl.replaceStore(next);
+      if (confirm('現在のアウトラインを置き換えますか？（元に戻すで取り消せます）')) ctl.replaceStore(next);
     } catch (err) {
       alert('読み込みに失敗しました: ' + (err as Error).message);
     }
   };
 
   return (
-    <header class="topbar">
-      <a class="brand" href="#/">
-        Yamoli
-      </a>
-      <nav class="crumbs">
-        {ancestors.map((id) => (
-          <a key={id} href={ctl.hashFor(id)} class="crumb">
-            {id === store.rootId ? 'Home' : store.node(id).text || '無題'}
-          </a>
-        ))}
-      </nav>
-      <span class="spacer" />
-      <SearchBox />
-      <button
-        class={'mini' + (ctl.prefs.showCompleted ? '' : ' on')}
-        title="完了した行の表示を切り替え"
-        onMouseDown={keepFocus}
-        onClick={() => ctl.toggleShowCompleted()}
-      >
-        {ctl.prefs.showCompleted ? '完了を隠す' : '完了を表示'}
-      </button>
-      <button
-        class={'mini' + (ctl.prefs.showFields ? '' : ' on')}
-        title="属性の行（name: value）の表示を切り替え"
-        onMouseDown={keepFocus}
-        onClick={() => ctl.toggleShowFields()}
-      >
-        {ctl.prefs.showFields ? '属性を隠す' : '属性を表示'}
-      </button>
-      <button
-        class="mini"
-        title="元に戻す (⌘/Ctrl+Z)"
-        disabled={!ctl.history.canUndo}
-        onMouseDown={keepFocus}
-        onClick={() => ctl.undo()}
-      >
-        ↶
-      </button>
-      <button
-        class="mini"
-        title="やり直す (⌘/Ctrl+Shift+Z)"
-        disabled={!ctl.history.canRedo}
-        onMouseDown={keepFocus}
-        onClick={() => ctl.redo()}
-      >
-        ↷
-      </button>
-      <SaveIndicator />
-      <HelpMenu />
-      <button class="mini" onClick={() => fileRef.current?.click()}>
-        Import
-      </button>
-      <button class="mini" onClick={exportJson}>
-        Export
-      </button>
+    <>
+      <Popup label="⋯" title="その他の操作">
+        {(close) => {
+          const run = (f: () => void) => () => {
+            close();
+            f();
+          };
+          return (
+            <div class="menu-list" role="menu">
+              <button role="menuitem" disabled={!ctl.history.canUndo} onClick={run(() => ctl.undo())}>
+                元に戻す<kbd>⌘Z</kbd>
+              </button>
+              <button role="menuitem" disabled={!ctl.history.canRedo} onClick={run(() => ctl.redo())}>
+                やり直す<kbd>⇧⌘Z</kbd>
+              </button>
+              <hr />
+              <button
+                role="menuitem"
+                title="全体を YAML で保存（読み込みには使えません）"
+                onClick={run(() => download(`yamoli-${day()}.yaml`, toYaml(toValue(ctl.store, ctl.store.rootId)), 'text/yaml'))}
+              >
+                YAML で書き出す
+              </button>
+              <button
+                role="menuitem"
+                title="全体をそのまま保存（読み込みで復元できます）"
+                onClick={run(() => {
+                  flush();
+                  download(`yamoli-${day()}.json`, JSON.stringify(ctl.store.toJSON(), null, 2), 'application/json');
+                })}
+              >
+                バックアップを書き出す（JSON）
+              </button>
+              <button role="menuitem" onClick={run(() => fileRef.current?.click())}>
+                バックアップから読み込む…
+              </button>
+              <hr />
+              <button role="menuitem" title="依存関係・日程計算・ガントの例" onClick={run(() => ctl.addSample())}>
+                サンプルプロジェクトを追加
+              </button>
+              <button role="menuitem" title="このアプリの使い方（スライドの例）" onClick={run(() => ctl.addGuide())}>
+                使い方スライドを追加
+              </button>
+            </div>
+          );
+        }}
+      </Popup>
       <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importJson} />
-    </header>
+    </>
   );
 }
 
@@ -327,26 +369,14 @@ const SHORTCUTS: [string, string][] = [
 ];
 
 function HelpMenu() {
-  const ctl = useCtl();
   return (
-    <details class="help" onToggle={(e) => e.currentTarget.querySelector('dl')?.scrollTo(0, 0)}>
-      <summary>ショートカット</summary>
-      <dl>
-        <dd class="help-sample">
-          <button class="mini" onClick={() => ctl.addSample()}>
-            サンプルプロジェクトを追加
-          </button>
-          依存関係・日程計算・ガントの例
-        </dd>
-        <dd class="help-sample">
-          <button class="mini" onClick={() => ctl.addGuide()}>
-            使い方スライドを追加
-          </button>
-          このアプリの使い方（スライドの例）
-        </dd>
-        {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
-      </dl>
-    </details>
+    <Popup label="?" title="ショートカット">
+      {() => (
+        <dl class="shortcuts">
+          {SHORTCUTS.map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
+        </dl>
+      )}
+    </Popup>
   );
 }
 
@@ -370,6 +400,27 @@ function ViewSwitch() {
       {item('slides', 'スライド')}
       {item('yaml', 'YAML')}
       {item('json', 'JSON')}
+    </div>
+  );
+}
+
+/** What the current view shows: completed rows (outline, Gantt) and fields (outline). */
+function ViewToggles() {
+  const ctl = useCtl();
+  const { view, prefs } = ctl;
+  if (view !== 'outline' && view !== 'gantt') return null;
+  return (
+    <div class="view-toggles">
+      <label title="完了した行を表示">
+        <input type="checkbox" checked={prefs.showCompleted} onChange={() => ctl.toggleShowCompleted()} />
+        完了
+      </label>
+      {view === 'outline' && (
+        <label title="属性の行（name: value）を表示">
+          <input type="checkbox" checked={prefs.showFields} onChange={() => ctl.toggleShowFields()} />
+          属性
+        </label>
+      )}
     </div>
   );
 }
