@@ -79,6 +79,7 @@ Because of `after`, Design is scheduled to start on the working day after Requir
 | `after` | `[[Requirements]], [[API design]]` | Dependencies: starts once they have all finished. A parent's dependencies apply to its children. `^` is the item just above |
 | `sequential` | `true` | On a parent: each child starts after the one above it, unless it has its own `after` |
 | `due` | `2026-11-20` | Deadline; finishing later is shown as late |
+| `completed` | `2026-11-09` | Set to the day an item is completed (⌘Enter); removed when it is reopened |
 | `workdays` | `mon-fri` | Working days of the week (default `mon-fri`). Inherited by children |
 | `holidays` | `jp`, `2026-12-29..2027-01-03` | Days off. `jp` adds Japanese public holidays |
 

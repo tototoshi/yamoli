@@ -2,6 +2,7 @@
  * Editing logic shared by all components. The store is mutated in place;
  * commit() saves and asks the App to re-render, optionally moving focus.
  */
+import { formatDate, today } from './calendar';
 import { DEP_KEY } from './deps';
 import type { ScheduleResult } from './schedule';
 import { addGuideSlides, addScheduleSample } from './sample';
@@ -48,6 +49,9 @@ export function applyFocus(f: Focus | null | undefined) {
   const s = pos(f.start);
   el.setSelectionRange(s, f.end == null ? s : pos(f.end));
 }
+
+/** The field that records when an item was completed. */
+const DONE_KEY = 'completed';
 
 const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
 export const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -418,11 +422,18 @@ export class Controller {
     );
   }
 
+  /** Complete or reopen an item; completing records the day in a `completed` field, reopening removes it. */
   toggleComplete(id: string) {
     const vis = this.visibleRows();
     const idx = vis.indexOf(id);
     const n = this.store.node(id);
     this.store.setCompleted(id, !n.completed);
+    if (n.key === null) {
+      const f = this.store.field(id, DONE_KEY);
+      if (n.completed && !f) this.store.addField(id, DONE_KEY, formatDate(today()));
+      else if (n.completed && f && !f.text.trim()) this.store.setText(f.id, formatDate(today()));
+      else if (!n.completed && f && !f.children.length) this.store.remove(f.id);
+    }
     let focus: Focus | null | undefined; // undefined keeps focus where it is
     if (n.completed && !this.prefs.showCompleted) {
       // Skip the row's own (now hidden) subtree when choosing the next row.
