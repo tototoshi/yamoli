@@ -109,7 +109,7 @@ export function App() {
           <GanttView />
         ) : ctl.view === 'slides' ? (
           <SlidesView />
-        ) : ctl.view === 'yaml' || ctl.view === 'json' ? (
+        ) : ctl.view === 'text' || ctl.view === 'yaml' || ctl.view === 'json' ? (
           <DataView format={ctl.view} />
         ) : (
           <section class="outline">
@@ -415,24 +415,25 @@ function ViewSwitch() {
       {item('outline', t('アウトライン', 'Outline'))}
       {item('gantt', t('ガント', 'Gantt'))}
       {item('slides', t('スライド', 'Slides'))}
+      {item('text', t('テキスト', 'Text'))}
       {item('yaml', 'YAML')}
       {item('json', 'JSON')}
     </div>
   );
 }
 
-/** What the current view shows: completed rows (outline, Gantt) and fields (outline). */
+/** What the current view shows: completed rows (outline, Gantt, text) and fields (outline, text). */
 function ViewToggles() {
   const ctl = useCtl();
   const { view, prefs } = ctl;
-  if (view !== 'outline' && view !== 'gantt') return null;
+  if (view !== 'outline' && view !== 'gantt' && view !== 'text') return null;
   return (
     <div class="view-toggles">
       <label title={t('完了した行を表示', 'Show completed rows')}>
         <input type="checkbox" checked={prefs.showCompleted} onChange={() => ctl.toggleShowCompleted()} />
         {t('完了', 'Completed')}
       </label>
-      {view === 'outline' && (
+      {view !== 'gantt' && (
         <label title={t('属性の行（name: value）を表示', 'Show field rows (name: value)')}>
           <input type="checkbox" checked={prefs.showFields} onChange={() => ctl.toggleShowFields()} />
           {t('属性', 'Fields')}

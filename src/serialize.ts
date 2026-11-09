@@ -16,7 +16,7 @@
  * being cluttered. A field named like one of those keys wins, and the item's
  * own entry gets a leading `_` instead.
  */
-import { refIds } from './links';
+import { refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 
 export type Value = string | number | boolean | null | Tagged | Value[] | { [key: string]: Value };
@@ -98,6 +98,30 @@ function scalar(text: string): Value {
   if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(t)) return Number(t);
   if (t === 'true' || t === 'false') return t === 'true';
   return t;
+}
+
+// ---------------------------------------------------------------- Markdown list
+
+/**
+ * The rows under id as a nested Markdown list, for pasting elsewhere: links
+ * become the linked item's label, completed items are struck through and
+ * fields read `name: value`. Blocks (multi-line values) are left out.
+ * children(id) picks the rows to include, so the view's filters apply.
+ */
+export function toMarkdownList(store: OutlineStore, id: string, children: (id: string) => string[]): string {
+  const lines: string[] = [];
+  const add = (c: string, depth: number) => {
+    const n = store.node(c);
+    if (n.format !== null) return;
+    const pad = '  '.repeat(depth);
+    let text = withLabels(store, n.text).trim();
+    if (n.key !== null) text = `${n.key}: ${text}`.trimEnd();
+    else if (n.completed && text) text = `~~${text}~~`;
+    lines.push(`${pad}- ${text}`.trimEnd().replace(/\n/g, `\n${pad}  `));
+    for (const k of children(c)) add(k, depth + 1);
+  };
+  for (const c of children(id)) add(c, 0);
+  return lines.length ? lines.join('\n') + '\n' : '';
 }
 
 // ---------------------------------------------------------------- YAML

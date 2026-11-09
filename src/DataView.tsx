@@ -1,16 +1,20 @@
 /*
- * The zoomed item as YAML or JSON (see serialize.ts), read-only, for looking
- * at the data the outline holds and copying it out.
+ * The zoomed item as YAML, JSON or a plain Markdown list (see serialize.ts),
+ * read-only, for looking at the data the outline holds and copying it out.
  */
 import { useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { t } from './i18n';
-import { toValue, toYaml } from './serialize';
+import { toMarkdownList, toValue, toYaml } from './serialize';
 
-export function DataView({ format }: { format: 'yaml' | 'json' }) {
+export function DataView({ format }: { format: 'yaml' | 'json' | 'text' }) {
   const ctl = useCtl();
-  const value = toValue(ctl.store, ctl.zoomId);
-  const text = format === 'yaml' ? toYaml(value) : JSON.stringify(value, null, 2) + '\n';
+  const text =
+    format === 'text'
+      ? toMarkdownList(ctl.store, ctl.zoomId, (id) => ctl.shownChildren(id))
+      : format === 'yaml'
+        ? toYaml(toValue(ctl.store, ctl.zoomId))
+        : JSON.stringify(toValue(ctl.store, ctl.zoomId), null, 2) + '\n';
   const [copied, setCopied] = useState(false);
 
   const copy = () =>

@@ -66,6 +66,10 @@ export function nodeLabel(store: OutlineStore, id: string, depth = 0): string {
 
 const norm = (s: string) => s.normalize('NFKC').toLowerCase();
 
+/** text with each [[id]] replaced by the label of the item it links to. */
+export const withLabels = (store: OutlineStore, text: string) =>
+  text.replace(REF_RE, (src, ref) => (store.get(ref) ? nodeLabel(store, ref) : src));
+
 /**
  * Items whose label contains query, best first: prefix matches, then the
  * ones nearest to fromId in the outline (fewest steps through the tree, then

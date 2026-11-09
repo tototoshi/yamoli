@@ -13,8 +13,8 @@ import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs } from './storage';
 
-export type View = 'outline' | 'gantt' | 'slides' | 'yaml' | 'json';
-const VIEWS: View[] = ['outline', 'gantt', 'slides', 'yaml', 'json'];
+export type View = 'outline' | 'gantt' | 'slides' | 'text' | 'yaml' | 'json';
+const VIEWS: View[] = ['outline', 'gantt', 'slides', 'text', 'yaml', 'json'];
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
 export interface Focus {

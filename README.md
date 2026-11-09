@@ -120,6 +120,7 @@ Switch with the view bar; each item remembers the view last used for it.
 - **Outline**: where all editing happens.
 - **Gantt**: the schedule as a chart, with dependency arrows, due-date lines and adjustable day width.
 - **Slides**: see above.
+- **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name; the Completed and Fields toggles apply.
 - **YAML / JSON**: the zoomed item as data (read-only, with a copy button). Items that something links to carry their `id`.
 
 ## Code layout
@@ -131,7 +132,7 @@ src/
   App.tsx         The UI (Preact)
   storage.ts      Saving (file / localStorage), initial data
   fields.ts       Reading YAML-like text (paste)
-  serialize.ts    Writing YAML / JSON
+  serialize.ts    Writing YAML / JSON / Markdown lists
   schedule.ts     Scheduling          calendar.ts  Working days, durations
   deps.ts         Dependencies        gantt.ts / GanttView.tsx
   slides.ts / SlidesView.tsx          search.ts    links.ts

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { OutlineStore } from './model';
-import { Tagged, toValue, toYaml } from './serialize';
+import { Tagged, toMarkdownList, toValue, toYaml } from './serialize';
 
 function project() {
   const s = OutlineStore.create();
@@ -84,4 +84,21 @@ test('linked items carry their id so references resolve', () => {
     children: [{ id: a, text: 'a' }, { text: 'b', after: `[[${a}]]` }, 'c'],
   });
   expect(toYaml(toValue(s, a))).toBe(`id: ${a}\ntext: a\n`);
+});
+
+test('toMarkdownList: a nested list with link labels, fields and struck-through done items', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'plan').id;
+  const a = s.addChild(p, -1, '**design**').id;
+  s.setCompleted(a, true);
+  const b = s.addChild(p, -1, 'build\nsecond line').id;
+  s.addField(b, 'after', `[[${a}]]`);
+  s.addBlock(b, 'note', 'markdown', '# left out');
+  s.addChild(b, -1, 'step');
+  const all = (id: string) => s.node(id).children;
+  expect(toMarkdownList(s, p, all)).toBe(
+    '- ~~**design**~~\n- build\n  second line\n  - after: design\n  - step\n'
+  );
+  expect(toMarkdownList(s, s.rootId, all)).toMatch(/^- plan\n  - ~~/);
+  expect(toMarkdownList(s, a, all)).toBe('');
 });
