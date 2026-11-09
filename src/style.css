@@ -414,6 +414,28 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 
 /* field rows: `name: value` */
+.date-pick {
+  position: relative;
+  flex: none;
+  margin-left: 6px;
+  font-size: 12px;
+  line-height: 22px;
+  opacity: 0.35;
+  cursor: pointer;
+}
+.row:hover .date-pick, .date-pick:focus-within { opacity: 1; }
+/* A date is short: keep the value narrow so the icon sits right after it. */
+.row:has(> .date-pick) > .text { flex: 0 0 11ch; }
+/* The real input lies over the icon, so its picker opens there. */
+.date-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
 .node.field > .row { font-size: 13px; color: var(--muted); min-height: 22px; }
 .node.field > .row .bullet .dot { width: 4px; height: 4px; opacity: 0.6; }
 .field-name {

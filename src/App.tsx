@@ -12,7 +12,7 @@ import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
 import { DataView } from './DataView';
 import { SegView } from './InlineText';
-import { shortDate, today } from './calendar';
+import { formatDate, parseDate, shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
 import { toValue, toYaml } from './serialize';
 import { computeSchedule } from './schedule';
@@ -502,6 +502,7 @@ function NodeItem({ id }: { id: string }) {
         </a>
         {isField && <FieldKey node={n} />}
         {isBlock ? <BlockHead node={n} /> : <NodeText node={n} />}
+        {isField && !isBlock && <DatePick node={n} />}
         {!isField && (
           <>
             <SchedLabel id={id} />
@@ -519,6 +520,33 @@ function NodeItem({ id }: { id: string }) {
         </ul>
       )}
     </li>
+  );
+}
+
+const DATE_KEYS = new Set(['start', 'due']);
+
+/** A calendar button on date fields (`start`, `due`, or any `YYYY-MM-DD`), opening the browser's date picker. */
+function DatePick({ node }: { node: OutlineNode }) {
+  const ctl = useCtl();
+  const current = parseDate(node.text);
+  if (current === null && !DATE_KEYS.has(node.key!.trim().toLowerCase())) return null;
+  return (
+    <span class="date-pick" title={t('日付を選ぶ', 'Pick a date')}>
+      📅
+      <input
+        type="date"
+        tabIndex={-1}
+        value={formatDate(current ?? today())}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker();
+          } catch {
+            // not supported: the input's own click opens it, or nothing does
+          }
+        }}
+        onChange={(e) => e.currentTarget.value && ctl.setFieldText(node.id, e.currentTarget.value)}
+      />
+    </span>
   );
 }
 

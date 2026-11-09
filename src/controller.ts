@@ -590,6 +590,12 @@ export class Controller {
     this.commit(this.view === 'outline' ? fText(id) : null);
   }
 
+  /** Set a field's value from outside its editor (the date picker). */
+  setFieldText(id: string, text: string) {
+    this.store.setText(id, text);
+    this.commit();
+  }
+
   /** Turn a field back into the ordinary row `name: value`. */
   private unfield(id: string, caret?: number) {
     const n = this.store.node(id);
