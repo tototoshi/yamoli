@@ -160,9 +160,19 @@ export class Controller {
   /** Open, update or close the picker after the field's value or caret changed. */
   updatePicker(el: HTMLTextAreaElement | HTMLInputElement, selfId: string) {
     const q = pickerQueryAt(el.value, el.selectionStart ?? 0);
+    const deps = this.inDependencies(selfId);
     this.picker = q
-      ? { key: el.dataset.fk!, from: q.from, candidates: linkCandidates(this.store, q.query, selfId), selected: 0 }
+      ? { key: el.dataset.fk!, from: q.from, candidates: linkCandidates(this.store, q.query, selfId, { deps }), selected: 0 }
       : null;
+  }
+
+  /** Whether id is (or is inside) its item's `after` field. */
+  private inDependencies(id: string): boolean {
+    const { store } = this;
+    const owner = store.owner(id);
+    let n = id;
+    while (store.parentOf(n) && store.parentOf(n) !== owner) n = store.parentOf(n)!;
+    return n !== owner && store.node(n).key?.trim().toLowerCase() === DEP_KEY;
   }
 
   /** Keyboard handling while the picker is open. Returns true if the key was consumed. */
@@ -626,7 +636,7 @@ export class Controller {
     }
     const key = 'text:' + f.id;
     this.commit({ key, start: 'end' });
-    this.picker = { key, from: f.text.length - 2, candidates: linkCandidates(this.store, '', id), selected: 0 };
+    this.picker = { key, from: f.text.length - 2, candidates: linkCandidates(this.store, '', id, { deps: true }), selected: 0 };
     this.rerender();
   }
 
