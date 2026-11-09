@@ -1,5 +1,6 @@
 /*
- * Drag a row by its bullet to move it (with its subtree).
+ * Drag a row by its bullet to move it (with its subtree); dragging a selected
+ * row moves all the selected ones. Dragging across rows' text selects them.
  *
  * Drop position is decided by the row under the pointer:
  *   upper half                          -> before that row
@@ -38,9 +39,9 @@ function rowAtY(y: number): HTMLElement | null {
   return found;
 }
 
-function computeDrop(ctl: Controller, source: HTMLElement, x: number, y: number): Drop | null {
+function computeDrop(ctl: Controller, sources: HTMLElement[], x: number, y: number): Drop | null {
   const li = rowAtY(y);
-  if (!li || source.contains(li)) return null;
+  if (!li || sources.some((s) => s.contains(li))) return null;
   const { store, zoomId } = ctl;
   const id = li.dataset.id!;
   const rowRect = rowOf(li).getBoundingClientRect();
@@ -91,8 +92,9 @@ function suppressNextClick() {
 
 export function startBulletDrag(e: PointerEvent, id: string, ctl: Controller) {
   if (e.button !== 0) return;
-  const source = (e.currentTarget as Element).closest<HTMLElement>('li.node');
-  if (!source) return;
+  const ids = ctl.selected.has(id) ? ctl.selectionRoots() : [id];
+  const sources = ids.map(liFor).filter((li): li is HTMLElement => !!li);
+  if (!sources.length) return;
   const startX = e.clientX;
   const startY = e.clientY;
   let active = false;
@@ -104,14 +106,14 @@ export function startBulletDrag(e: PointerEvent, id: string, ctl: Controller) {
     if (!active) {
       if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < START_DISTANCE) return;
       active = true;
-      source.classList.add('drag-source');
+      sources.forEach((s) => s.classList.add('drag-source'));
       document.body.classList.add('dragging');
       document.body.append(indicator);
     }
     if (ev.clientY < SCROLL_EDGE) window.scrollBy(0, -12);
     else if (ev.clientY > window.innerHeight - SCROLL_EDGE) window.scrollBy(0, 12);
 
-    drop = computeDrop(ctl, source, ev.clientX, ev.clientY);
+    drop = computeDrop(ctl, sources, ev.clientX, ev.clientY);
     indicator.hidden = !drop;
     if (drop) {
       const right = document.querySelector('.outline')!.getBoundingClientRect().right;
@@ -128,10 +130,10 @@ export function startBulletDrag(e: PointerEvent, id: string, ctl: Controller) {
     window.removeEventListener('keydown', onKey, true);
     if (!active) return;
     suppressNextClick();
-    source.classList.remove('drag-source');
+    sources.forEach((s) => s.classList.remove('drag-source'));
     document.body.classList.remove('dragging');
     indicator.remove();
-    if (commit && drop) ctl.moveNode(id, drop.parentId, drop.beforeId);
+    if (commit && drop) ctl.moveNodes(ids, drop.parentId, drop.beforeId);
   };
   const onUp = () => finish(true);
   const onCancel = () => finish(false);
@@ -146,4 +148,46 @@ export function startBulletDrag(e: PointerEvent, id: string, ctl: Controller) {
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onCancel);
   window.addEventListener('keydown', onKey, true);
+}
+
+/**
+ * A press on a row's text: Shift extends a selection (or starts one from the
+ * row being edited); otherwise, once the pointer moves onto another row, the
+ * rows in between are selected instead of text.
+ */
+export function startRowSelect(e: PointerEvent, id: string, ctl: Controller) {
+  if (e.button !== 0) return;
+  const editing = ctl.activeField?.replace(/^\w+:/, '');
+  if (e.shiftKey) {
+    const anchor = ctl.selection?.anchor ?? editing;
+    if (anchor && anchor !== id && ctl.visibleRows().includes(anchor)) {
+      e.preventDefault();
+      suppressNextClick(); // the click would start editing the row
+      ctl.selectRows(anchor, id);
+    }
+    return;
+  }
+  ctl.clearSelection();
+
+  let head = id;
+  const move = (ev: PointerEvent) => {
+    const li = rowAtY(ev.clientY);
+    const over = li?.dataset.id;
+    if (!over || over === head || !ctl.visibleRows().includes(over)) return;
+    if (!ctl.selection) {
+      document.body.classList.add('row-selecting');
+      window.getSelection()?.removeAllRanges();
+    }
+    head = over;
+    ctl.selectRows(id, head);
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    if (!document.body.classList.contains('row-selecting')) return;
+    document.body.classList.remove('row-selecting');
+    suppressNextClick();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
 }

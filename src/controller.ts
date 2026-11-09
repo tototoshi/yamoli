@@ -11,6 +11,7 @@ import { browserLang, setLang, t, type Lang } from './i18n';
 import { linkCandidates, pickerQueryAt } from './links';
 import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
+import { toMarkdownRows } from './serialize';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs, type FieldsMode } from './storage';
 
@@ -100,6 +101,10 @@ export class Controller {
    * rendered as an editor; all others show formatted text.
    */
   activeField: string | null = null;
+  /** Rows selected as a whole (Shift+↑↓ past a row's ends, Shift+click, dragging across rows): from anchor to head. */
+  selection: { anchor: string; head: string } | null = null;
+  /** The selected rows, worked out at each render. */
+  selected = new Set<string>();
   /** Rows whose folded fields were opened by hand (fold mode). */
   openFields = new Set<string>();
   picker: LinkPicker | null = null;
@@ -305,6 +310,108 @@ export class Controller {
     };
     walk(this.zoomId);
     return out;
+  }
+
+  // ================================================================ selecting rows
+
+  /** The selected rows, top to bottom (empty when the selection no longer fits what is shown). */
+  selectedRows(): string[] {
+    if (!this.selection) return [];
+    const vis = this.visibleRows();
+    const a = vis.indexOf(this.selection.anchor);
+    const h = vis.indexOf(this.selection.head);
+    if (a < 0 || h < 0) return [];
+    return vis.slice(Math.min(a, h), Math.max(a, h) + 1);
+  }
+
+  /** The selected rows not inside another selected row: what moving or deleting acts on. */
+  selectionRoots(): string[] {
+    const rows = this.selectedRows();
+    const set = new Set(rows);
+    return rows.filter((r) => !set.has(this.store.parentOf(r)!));
+  }
+
+  /** Select whole rows from anchor to head, leaving any text editor. */
+  selectRows(anchor: string, head: string) {
+    this.selection = { anchor, head };
+    this.activeField = null;
+    this.picker = null;
+    this.pendingFocus = null;
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    this.rerender();
+  }
+
+  /** Drop the selection, editing focusId if given. */
+  clearSelection(focusId?: string) {
+    if (!this.selection) return;
+    this.selection = null;
+    if (focusId) this.focus(fText(focusId));
+    else this.rerender();
+  }
+
+  /** Keys while rows are selected. Returns true if the key was handled. */
+  selectionKeydown(e: KeyboardEvent): boolean {
+    const sel = this.selection;
+    if (!sel || e.defaultPrevented) return false; // e.g. the Shift+↓ in a row that just started the selection
+    const { store } = this;
+    const vis = this.visibleRows();
+    const rows = this.selectedRows();
+    if (!rows.length) {
+      this.selection = null;
+      return false;
+    }
+    const key = arrowOf(e);
+    const plain = !e.altKey && !isMod(e);
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.clearSelection(sel.head);
+    } else if ((key === 'ArrowUp' || key === 'ArrowDown') && (key !== e.key || plain)) {
+      e.preventDefault();
+      if (!e.shiftKey) return this.clearSelection(key === 'ArrowUp' ? rows[0] : rows[rows.length - 1]), true;
+      const head = vis[vis.indexOf(sel.head) + (key === 'ArrowDown' ? 1 : -1)];
+      if (head) {
+        this.selection = { ...sel, head };
+        this.rerender();
+      }
+    } else if (e.key === 'Tab' && plain) {
+      e.preventDefault();
+      const roots = this.selectionRoots();
+      let changed = false;
+      if (e.shiftKey) {
+        // Bottom up: each goes right after its parent, so the order holds.
+        for (const r of [...roots].reverse()) changed = store.outdent(r, this.zoomId) || changed;
+      } else {
+        const set = new Set(roots);
+        for (const r of roots) {
+          const sibs = this.shownChildren(store.parentOf(r)!);
+          if (set.has(sibs[sibs.indexOf(r) - 1])) continue; // would go into the selection itself
+          changed = this.indentShown(r) || changed;
+        }
+      }
+      if (changed) this.commit(null);
+    } else if ((e.key === 'Backspace' || e.key === 'Delete') && plain) {
+      e.preventDefault();
+      const before = vis[vis.indexOf(rows[0]) - 1];
+      for (const r of this.selectionRoots()) store.remove(r);
+      this.selection = null;
+      this.commit(before ? fText(before) : this.zoomId !== store.rootId ? fText(this.zoomId) : null);
+    } else if (isMod(e) && !e.altKey && (e.code === 'KeyC' || e.code === 'KeyX')) {
+      e.preventDefault();
+      const roots = this.selectionRoots();
+      void navigator.clipboard.writeText(toMarkdownRows(store, roots, (id) => this.shownChildren(id)));
+      if (e.code === 'KeyX') {
+        const before = vis[vis.indexOf(rows[0]) - 1];
+        for (const r of roots) store.remove(r);
+        this.selection = null;
+        this.commit(before ? fText(before) : null);
+      }
+    } else if (e.key === 'Enter' && isMod(e)) {
+      e.preventDefault();
+      for (const r of this.selectionRoots()) if (store.node(r).key === null) this.toggleComplete(r);
+    } else {
+      return false;
+    }
+    return true;
   }
 
   /** Switch the UI language (null: follow the browser). */
@@ -689,8 +796,13 @@ export class Controller {
     this.rerender();
   }
 
-  moveNode(id: string, parentId: string, beforeId: string | null) {
-    if (this.store.moveTo(id, parentId, beforeId)) this.commit();
+  /** Move rows (with their subtrees, in this order) under parentId, before beforeId or at the end. */
+  moveNodes(ids: string[], parentId: string, beforeId: string | null) {
+    const kids = this.store.node(parentId).children;
+    while (beforeId && ids.includes(beforeId)) beforeId = kids[kids.indexOf(beforeId) + 1] ?? null;
+    let changed = false;
+    for (const id of ids) changed = this.store.moveTo(id, parentId, beforeId) || changed;
+    if (changed) this.commit();
   }
 
   /** Append the scheduling sample at the end of the top level and zoom into it. */
@@ -819,6 +931,16 @@ export class Controller {
       if (m.children.length && !adopt) return;
       store.mergeInto(next, id);
       return this.commit(fText(id, start));
+    }
+
+    // ---- Shift+↑↓ with the text selected to its end selects whole rows
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey && !e.altKey && !isMod(e) && !isTitle) {
+      const down = e.key === 'ArrowDown';
+      if (down ? end === ta.value.length : start === 0) {
+        e.preventDefault();
+        this.selectRows(id, vis[idx + (down ? 1 : -1)] ?? id);
+        return;
+      }
     }
 
     // ---- move / collapse

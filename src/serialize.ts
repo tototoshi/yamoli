@@ -109,6 +109,11 @@ function scalar(text: string): Value {
  * children(id) picks the rows to include, so the view's filters apply.
  */
 export function toMarkdownList(store: OutlineStore, id: string, children: (id: string) => string[]): string {
+  return toMarkdownRows(store, children(id), children);
+}
+
+/** The given rows (and what children picks under them) as a Markdown list. */
+export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id: string) => string[]): string {
   const lines: string[] = [];
   const add = (c: string, depth: number) => {
     const n = store.node(c);
@@ -120,7 +125,7 @@ export function toMarkdownList(store: OutlineStore, id: string, children: (id: s
     lines.push(`${pad}- ${text}`.trimEnd().replace(/\n/g, `\n${pad}  `));
     for (const k of children(c)) add(k, depth + 1);
   };
-  for (const c of children(id)) add(c, 0);
+  for (const c of ids) add(c, 0);
   return lines.length ? lines.join('\n') + '\n' : '';
 }
 

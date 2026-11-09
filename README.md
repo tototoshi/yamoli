@@ -39,6 +39,7 @@ A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/y
 ### Rows and fields
 
 - **Enter** starts a new row, **Tab / Shift+Tab** indents and outdents. Click a ● to zoom into that item.
+- Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Enter then act on all of them, and dragging one's ● moves them together.
 - Typing `name: ` at the start of a row makes it a **field**. Backspace at the start of the value turns it back into an ordinary row.
 - A field without a value can hold nested rows: fields below it make an object, ordinary rows a list.
 - A **block** (Alt+D) is a field with a multi-line value: Markdown, CSV, code or plain text. In YAML it is written as `note: !markdown |`.

@@ -6,7 +6,7 @@ import { lang, t } from './i18n';
 import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
 import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
-import { startBulletDrag } from './drag';
+import { startBulletDrag, startRowSelect } from './drag';
 import { Ctx, useCtl } from './context';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
@@ -35,6 +35,7 @@ export function App() {
     const onHash = () => ctl.onHashChange();
     const onKey = (e: KeyboardEvent) => {
       if (imeActive(e)) return;
+      if (ctl.selectionKeydown(e)) return;
       // Our history replaces the browser's per-field undo everywhere.
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.code === 'KeyZ' || (e.code === 'KeyY' && e.ctrlKey))) {
         e.preventDefault();
@@ -55,14 +56,18 @@ export function App() {
         ctl.zoomOut();
       }
     };
+    // A press outside the rows ends a selection of rows (a press on a row handles it itself).
+    const onPress = (e: PointerEvent) => ctl.selection && !(e.target as Element).closest('.outline .row') && ctl.clearSelection();
     window.addEventListener('hashchange', onHash);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPress);
     const first = ctl.store.node(ctl.zoomId).children[0];
     if (first) ctl.focus(fText(first));
     else rerender();
     return () => {
       window.removeEventListener('hashchange', onHash);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPress);
     };
   }, []);
 
@@ -76,6 +81,8 @@ export function App() {
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
   ctl.cycles = findCycles(store);
+  ctl.selected = new Set(ctl.selectedRows());
+  if (ctl.selection && !ctl.selected.size) ctl.selection = null;
   ctl.schedule = computeSchedule(store, ctl.cycles, ctl.jpDays);
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
@@ -354,6 +361,10 @@ const shortcuts = (): [string, string][] => [
   [t('↑ ↓ / Ctrl+P N（Mac）', '↑ ↓ / Ctrl+P N (Mac)'), t('前 / 次の行へ', 'Previous / next row')],
   [t('← → / Ctrl+B F（Mac）', '← → / Ctrl+B F (Mac)'), t('行の端で前 / 次の行へ', 'At a row’s ends, on to the previous / next row')],
   ['Alt(⌘)+Shift+↑↓', t('行を移動', 'Move the row')],
+  [
+    t('Shift+↑↓（行の端で）/ Shift+クリック / 行をまたいでドラッグ', 'Shift+↑↓ (at a row’s ends) / Shift+click / drag across rows'),
+    t('複数行を選択：Tab・Shift+Tab・削除・⌘C・⌘X・⌘Enter、● のドラッグでまとめて移動', 'Select rows: Tab, Shift+Tab, delete, ⌘C, ⌘X, ⌘Enter; drag a ● to move them all'),
+  ],
   ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
   ['⌘/Ctrl+Enter', t('完了 / 未完了', 'Complete / reopen')],
   ['Alt+→ / ⌘+.', t('ズームイン（●クリックでも可）', 'Zoom in (or click the ●)')],
@@ -471,11 +482,17 @@ function NodeItem({ id }: { id: string }) {
   if (isBlock) cls += ' block-field';
   if ((kids.length && !expanded) || (isBlock && n.collapsed)) cls += ' collapsed';
   if (n.completed) cls += ' completed';
+  if (ctl.selected.has(id)) cls += ' selected';
   if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
 
   return (
     <li class={cls} data-id={id}>
-      <div class="row">
+      <div
+        class="row"
+        onPointerDown={(e) =>
+          !(e.target as Element).closest('.bullet, .toggle, button, input, select, .link-bubble') && startRowSelect(e, id, ctl)
+        }
+      >
         <button
           class={'toggle' + (canToggle ? '' : ' empty')}
           tabIndex={-1}

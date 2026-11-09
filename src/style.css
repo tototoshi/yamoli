@@ -4,6 +4,7 @@
   --muted: #8a9099;
   --faint: #e6e8eb;
   --hover: #f3f4f6;
+  --select-bg: #dfe8fb;
   --accent: #3b6fd8;
   --danger: #c84040;
   --bullet: #5c6370;
@@ -189,6 +190,8 @@ ul.children ul.children {
 .row { position: relative; display: flex; align-items: flex-start; border-radius: 4px; }
 /* The row under the pointer, so its buttons at the far end read as its own. */
 .row:hover { background: var(--hover); }
+.node.selected > .row, .node.selected > .row:hover { background: var(--select-bg); }
+body.row-selecting { user-select: none; cursor: default; }
 
 .toggle {
   flex: none;
