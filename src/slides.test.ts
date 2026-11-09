@@ -31,6 +31,9 @@ test('a deck: title slide, one slide per item, fields as settings', () => {
   expect(d.slides[1].bullets).toEqual([{ id: a1, children: [{ id: a11, children: [] }] }]);
   expect(d.slides[1].notes).toBe('現場の声\n数字の出典');
   expect(d.slides[2].embed).toBe(a);
+  expect(d.slides[2].embedAs).toBe('gantt');
+  s.setText(s.field(b, 'embed')!.id, `[[${a}]] 図`);
+  expect(buildDeck(s, deck).slides[2].embedAs).toBe('diagram');
   // Home is not a slide of its own.
   expect(buildDeck(s, s.rootId).slides.map((x) => x.id)).toEqual([deck]);
 });

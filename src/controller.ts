@@ -5,7 +5,7 @@
 import { formatDate, today } from './calendar';
 import { DEP_KEY } from './deps';
 import type { ScheduleResult } from './schedule';
-import { addGuideSlides, addScheduleSample } from './sample';
+import { addDiagramSample, addGuideSlides, addScheduleSample } from './sample';
 import { UndoHistory } from './history';
 import { browserLang, setLang, t, type Lang } from './i18n';
 import { keyCandidates, linkCandidates, pickerQueryAt, valueCandidates } from './links';
@@ -15,8 +15,8 @@ import { toMarkdownRows } from './serialize';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs, type FieldsMode } from './storage';
 
-export type View = 'outline' | 'gantt' | 'slides' | 'text' | 'yaml' | 'json';
-const VIEWS: View[] = ['outline', 'gantt', 'slides', 'text', 'yaml', 'json'];
+export type View = 'outline' | 'gantt' | 'diagram' | 'slides' | 'text' | 'yaml' | 'json';
+const VIEWS: View[] = ['outline', 'gantt', 'diagram', 'slides', 'text', 'yaml', 'json'];
 
 /** Focus is addressed by a stable data-fk key so it survives re-rendering. */
 export interface Focus {
@@ -721,6 +721,19 @@ export class Controller {
     this.rerender();
   }
 
+  /** Where the caret goes once the outline is shown again (from openRow). */
+  private focusAfterHash: Focus | null = null;
+
+  /** From another view (the diagram): edit id's row in the outline, opening the rows it is under. */
+  openRow(id: string) {
+    const { store } = this;
+    let opened = false;
+    for (let p = store.parentOf(id); p && p !== this.zoomId; p = store.parentOf(p)) opened = store.setCollapsed(p, false) || opened;
+    if (opened) this.commit();
+    this.focusAfterHash = fText(id);
+    this.setView('outline');
+  }
+
   zoomTo(id: string) {
     location.hash = this.hashFor(id);
   }
@@ -738,7 +751,8 @@ export class Controller {
     if (this.zoomId === prev && this.view !== prevView) {
       // Only the view changed: keep scroll, focus the item's first row.
       const first = this.view === 'outline' ? this.visibleRows()[0] : undefined;
-      this.focus(first ? fText(first) : null);
+      this.focus(this.view === 'outline' && this.focusAfterHash ? this.focusAfterHash : first ? fText(first) : null);
+      this.focusAfterHash = null;
       return;
     }
     this.slide = 0;
@@ -941,6 +955,13 @@ export class Controller {
     const id = addScheduleSample(this.store, this.store.rootId);
     this.commit(null);
     this.zoomTo(id);
+  }
+
+  /** Append the architecture sample at the end of the top level and open it as a diagram. */
+  addDiagramSample() {
+    const id = addDiagramSample(this.store, this.store.rootId);
+    this.commit(null);
+    location.hash = this.hashFor(id, 'diagram');
   }
 
   /** Add the usage guide deck and open it as slides. */

@@ -1,7 +1,8 @@
 /*
  * Sample content, written in the current UI language: a small project broken
  * down like a WBS (phases > work packages > tasks) that shows dependencies
- * and scheduling at work, and a slide deck explaining the app. Dates are
+ * and scheduling at work, a system's architecture drawn as a diagram, and a
+ * slide deck explaining the app. Dates are
  * relative to today so the samples never go stale.
  */
 import { formatDate, today, weekday, type Day } from './calendar';
@@ -9,6 +10,10 @@ import { lang, t } from './i18n';
 import type { OutlineStore } from './model';
 
 const SAMPLE_PREFIXES = ['サンプル: ', 'Sample: '];
+
+/** A sample under parentId, told apart by a field only it has (`start`, `direction`). */
+const findSample = (s: OutlineStore, parentId: string, field: string) =>
+  s.items(parentId).find((id) => SAMPLE_PREFIXES.some((p) => s.node(id).text.startsWith(p)) && s.field(id, field));
 
 /** Append the sample project under parentId and return its id. */
 export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = today()): string {
@@ -72,16 +77,68 @@ export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = 
   return proj.id;
 }
 
+/** Append a web service's architecture under parentId, to be seen in the Diagram view, and return its id. */
+export function addDiagramSample(s: OutlineStore, parentId: string): string {
+  const sys = s.addChild(parentId, -1, t('サンプル: システム構成', 'Sample: System architecture'));
+  s.addField(sys.id, 'direction', 'LR');
+  s.addBlock(
+    sys.id,
+    'note',
+    'markdown',
+    t(
+      '「図」に切り替えると構成図になります。\n\n' +
+        '- 行が箱、子を持つ行がそれを囲む枠\n' +
+        '- `to: [[API]] gRPC` のように属性に書いたリンクが矢印、後ろの語がラベル\n' +
+        '- `shape` で形（actor / db / queue / external）、`color` で色\n' +
+        '- `direction: TB` で縦向き。箱をクリックするとその行を編集',
+      'Switch to “Diagram” to see it drawn.\n\n' +
+        '- Each row is a box, a row with rows under it a frame around them\n' +
+        '- A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
+        '- `shape` picks the shape (actor / db / queue / external), `color` the colour\n' +
+        '- `direction: TB` draws it top to bottom. Click a box to edit its row'
+    )
+  );
+  const add = (parent: string, text: string, attrs: Record<string, string> = {}) => {
+    const n = s.addChild(parent, -1, text);
+    for (const [k, v] of Object.entries(attrs)) s.addField(n.id, k, v);
+    return n.id;
+  };
+  const to = (id: string, label = '') => `[[${id}]]` + (label && ' ' + label);
+
+  // Rows first, arrows after: an arrow needs the id of the row it points at.
+  const user = add(sys.id, t('ユーザー', 'User'), { shape: 'actor' });
+  const cdn = add(sys.id, 'CDN');
+  const vpc = add(sys.id, 'AWS VPC');
+  const pub = add(vpc, t('パブリック', 'Public'));
+  const alb = add(pub, t('ロードバランサー', 'Load balancer'));
+  const app = add(vpc, t('アプリ', 'App'));
+  const web = add(app, 'Web', { tech: 'Next.js' });
+  const api = add(app, 'API', { tech: 'Go', replicas: '3' });
+  const worker = add(app, t('ワーカー', 'Worker'), { tech: 'Go' });
+  const data = add(vpc, t('データ', 'Data'));
+  const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
+  const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
+  const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });
+  const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', tech: 'SendGrid' });
+
+  s.addField(user, 'to', to(cdn, 'HTTPS'));
+  s.addField(cdn, 'to', to(alb));
+  s.addField(alb, 'to', to(web));
+  s.addField(web, 'to', to(api, 'gRPC'));
+  s.addField(api, 'to', [to(db, 'SQL'), to(queue, t('投入', 'enqueue')), to(pay, 'HTTPS')].join(', '));
+  s.addField(worker, 'to', [to(queue, t('取得', 'poll')), to(db), to(mail, 'API')].join(', '));
+  return sys.id;
+}
+
 /**
  * A slide deck explaining the app, written as an ordinary outline. The
- * scheduling slide embeds a project's Gantt chart: projectId, or a sample
- * project found or added beside the deck.
+ * scheduling slide embeds a project's Gantt chart (projectId, or a sample
+ * project found or added beside the deck), and the diagram slide a sample
+ * architecture's diagram, found or added the same way.
  */
 export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: string): string {
-  const project =
-    projectId ??
-    s.items(parentId).find((id) => SAMPLE_PREFIXES.some((p) => s.node(id).text.startsWith(p))) ??
-    addScheduleSample(s, parentId);
+  const project = projectId ?? findSample(s, parentId, 'start') ?? addScheduleSample(s, parentId);
+  const system = findSample(s, parentId, 'direction') ?? addDiagramSample(s, parentId);
 
   const deck = s.addChild(parentId, -1, t('Yamoli の使い方', 'Using Yamoli'));
   s.addField(deck.id, 'subtitle', t('アウトライン × YAML × プロジェクト管理', 'Outlines × YAML × project planning'));
@@ -158,9 +215,22 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
     [t('`start` / `duration` / `after` / `due` から日付を自動計算 — ★ はクリティカルパス', 'Dates come from `start` / `duration` / `after` / `due` — ★ is the critical path')]
   );
 
+  slide(
+    t('図', 'Diagrams'),
+    {
+      embed: `[[${system}]] diagram`,
+      notes: t(
+        'サンプルのシステム構成を図として埋め込んでいます。アウトラインの行と属性から描いています。',
+        'The sample architecture, embedded as a diagram. It is drawn from the outline’s rows and fields.'
+      ),
+    },
+    [t('行が箱、子を持つ行が枠、`to: [[…]]` が矢印 — 「図」ビューで開く', 'Rows are boxes, rows with rows under them frames, `to: [[…]]` arrows — open the Diagram view')]
+  );
+
   slide(t('ビュー', 'Views'), { layout: 'two-column' }, [
     [t('アウトライン', 'Outline'), [t('すべての編集はここで', 'Where all editing happens')]],
     [t('ガント', 'Gantt'), [t('日程を線表で', 'The schedule as a chart'), t('日付の列幅は切り替え可能', 'Adjustable day width')]],
+    [t('図', 'Diagram'), [t('構成図・フロー図・マインドマップ', 'Architecture, flows, mind maps')]],
     [t('スライド', 'Slides'), [t('項目 = デッキ、子 = 1 枚ずつ', 'An item is a deck, each row under it a slide'), '`layout` / `notes` / `image` / `theme`']],
     ['YAML / JSON', [t('ズームした項目をデータとして', 'The zoomed item as data')]],
     [t('検索', 'Search'), [t('`status:進行中`、`budget.amount:1200000`', '`status:active`, `budget.amount:1200000`'), '`is:late` / `is:critical` / `is:done`']],

@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { useCtl } from './context';
 import { t } from './i18n';
 import { renderFormat } from './formats';
+import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
 import { nodeLabel } from './links';
@@ -185,7 +186,7 @@ function SlideBody({ slide }: { slide: Slide }) {
           {body}
           {slide.embed && (
             <div class="slide-embed">
-              <GanttView rootId={slide.embed} embedded />
+              {slide.embedAs === 'diagram' ? <DiagramView rootId={slide.embed} embedded /> : <GanttView rootId={slide.embed} embedded />}
             </div>
           )}
         </div>

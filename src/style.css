@@ -915,3 +915,33 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   box-shadow: none;
 }
 .jump-list li.done .pick-label { color: var(--muted); text-decoration: line-through; }
+
+/* diagram */
+.diagram-wrap { overflow-x: auto; padding: 4px 0 16px; }
+/* Full size in its view (scrolling sideways when wide), shrunk to fit when embedded. */
+.diagram { display: block; height: auto; margin: 0 auto; font-size: 13px; user-select: none; }
+.diagram-wrap.embedded { overflow: hidden; }
+.diagram-wrap.embedded .diagram { max-width: 100%; max-height: 100%; }
+.diagram-empty, .diagram-hint { color: var(--muted); font-size: 13px; }
+.diagram-hint { text-align: center; font-size: 12px; margin-top: 8px; }
+.dg-node, .dg-frame { cursor: pointer; }
+.diagram-wrap.embedded .dg-node, .diagram-wrap.embedded .dg-frame { cursor: default; }
+.dg-node rect, .dg-node > path:first-of-type { fill: var(--bg); stroke: #9aa3ae; stroke-width: 1.2; }
+.dg-node rect.dashed { stroke-dasharray: 5 4; }
+.dg-node .dg-line { fill: none; stroke: #9aa3ae; stroke-width: 1.2; }
+.dg-node:hover rect, .dg-node:hover > path:first-of-type { stroke: var(--accent); }
+.dg-actor { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linecap: round; }
+.dg-label { text-anchor: middle; font-weight: 600; fill: var(--fg); font-size: 13px; }
+.dg-prop { text-anchor: middle; fill: var(--muted); font-size: 11px; }
+.dg-node.done { opacity: 0.5; }
+.dg-node.done .dg-label { text-decoration: line-through; }
+.dg-frame rect { fill: var(--data-bg); stroke: #c9ced6; stroke-width: 1; stroke-dasharray: 6 4; }
+.dg-frame:hover rect { stroke: var(--accent); }
+.dg-frame-title { font-size: 12px; font-weight: 600; fill: var(--summary); paint-order: stroke; stroke: var(--data-bg); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
+.dg-branch { fill: none; stroke: #b6bcc5; stroke-width: 1.5; }
+.dg-edge path { fill: none; stroke: #7d848e; stroke-width: 1.3; }
+.dg-edge.near path { stroke: var(--accent); stroke-width: 2; }
+.dg-edge-label rect { fill: var(--bg); stroke: var(--faint); }
+.dg-edge-label text { text-anchor: middle; font-size: 11px; fill: var(--summary); }
+.dg-edge-label { pointer-events: none; }
+.dg-edge-label.near text { fill: var(--accent); }

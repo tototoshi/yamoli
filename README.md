@@ -13,7 +13,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-On first launch the outline comes with a usage-guide slide deck and a sample project showing scheduling, written in the interface language. Both can be added again at any time from the **⋯** menu at the top right.
+On first launch the outline comes with a usage-guide slide deck, a sample project showing scheduling and a sample system architecture for the Diagram view, written in the interface language. Both can be added again at any time from the **⋯** menu at the top right.
 
 | Command | What it does |
 | --- | --- |
@@ -97,9 +97,40 @@ An item with children spans the dates of its children. ★ marks the critical pa
 | `layout` | slide | `center` / `two-column` / `title` |
 | `notes` | slide | Speaker notes (N to show) |
 | `image` | slide | Image URL |
-| `embed` | slide | Embed the Gantt chart of `[[item]]` |
+| `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram) |
 
 The zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content. ← → page through, F goes full screen.
+
+**Diagrams**
+
+The Diagram view draws the zoomed item from its rows, for example a system's architecture:
+
+```
+・Production                     ┌ VPC ──────────────────────┐
+  ・User                          │ ┌ Private ─────────────┐  │
+    ・shape: actor          ☺ ──▶ │ │ Web ─gRPC─▶ API ──▶ (DB) │
+    ・to: [[Web]] HTTPS           │ └──────────────────────┘  │
+  ・VPC                           └───────────────────────────┘
+    ・Private
+      ・Web
+        ・to: [[API]] gRPC
+      ・API
+        ・to: [[DB]]
+      ・DB
+        ・shape: db
+```
+
+| Written | Drawn as |
+| --- | --- |
+| A row | A box; a row with rows under it is a frame around them |
+| `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency |
+| `shape` | `box` / `actor` / `db` / `queue` / `external` |
+| `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
+| Other fields | Small `key: value` lines in the box |
+| `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
+| `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are any); `tree`: a mind map |
+
+Lines that would cross a box go around it. Clicking a box edits its row. A slide shows a diagram with `embed: [[item]] diagram`.
 
 ### Search
 
@@ -125,6 +156,7 @@ Switch with the view bar; each item remembers the view last used for it.
 
 - **Outline**: where all editing happens.
 - **Gantt**: the schedule as a chart, with dependency arrows, due-date lines and adjustable day width.
+- **Diagram**: see above.
 - **Slides**: see above.
 - **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name; the Completed and Fields toggles apply.
 - **YAML / JSON**: the zoomed item as data (read-only, with a copy button). Items that something links to carry their `id`.
@@ -142,6 +174,7 @@ src/
   schedule.ts     Scheduling          calendar.ts  Working days, durations
   deps.ts         Dependencies        gantt.ts / GanttView.tsx
   slides.ts / SlidesView.tsx          search.ts    links.ts
+  diagram.ts / DiagramView.tsx        Diagrams
   i18n.ts         The interface language: t('日本語', 'English')
   formats.ts      Showing blocks (Markdown, CSV, code, text)
 server/

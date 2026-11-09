@@ -8,6 +8,7 @@ import { findBacklinks, nodeLabel } from './links';
 import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles, missingDependencies } from './deps';
 import { startBulletDrag, startRowSelect } from './drag';
 import { Ctx, useCtl } from './context';
+import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
 import { DataView } from './DataView';
@@ -97,7 +98,7 @@ export function App() {
   return (
     <Ctx.Provider value={ctl}>
       <TopBar />
-      <main class={'page' + (ctl.view === 'gantt' || ctl.view === 'slides' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
+      <main class={'page' + (ctl.view === 'gantt' || ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
         <ZoomHeader node={zoom} />
         <div class="view-bar">
           <ViewSwitch />
@@ -113,6 +114,8 @@ export function App() {
         </div>
         {ctl.view === 'gantt' ? (
           <GanttView />
+        ) : ctl.view === 'diagram' ? (
+          <DiagramView />
         ) : ctl.view === 'slides' ? (
           <SlidesView />
         ) : ctl.view === 'text' || ctl.view === 'yaml' || ctl.view === 'json' ? (
@@ -260,6 +263,9 @@ function MoreMenu() {
               <hr />
               <button role="menuitem" title={t('依存関係・日程計算・ガントの例', 'Dependencies, scheduling and the Gantt chart')} onClick={run(() => ctl.addSample())}>
                 {t('サンプルプロジェクトを追加', 'Add the sample project')}
+              </button>
+              <button role="menuitem" title={t('システム構成図の例（図ビュー）', 'A system architecture, in the Diagram view')} onClick={run(() => ctl.addDiagramSample())}>
+                {t('構成図のサンプルを追加', 'Add the architecture sample')}
               </button>
               <button role="menuitem" title={t('このアプリの使い方（スライドの例）', 'How to use this app (as slides)')} onClick={run(() => ctl.addGuide())}>
                 {t('使い方スライドを追加', 'Add the guide slides')}
@@ -429,6 +435,7 @@ function ViewSwitch() {
     <div class="view-switch" role="group" aria-label={t('表示', 'View')}>
       {item('outline', t('アウトライン', 'Outline'))}
       {item('gantt', t('ガント', 'Gantt'))}
+      {item('diagram', t('図', 'Diagram'))}
       {item('slides', t('スライド', 'Slides'))}
       {item('text', t('テキスト', 'Text'))}
       {item('yaml', 'YAML')}
@@ -437,18 +444,18 @@ function ViewSwitch() {
   );
 }
 
-/** What the current view shows: completed rows (outline, Gantt, text) and fields (outline, text). */
+/** What the current view shows: completed rows (outline, Gantt, diagram, text) and fields (outline, text). */
 function ViewToggles() {
   const ctl = useCtl();
   const { view, prefs } = ctl;
-  if (view !== 'outline' && view !== 'gantt' && view !== 'text') return null;
+  if (view !== 'outline' && view !== 'gantt' && view !== 'diagram' && view !== 'text') return null;
   return (
     <div class="view-toggles">
       <label title={t('完了した行を表示', 'Show completed rows')}>
         <input type="checkbox" checked={prefs.showCompleted} onChange={() => ctl.toggleShowCompleted()} />
         {t('完了', 'Completed')}
       </label>
-      {view !== 'gantt' && (
+      {(view === 'outline' || view === 'text') && (
         <label title={t('属性の行（name: value）の表示', 'How field rows (name: value) are shown')}>
           {t('属性', 'Fields')}
           <select value={prefs.fields} onChange={(e) => ctl.setFieldsMode(e.currentTarget.value as FieldsMode)}>

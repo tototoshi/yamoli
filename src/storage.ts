@@ -1,7 +1,7 @@
 import { OutlineStore } from './model';
 import type { View } from './controller';
 import { lang, t, type Lang } from './i18n';
-import { addGuideSlides, addScheduleSample } from './sample';
+import { addDiagramSample, addGuideSlides, addScheduleSample } from './sample';
 
 const STORAGE_KEY = 'yamoli:v1';
 const PREFS_KEY = 'yamoli:prefs';
@@ -319,6 +319,7 @@ function seed(): OutlineStore {
   s.addBlock(sales.id, 'table', 'csv', 'month,amount\n2026-09,120\n2026-10,135\n2026-11,150');
 
   const sample = addScheduleSample(s, r);
+  s.setCollapsed(addDiagramSample(s, r), true);
   s.setCollapsed(addGuideSlides(s, r, sample), true);
 
   const shop = s.addChild(r, -1, t('買い物リスト', 'Shopping list'));

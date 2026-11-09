@@ -10,6 +10,7 @@
  *                  notes: …            speaker notes (also as a list)
  *                  image: https://…    picture beside the bullets
  *                  embed: [[item]]     that item's Gantt chart
+ *                  embed: [[item]] diagram   …or its diagram (also `図`)
  */
 import { refIds } from './links';
 import type { OutlineStore } from './model';
@@ -31,6 +32,8 @@ export interface Slide {
   notes?: string;
   image?: string;
   embed?: string;
+  /** What of the embedded item to show. */
+  embedAs?: 'gantt' | 'diagram';
 }
 
 export interface Deck {
@@ -60,6 +63,7 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
       notes: value(id, 'notes'),
       image: value(id, 'image'),
       embed: embed ? refIds(embed).find((r) => store.get(r)) : undefined,
+      embedAs: embed ? (/diagram|図/i.test(embed.replace(/\[\[[^\]]*\]\]/g, '')) ? 'diagram' : 'gantt') : undefined,
     });
   }
   return { theme: value(deckId, 'theme') === 'dark' ? 'dark' : 'light', slides };
