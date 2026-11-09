@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { highlight, parseInline } from './inline';
+import { highlight, linkAt, markupSpans, parseInline } from './inline';
 import { parseQuery } from './search';
 
 test('parseInline splits formatting and keeps source offsets', () => {
@@ -51,4 +51,23 @@ test('[[id]] becomes a ref segment', () => {
     ['ref', '[[abc123]]', 'abc123'],
     ['text', ' and [[ x ]]', undefined],
   ]);
+});
+
+test('markupSpans keeps every character and marks the markup', () => {
+  const src = 'see **bold** [docs](https://ex.com/a) and [[abc123]] #tag';
+  const spans = markupSpans(src);
+  expect(spans.map((s) => s.text).join('')).toBe(src);
+  expect(spans.filter((s) => s.cls === 'mk').map((s) => s.text)).toEqual(['**', '**', '[', '](https://ex.com/a)', '[[', ']]']);
+  expect(spans.find((s) => s.cls === 'link')?.text).toBe('docs');
+  expect(spans.find((s) => s.cls === 'tag')?.text).toBe('#tag');
+});
+
+test('linkAt finds the link around the caret', () => {
+  const src = 'a [docs](https://ex.com) b https://x.io c [[abc]] **d**';
+  expect(linkAt(src, 0)).toBeNull();
+  expect(linkAt(src, 4)).toEqual({ kind: 'link', start: 2, end: 24, label: 'docs', href: 'https://ex.com' });
+  expect(linkAt(src, 24)?.kind).toBe('link'); // right after it
+  expect(linkAt(src, 30)).toEqual({ kind: 'url', start: 27, end: 39, href: 'https://x.io' });
+  expect(linkAt(src, 46)).toEqual({ kind: 'ref', start: 42, end: 49, refId: 'abc' });
+  expect(linkAt(src, 54)).toBeNull(); // bold is not a link
 });

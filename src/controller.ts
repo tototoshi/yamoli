@@ -616,6 +616,12 @@ export class Controller {
     this.commit(this.view === 'outline' ? fText(id) : null);
   }
 
+  /** Replace a row's text from a tool (link editing) and put the caret at caret. */
+  replaceText(id: string, text: string, caret: number) {
+    this.store.setText(id, text);
+    this.commit(fText(id, caret));
+  }
+
   /** Set a field's value from outside its editor (the date picker). */
   setFieldText(id: string, text: string) {
     this.store.setText(id, text);

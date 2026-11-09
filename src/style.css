@@ -269,7 +269,49 @@ textarea.text {
   background: transparent;
   line-height: 1.6;
 }
-textarea.text.title { padding: 0; width: 100%; } /* not in a flex row, so it would keep the default 20 columns */
+textarea.text.title { padding: 0; width: 100%; }
+
+/*
+ * The row editor (RowEditor.tsx): the textarea's text is invisible and a copy
+ * underneath shows it styled. Both sit in one grid cell so they wrap alike;
+ * nothing here may change a character's width.
+ */
+.rich { position: relative; display: grid; flex: 1; min-width: 0; }
+.rich > .mirror, .rich > textarea { grid-area: 1 / 1; min-width: 0; }
+.rich > textarea { -webkit-text-fill-color: transparent; }
+.rich > textarea::placeholder { -webkit-text-fill-color: var(--muted); }
+.mirror { padding: 1px 0; line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
+.mirror.title { padding: 0; }
+.m-mk { color: var(--muted); opacity: 0.7; }
+.m-strong { -webkit-text-stroke: 0.4px currentColor; }
+.m-del { text-decoration: line-through; }
+.m-code { background: var(--hover); border-radius: 3px; }
+.m-link, .m-tag, .m-ref { color: var(--accent); }
+.m-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+.link-bubble {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(520px, 100%);
+  margin-top: 2px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--faint);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.1);
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 1.5;
+}
+.link-bubble a { color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.link-form { flex-wrap: wrap; }
+.link-form label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.link-form input { width: 14em; padding: 2px 6px; border: 1px solid var(--faint); border-radius: 4px; font-size: 12px; color: var(--fg); background: var(--bg); } /* not in a flex row, so it would keep the default 20 columns */
 
 .text-view {
   flex: 1;
@@ -418,7 +460,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 
 /* folded fields: one line right after the row's text (clear of the buttons at the far end) */
-.row:has(> .fields-summary) > .text { flex: 0 1 auto; field-sizing: content; min-width: 2em; }
+.row:has(> .fields-summary) > :is(.text, .rich) { flex: 0 1 auto; min-width: 2em; }
+.row:has(> .fields-summary) > :is(.text, .rich textarea) { field-sizing: content; }
 .fields-summary {
   flex: 0 1 auto;
   margin-right: auto;
@@ -455,7 +498,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 }
 .row:hover .date-pick, .date-pick:focus-within { opacity: 1; }
 /* A date is short: keep the value narrow so the icon sits right after it. */
-.row:has(> .date-pick) > .text { flex: 0 0 11ch; }
+.row:has(> .date-pick) > :is(.text, .rich) { flex: 0 0 11ch; }
 /* The real input lies over the icon, so its picker opens there. */
 .date-pick input {
   position: absolute;

@@ -47,14 +47,20 @@ export function SegView({ seg }: { seg: Seg }) {
       const target = ctl.store.get(seg.refId!);
       if (!target) return <>{pieces}</>; // unknown id: show the raw text
       return (
-        <a class={'ref' + (target.completed ? ' done' : '')} href={ctl.hashFor(target.id)} title={t('クリックで移動', 'Go to this item')}>
+        <a
+          class={'ref' + (target.completed ? ' done' : '')}
+          href={ctl.hashFor(target.id)}
+          data-ref={target.id}
+          data-o={seg.start + 2}
+          title={t('⌘/Ctrl+クリックで移動', '⌘/Ctrl+click to go there')}
+        >
           {nodeLabel(ctl.store, target.id)}
         </a>
       );
     }
     case 'link':
       return (
-        <a href={seg.href} target="_blank" rel="noopener noreferrer">
+        <a href={seg.href} target="_blank" rel="noopener noreferrer" title={t('⌘/Ctrl+クリックで開く', '⌘/Ctrl+click to open')}>
           {pieces}
         </a>
       );

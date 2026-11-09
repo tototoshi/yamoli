@@ -58,6 +58,59 @@ export function parseInline(src: string): Seg[] {
   return out;
 }
 
+/** A run of the editor's text, styled by cls: 'mk' for markup characters, else the kind of its content. */
+export interface MarkSpan {
+  text: string;
+  cls?: 'mk' | SegKind;
+}
+
+/**
+ * The source split for styling it while it is edited: every character kept
+ * (the spans join back to src), markup characters marked as such.
+ */
+export function markupSpans(src: string): MarkSpan[] {
+  const out: MarkSpan[] = [];
+  let last = 0;
+  const put = (text: string, cls?: MarkSpan['cls']) => text && out.push({ text, cls });
+  for (const m of src.matchAll(INLINE)) {
+    const g = m.groups!;
+    const i = m.index! + (g.pre?.length ?? 0);
+    put(src.slice(last, i));
+    if (g.ref !== undefined) put('[[', 'mk'), put(g.ref, 'ref'), put(']]', 'mk');
+    else if (g.code !== undefined) put('`', 'mk'), put(g.code, 'code'), put('`', 'mk');
+    else if (g.strong !== undefined) put('**', 'mk'), put(g.strong, 'strong'), put('**', 'mk');
+    else if (g.del !== undefined) put('~~', 'mk'), put(g.del, 'del'), put('~~', 'mk');
+    else if (g.em !== undefined) put('*', 'mk'), put(g.em, 'em'), put('*', 'mk');
+    else if (g.label !== undefined) put('[', 'mk'), put(g.label, 'link'), put(`](${g.href})`, 'mk');
+    else if (g.url !== undefined) put(g.url, 'link');
+    else put(g.tag, 'tag');
+    last = m.index! + m[0].length;
+  }
+  put(src.slice(last));
+  return out;
+}
+
+/** A link in the source, from its first to past its last character. */
+export type LinkAt = { start: number; end: number } & (
+  | { kind: 'link'; label: string; href: string }
+  | { kind: 'url'; href: string }
+  | { kind: 'ref'; refId: string }
+);
+
+/** The Markdown link, bare URL or [[ref]] that the caret is in or touches. */
+export function linkAt(src: string, caret: number): LinkAt | null {
+  for (const m of src.matchAll(INLINE)) {
+    const g = m.groups!;
+    const start = m.index! + (g.pre?.length ?? 0);
+    const end = m.index! + m[0].length;
+    if (caret < start || caret > end) continue;
+    if (g.ref !== undefined) return { kind: 'ref', start, end, refId: g.ref };
+    if (g.label !== undefined) return { kind: 'link', start, end, label: g.label, href: g.href };
+    if (g.url !== undefined) return { kind: 'url', start, end, href: g.url };
+  }
+  return null;
+}
+
 export interface Piece {
   text: string;
   /** Offset of `text` within the segment. */

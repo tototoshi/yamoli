@@ -1,4 +1,4 @@
-import type { ComponentChildren, TargetedEvent, TextareaHTMLAttributes } from 'preact';
+import type { ComponentChildren, TargetedEvent } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { applyFocus, Controller, IS_MAC, fKey, fText, type View } from './controller';
 import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
@@ -18,18 +18,11 @@ import { toValue, toYaml } from './serialize';
 import { computeSchedule } from './schedule';
 import type { OutlineNode } from './model';
 import { OutlineStore } from './model';
+import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
 import { dataFile, flush, saveState, type FieldsMode } from './storage';
 
 // Keep focus in the text while clicking toolbar-ish buttons.
 const keepFocus = (e: MouseEvent) => e.preventDefault();
-const imeActive = (e: KeyboardEvent) => e.isComposing || e.keyCode === 229;
-
-/**
- * Whether the editor for key has focus. Checked by key, not element: moving a
- * row (Tab, Alt+Shift+↑↓) re-creates its editor, and the old one's blur must
- * not close the new one.
- */
-const hasFocus = (key: string) => (document.activeElement as HTMLElement | null)?.dataset?.fk === key;
 
 // ================================================================ app
 
@@ -369,6 +362,7 @@ const shortcuts = (): [string, string][] => [
   ['Alt+A', t('属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）', 'Add a field (Tab under a field nests an object or list)')],
   ['Alt+D', t('ブロック（Markdown・CSV・コードなど複数行の値）を追加', 'Add a block: a multi-line value (Markdown, CSV, code …)')],
   ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
+  ['⌘/Ctrl+K', t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)')],
   ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
   [t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'), t('次の行を結合（空の行なら行を削除）', 'Join the next row (removes an empty row)')],
   ['⌘/Ctrl+Shift+Backspace', t('行を削除（子も含む）', 'Delete the row and what’s below it')],
@@ -640,19 +634,7 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
       />
     );
   }
-  return (
-    <AutoTextarea
-      class={'text' + (title ? ' title' : '')}
-      placeholder={title ? t('無題', 'Untitled') : undefined}
-      data-id={node.id}
-      data-fk={key}
-      value={node.text}
-      onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
-      onKeyDown={(e) => !imeActive(e) && ctl.onTextKeydown(e, e.currentTarget)}
-      onPaste={(e) => ctl.onTextPaste(e, e.currentTarget)}
-      onBlur={() => setTimeout(() => !hasFocus(key) && ctl.deactivate(key), 0)}
-    />
-  );
+  return <RowEditor node={node} title={title} />;
 }
 
 /**
@@ -681,7 +663,20 @@ function InlineView({
   const onClick = (e: MouseEvent) => {
     pointerDown.current = false;
     const target = e.target as Element;
-    if (target.closest('a')) return; // let links open / zoom
+    // A click on a link edits there (the bubble then offers to open it); ⌘/Ctrl+click follows it.
+    const link = target.closest<HTMLAnchorElement>('a');
+    if (link) {
+      const ref = link.dataset.ref;
+      if (e.metaKey || e.ctrlKey) {
+        if (ref) {
+          e.preventDefault();
+          ctl.zoomTo(ref);
+        }
+        return;
+      }
+      e.preventDefault();
+      if (ref) return onEdit(Number(link.dataset.o)); // its label isn't the source text: put the caret inside
+    }
     const tag = target.closest<HTMLElement>('.tag');
     if (tag) {
       ctl.setQuery(tag.textContent ?? '');
@@ -1133,13 +1128,4 @@ function caretFromPoint(x: number, y: number): { node: Node; offset: number } | 
   return r && { node: r.startContainer, offset: r.startOffset };
 }
 
-/** A textarea that grows to fit its content. */
-function AutoTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement> & Record<`data-${string}`, string>) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const ta = ref.current!;
-    ta.style.height = 'auto';
-    ta.style.height = ta.scrollHeight + 'px';
-  });
-  return <textarea ref={ref} rows={1} {...props} />;
-}
+
