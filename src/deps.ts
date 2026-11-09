@@ -50,6 +50,13 @@ function previousItem(store: OutlineStore, id: string): string | null {
 const isSequential = (store: OutlineStore, id: string) =>
   /^(true|yes|on)$/i.test(store.fieldValue(id, SEQUENTIAL_KEY)?.trim() ?? '');
 
+/** Links in id's `after` to items that no longer exist (deleted since), which hold nothing up. */
+export function missingDependencies(store: OutlineStore, id: string): string[] {
+  const f = store.field(id, DEP_KEY);
+  if (!f) return [];
+  return [...new Set(store.fieldTexts(f.id).flatMap(refIds))].filter((ref) => !store.get(ref));
+}
+
 /** Items that depend on id. */
 export function dependents(store: OutlineStore, id: string): string[] {
   return Object.keys(store.nodes).filter((n) => n !== id && dependencies(store, n).includes(id));

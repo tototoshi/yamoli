@@ -158,6 +158,8 @@ let pending: OutlineStore | null = null;
 let unsaved: string | null = null;
 let inflight = false;
 let retryTimer: ReturnType<typeof setTimeout> | undefined;
+/** The last save to this browser failed, with no file to fall back on. */
+let browserFull = false;
 
 export function save(store: OutlineStore) {
   pending = store;
@@ -172,8 +174,23 @@ export function flush() {
   pending = null;
   try {
     localStorage.setItem(STORAGE_KEY, json);
+    if (browserFull) {
+      browserFull = false;
+      setState({ kind: 'local' });
+    }
   } catch (e) {
     console.error('Failed to save outline to the browser', e);
+    // Without a file this copy is the only one: say so rather than look saved.
+    if (!dataFile) {
+      browserFull = true;
+      setState({
+        kind: 'error',
+        message: t(
+          'ブラウザに保存できません（容量不足？）。⋯ メニューからバックアップを書き出してください',
+          'Can’t save in this browser (out of space?). Export a backup from the ⋯ menu'
+        ),
+      });
+    }
   }
   if (!dataFile) return;
   unsaved = json;

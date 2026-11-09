@@ -161,13 +161,15 @@ test('data blocks from older files become blocks; JSON becomes fields', () => {
           { id: 'd2', format: 'markdown', content: 'more' },
           { id: 'd3', format: 'json', content: '{"theme":"auto","size":15,"tags":["x","y"],"opt":{"on":true}}' },
           { id: 'd4', format: 'json', content: '{broken' },
+          { id: 'd5', format: 'text', content: 'plain' },
         ],
       },
       b: { text: 'b' },
     },
   });
   const a = s.node('a');
-  expect(a.children.map((c) => s.node(c).key)).toEqual(['markdown', 'markdown2', 'json', 'json2', null]);
+  expect(a.children.map((c) => s.node(c).key)).toEqual(['markdown', 'markdown2', 'json', 'json2', 'note', null]);
+  expect(s.field('a', 'note')).toMatchObject({ text: 'plain', format: 'text' }); // not `text`, the item's own key in YAML
   expect(s.field('a', 'markdown')).toMatchObject({ text: '# memo', format: 'markdown', collapsed: true });
   expect(s.field('a', 'json2')).toMatchObject({ text: '{broken', format: 'code' });
   const json = s.field('a', 'json')!;

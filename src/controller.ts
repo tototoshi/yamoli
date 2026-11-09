@@ -407,7 +407,7 @@ export class Controller {
       }
     } else if (e.key === 'Enter' && isMod(e)) {
       e.preventDefault();
-      for (const r of this.selectionRoots()) if (store.node(r).key === null) this.toggleComplete(r);
+      this.toggleCompleteAll(this.selectionRoots());
     } else {
       return false;
     }
@@ -534,13 +534,7 @@ export class Controller {
     const vis = this.visibleRows();
     const idx = vis.indexOf(id);
     const n = this.store.node(id);
-    this.store.setCompleted(id, !n.completed);
-    if (n.key === null) {
-      const f = this.store.field(id, DONE_KEY);
-      if (n.completed && !f) this.store.addField(id, DONE_KEY, formatDate(today()));
-      else if (n.completed && f && !f.text.trim()) this.store.setText(f.id, formatDate(today()));
-      else if (!n.completed && f && !f.children.length) this.store.remove(f.id);
-    }
+    this.setDone(id, !n.completed);
     let focus: Focus | null | undefined; // undefined keeps focus where it is
     if (n.completed && !this.prefs.showCompleted) {
       // Skip the row's own (now hidden) subtree when choosing the next row.
@@ -548,6 +542,26 @@ export class Controller {
       focus = next ? fText(next, 0) : vis[idx - 1] ? fText(vis[idx - 1]) : null;
     }
     this.commit(focus);
+  }
+
+  /** Complete or reopen several items as one step: all completed, unless they all are already. */
+  toggleCompleteAll(ids: string[]) {
+    const items = ids.filter((id) => this.store.node(id).key === null);
+    if (!items.length) return;
+    const done = !items.every((id) => this.store.node(id).completed);
+    for (const id of items) this.setDone(id, done);
+    this.commit();
+  }
+
+  private setDone(id: string, done: boolean) {
+    const { store } = this;
+    if (store.node(id).completed === done) return;
+    store.setCompleted(id, done);
+    if (store.node(id).key !== null) return;
+    const f = store.field(id, DONE_KEY);
+    if (done && !f) store.addField(id, DONE_KEY, formatDate(today()));
+    else if (done && f && !f.text.trim()) store.setText(f.id, formatDate(today()));
+    else if (!done && f && !f.children.length) store.remove(f.id);
   }
 
   // ================================================================ zoom
@@ -559,7 +573,8 @@ export class Controller {
   private readHash() {
     const m = location.hash.match(/^#\/([^?]*)(?:\?(.*))?$/);
     const raw = m?.[1] ? decodeURIComponent(m[1]) : this.store.rootId;
-    this.zoomId = this.store.get(raw) ? raw : this.store.rootId;
+    // A field or block can't be zoomed into: its item is shown instead.
+    this.zoomId = this.store.get(raw) ? this.store.owner(raw) : this.store.rootId;
     const asked = new URLSearchParams(m?.[2] ?? '').get('view') as View | null;
     if (asked && VIEWS.includes(asked)) {
       this.view = asked;
@@ -582,6 +597,7 @@ export class Controller {
   }
 
   hashFor(id: string, view?: View) {
+    if (this.store.get(id)) id = this.store.owner(id); // fields and blocks open their item
     const base = id === this.store.rootId ? '#/' : '#/' + encodeURIComponent(id);
     return view ? `${base}?view=${view}` : base;
   }
@@ -906,9 +922,11 @@ export class Controller {
         store.remove(id);
         return this.commit(prev ? fText(prev) : zoomFocus);
       }
-      if (prev && store.node(prev).format === null) {
+      // Only into a row of the same kind: an item into an item, a list element into a list element.
+      const pn = prev ? store.node(prev) : null;
+      if (pn && pn.key === null && pn.format === null && store.isData(prev) === store.isData(id)) {
         e.preventDefault();
-        const pos = store.node(prev).text.length;
+        const pos = pn.text.length;
         store.mergeInto(id, prev);
         return this.commit(fText(prev, pos));
       }
@@ -1027,9 +1045,9 @@ export class Controller {
     if (!p) return false;
     const sibs = this.shownChildren(p);
     const prev = sibs[sibs.indexOf(id) - 1];
-    // A field with a value is a leaf: `owner: [[x]]` can't also hold children.
+    // A field with a value is a leaf: `owner: [[x]]` can't also hold children; nor can a block, even empty.
     const pn = prev && this.store.node(prev);
-    if (!pn || (pn.key !== null && pn.text.trim())) return false;
+    if (!pn || (pn.key !== null && (pn.text.trim() || pn.format !== null))) return false;
     return this.store.moveTo(id, prev, null);
   }
 

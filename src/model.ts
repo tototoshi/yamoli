@@ -97,13 +97,14 @@ export class OutlineStore {
     for (const n of Object.values(nodes)) n.children = n.children.filter((c) => nodes[c] && c !== n.id);
     const store = new OutlineStore({ rootId: json.rootId, nodes });
     // Earlier versions had data blocks beside the fields: they become blocks
-    // named after their format, and JSON becomes nested fields.
+    // named after their format (plain text as `note`, since an item's own
+    // `text` has that name in YAML), and JSON becomes nested fields.
     for (const [id, raw] of Object.entries<any>(json.nodes)) {
       if (!nodes[id] || !Array.isArray(raw?.data)) continue;
       for (const d of raw.data) {
         const format = String(d?.format || 'text');
         const content = String(d?.content ?? '');
-        const key = store.freeKey(id, format);
+        const key = store.freeKey(id, format === 'text' ? 'note' : format);
         let parsed: unknown;
         try {
           parsed = format === 'json' ? JSON.parse(content) : undefined;

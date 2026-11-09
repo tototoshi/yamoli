@@ -5,7 +5,7 @@ import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from '
 import { lang, t } from './i18n';
 import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
-import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles } from './deps';
+import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles, missingDependencies } from './deps';
 import { startBulletDrag, startRowSelect } from './drag';
 import { Ctx, useCtl } from './context';
 import { GanttView } from './GanttView';
@@ -642,10 +642,14 @@ function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
   const ctl = useCtl();
   const key = 'text:' + node.id;
   if (!title && ctl.activeField !== key) {
+    const { store } = ctl;
+    // An object in a list (`- name: …`) has no text of its own: show what it holds.
+    const fields = !node.text && store.isData(node.id) ? node.children.filter((c) => store.isField(c)) : [];
     return (
       <InlineView
         class="text text-view"
         text={node.text}
+        placeholder={fields.length ? fields.map((f) => nodeLabel(store, f)).join(' · ') : undefined}
         data-id={node.id}
         onEdit={(pos) => ctl.focus(fText(node.id, pos))}
       />
@@ -1035,7 +1039,17 @@ function DepBadge({ id }: { id: string }) {
   const ctl = useCtl();
   const { store } = ctl;
   const status = depStatus(store, id, ctl.cycles);
-  if (status === 'none' || (store.node(id).completed && status !== 'cycle')) return null;
+  const missing = missingDependencies(store, id);
+  const broken = missing.length > 0 && !store.node(id).completed && (
+    <span
+      class="dep-badge cycle"
+      title={t('after のリンク先が見つかりません（削除された？）。この依存は日程に効いていません', 'An item in `after` is gone (deleted?), so it no longer holds this up')}
+    >
+      ⚠ {t('依存先なし', 'Missing')} {missing.length}
+    </span>
+  );
+  if (status === 'none' || (store.node(id).completed && status !== 'cycle')) return broken || null;
+  if (broken) return broken;
   if (status === 'ready') {
     return (
       <span class="dep-badge ready" title={t('前提がすべて完了しています', 'Everything it waits for is done')}>

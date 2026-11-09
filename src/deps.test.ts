@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { blockers, dependencies, dependents, depStatus, findCycles } from './deps';
+import { blockers, dependencies, dependents, depStatus, findCycles, missingDependencies } from './deps';
 import { OutlineStore } from './model';
 
 function project() {
@@ -74,4 +74,13 @@ test('`^` stands for the item just above', () => {
   expect(dependencies(s, b)).toEqual([a]);
   expect(dependencies(s, a)).toEqual([]);
   expect(dependencies(s, x).sort()).toEqual([a, b].sort());
+});
+
+test('links in `after` to deleted items are reported, not silently ignored', () => {
+  const { s, design, api, release } = project();
+  expect(missingDependencies(s, api.id)).toEqual([]);
+  s.remove(design.id);
+  expect(dependencies(s, api.id)).toEqual([]);
+  expect(missingDependencies(s, api.id)).toEqual([design.id]);
+  expect(missingDependencies(s, release.id)).toEqual([]);
 });
