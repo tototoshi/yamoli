@@ -50,7 +50,12 @@ export function applyFocus(f: Focus | null | undefined) {
 }
 
 const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
-const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+export const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** macOS's Emacs keys (Ctrl+P / N / B / F) as the arrow they stand for. */
+const EMACS: Record<string, string> = { KeyP: 'ArrowUp', KeyN: 'ArrowDown', KeyB: 'ArrowLeft', KeyF: 'ArrowRight' };
+const arrowOf = (e: KeyboardEvent) =>
+  (IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && EMACS[e.code]) || e.key;
 
 /** State of the `[[` link picker attached to one editable field. */
 /** The menu opened by right-clicking an item's bullet. */
@@ -165,9 +170,10 @@ export class Controller {
     const p = this.picker;
     if (!p || p.key !== el.dataset.fk) return false;
     const n = p.candidates.length;
-    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
+    const key = arrowOf(e);
+    if ((key === 'ArrowDown' || key === 'ArrowUp') && n) {
       e.preventDefault();
-      p.selected = (p.selected + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+      p.selected = (p.selected + (key === 'ArrowDown' ? 1 : -1) + n) % n;
       this.rerender();
       return true;
     }
@@ -521,18 +527,37 @@ export class Controller {
 
   onKeyKeydown(e: KeyboardEvent, input: HTMLInputElement) {
     const id = input.dataset.id!;
+    const key = arrowOf(e);
+    const caret = input.selectionStart === input.selectionEnd ? input.selectionStart : null;
     if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Escape') {
       e.preventDefault();
       this.focus(fText(id, e.key === 'Escape' ? 'end' : 0));
     } else if (e.key === 'Backspace' && !input.value) {
       e.preventDefault();
       this.unfield(id, 0);
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    } else if (key === 'ArrowDown' || key === 'ArrowUp') {
       e.preventDefault();
       const vis = this.visibleRows();
-      const other = vis[vis.indexOf(id) + (e.key === 'ArrowDown' ? 1 : -1)];
+      const other = vis[vis.indexOf(id) + (key === 'ArrowDown' ? 1 : -1)];
       if (other) this.focus(fText(other));
+    } else if (key === 'ArrowRight' && caret === input.value.length) {
+      e.preventDefault();
+      this.focus(fText(id, 0));
+    } else if (key === 'ArrowLeft' && caret === 0) {
+      const prev = this.rowBefore(id);
+      if (prev) {
+        e.preventDefault();
+        this.focus(fText(prev));
+      }
     }
+  }
+
+  /** The row the caret goes to before this one: the one shown above, else the zoomed item's title. */
+  private rowBefore(id: string): string | null {
+    const vis = this.visibleRows();
+    const idx = vis.indexOf(id);
+    if (idx > 0) return vis[idx - 1];
+    return id !== this.zoomId && this.zoomId !== this.store.rootId ? this.zoomId : null;
   }
 
   /** Leaving a field's name empty turns it back into an ordinary row (or drops it if empty). */
@@ -775,22 +800,41 @@ export class Controller {
       return this.addBlock(id);
     }
 
-    // ---- cursor movement between rows
-    if (e.key === 'ArrowUp' && !e.shiftKey && !e.altKey && !isMod(e)) {
+    // ---- cursor movement between rows (also Ctrl+P / N / B / F on macOS)
+    const key = arrowOf(e);
+    const plain = key !== e.key || (!e.shiftKey && !e.altKey && !isMod(e));
+    if (key === 'ArrowUp' && plain) {
       if (ta.value.lastIndexOf('\n', start - 1) !== -1) return; // still lines above in this row
-      const target = idx > 0 ? vis[idx - 1] : !isTitle && zoomId !== store.rootId ? zoomId : null;
+      const target = isTitle ? null : this.rowBefore(id);
       if (target) {
         e.preventDefault();
         this.focus(fText(target, start));
       }
       return;
     }
-    if (e.key === 'ArrowDown' && !e.shiftKey && !e.altKey && !isMod(e)) {
+    if (key === 'ArrowDown' && plain) {
       if (ta.value.indexOf('\n', end) !== -1) return;
       const target = isTitle ? vis[0] : vis[idx + 1];
       if (target) {
         e.preventDefault();
         this.focus(fText(target, start));
+      }
+      return;
+    }
+    // ← at the start of a row goes to the end of the one before (or a field's name), → the other way.
+    if (key === 'ArrowLeft' && plain && start === 0 && end === 0) {
+      const target = n.key !== null && !isTitle ? fKey(id) : !isTitle && this.rowBefore(id);
+      if (target) {
+        e.preventDefault();
+        this.focus(typeof target === 'string' ? fText(target) : target);
+      }
+      return;
+    }
+    if (key === 'ArrowRight' && plain && start === ta.value.length && end === start) {
+      const next = isTitle ? vis[0] : vis[idx + 1];
+      if (next) {
+        e.preventDefault();
+        this.focus(store.node(next).key !== null ? { ...fKey(next), start: 0 } : fText(next, 0));
       }
     }
   }

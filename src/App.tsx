@@ -1,6 +1,6 @@
 import type { ComponentChildren, TargetedEvent, TextareaHTMLAttributes } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { applyFocus, Controller, fKey, fText, type View } from './controller';
+import { applyFocus, Controller, IS_MAC, fKey, fText, type View } from './controller';
 import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
 import { lang, t } from './i18n';
 import { parseInline } from './inline';
@@ -42,7 +42,8 @@ export function App() {
         else ctl.undo();
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyF') {
+      // ⌘F on macOS, where Ctrl+F moves the caret.
+      if ((IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyF') {
         e.preventDefault();
         const box = document.querySelector<HTMLInputElement>('input.search');
         box?.focus();
@@ -350,7 +351,8 @@ const shortcuts = (): [string, string][] => [
   ['Enter', t('新しい行（カーソル位置で分割）', 'New row (splits at the caret)')],
   ['Shift+Enter', t('行内改行', 'Line break within a row')],
   ['Tab / Shift+Tab', t('インデント / アウトデント', 'Indent / outdent')],
-  ['↑ / ↓', t('前 / 次の行へ', 'Previous / next row')],
+  [t('↑ ↓ / Ctrl+P N（Mac）', '↑ ↓ / Ctrl+P N (Mac)'), t('前 / 次の行へ', 'Previous / next row')],
+  [t('← → / Ctrl+B F（Mac）', '← → / Ctrl+B F (Mac)'), t('行の端で前 / 次の行へ', 'At a row’s ends, on to the previous / next row')],
   ['Alt(⌘)+Shift+↑↓', t('行を移動', 'Move the row')],
   ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
   ['⌘/Ctrl+Enter', t('完了 / 未完了', 'Complete / reopen')],
