@@ -719,10 +719,11 @@ export class Controller {
         return this.commit(fText(id, 0));
       }
       store.setText(id, before);
-      const kids = this.shownChildren(id);
+      // The new row goes first among the sub-items, after the fields; with fields only, it's the next sibling.
+      const firstItem = this.shownChildren(id).find((c) => !store.isField(c));
       const next =
-        kids.length && this.isExpanded(id)
-          ? store.addChild(id, store.indexOf(kids[0]), after)
+        firstItem && this.isExpanded(id)
+          ? store.addChild(id, store.indexOf(firstItem), after)
           : store.addSiblingAfter(id, after);
       return this.commit(fText(next.id, 0));
     }
