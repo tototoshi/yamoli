@@ -192,19 +192,23 @@ ul.children ul.children {
 
 .toggle {
   flex: none;
-  width: 16px;
+  width: 20px;
   height: 26px;
-  margin-left: -18px;
+  margin-left: -21px;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: none;
   color: var(--muted);
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   opacity: 0;
   transition: transform 0.1s, opacity 0.1s;
 }
 .row:hover .toggle:not(.empty) { opacity: 1; }
+.toggle:not(.empty):hover { color: var(--fg); background: var(--hover); }
 .node.collapsed > .row > .toggle { transform: rotate(-90deg); }
 
 .bullet {
