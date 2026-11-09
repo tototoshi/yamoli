@@ -46,3 +46,32 @@ test('cycles are detected', () => {
   expect(cycles).toEqual(new Set([design.id, api.id, ui.id, release.id]));
   expect(depStatus(s, api.id, cycles)).toBe('cycle');
 });
+
+test('a sequential parent chains its items, unless one says otherwise', () => {
+  const s = OutlineStore.create();
+  const phase = s.addChild(s.rootId, -1, 'phase');
+  s.addField(phase.id, 'sequential', 'true');
+  const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((t) => s.addChild(phase.id, -1, t).id);
+  const other = s.addChild(s.rootId, -1, 'other').id;
+  s.addField(c, 'after', `[[${other}]]`);
+  s.addField(d, 'after', '');
+  expect(dependencies(s, a)).toEqual([]);
+  expect(dependencies(s, b)).toEqual([a]);
+  expect(dependencies(s, c)).toEqual([other]); // its own `after` wins
+  expect(dependencies(s, d)).toEqual([c]); // an empty `after` doesn't
+  s.setText(s.field(phase.id, 'sequential')!.id, 'false');
+  expect(dependencies(s, b)).toEqual([]);
+});
+
+test('`^` stands for the item just above', () => {
+  const s = OutlineStore.create();
+  const a = s.addChild(s.rootId, -1, 'a').id;
+  const b = s.addChild(s.rootId, -1, 'b').id;
+  const x = s.addChild(s.rootId, -1, 'x').id;
+  s.addField(b, 'after', '^');
+  s.addField(a, 'after', '^'); // nothing above
+  s.addField(x, 'after', `^, [[${a}]]`);
+  expect(dependencies(s, b)).toEqual([a]);
+  expect(dependencies(s, a)).toEqual([]);
+  expect(dependencies(s, x).sort()).toEqual([a, b].sort());
+});

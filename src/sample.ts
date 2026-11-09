@@ -43,20 +43,21 @@ export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = 
   const plan = add(proj.id, t('1. 企画', '1. Planning'));
   const kickoff = add(plan, t('キックオフ', 'Kickoff'), { duration: '0d' });
   s.setCompleted(kickoff, true);
-  add(plan, t('要件定義', 'Requirements'), { duration: '3d', after: after(kickoff) });
+  add(plan, t('要件定義', 'Requirements'), { duration: '3d', after: '^' }); // the item just above
 
   // A phase-level dependency: everything in design waits for planning.
   const design = add(proj.id, t('2. 設計', '2. Design'), { after: after(plan) });
   const ia = add(design, t('情報設計', 'Information architecture'), { duration: '2d' });
-  const visual = add(design, t('デザイン', 'Visual design'));
-  const wire = add(visual, t('ワイヤーフレーム', 'Wireframes'), { duration: '2d', after: after(ia) });
-  const look = add(visual, t('ビジュアルデザイン', 'Mockups'), { duration: '3d', after: after(wire) });
+  // Sequential: each child comes after the one above it, no `after` needed.
+  const visual = add(design, t('デザイン', 'Visual design'), { sequential: 'true' });
+  add(visual, t('ワイヤーフレーム', 'Wireframes'), { duration: '2d', after: after(ia) });
+  const look = add(visual, t('ビジュアルデザイン', 'Mockups'), { duration: '3d' });
   const apiDesign = add(design, t('API 設計', 'API design'), { duration: '2d', after: after(ia) });
 
   const build = add(proj.id, t('3. 実装', '3. Build'));
-  const back = add(build, t('バックエンド', 'Back end'));
+  const back = add(build, t('バックエンド', 'Back end'), { sequential: 'true' });
   const api = add(back, t('API 実装', 'API'), { duration: '1w', after: after(apiDesign) });
-  const migrate = add(back, t('データ移行', 'Data migration'), { duration: '3d', after: after(api) });
+  const migrate = add(back, t('データ移行', 'Data migration'), { duration: '3d' });
   const front = add(build, t('フロントエンド', 'Front end'));
   const screens = add(front, t('画面実装', 'Pages'), { duration: '1w', after: after(look) });
   const wiring = add(front, t('API 連携', 'Connect to the API'), { duration: '2d', after: after(screens, api) });
@@ -137,6 +138,10 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
         t('先行する作業が終わってから始まる', 'It starts once the other task is done'),
         t('is:ready / is:blocked で着手可・待ちを検索', 'is:ready / is:blocked find what can start and what waits'),
       ],
+    ],
+    [
+      t('`after: ^` ですぐ上の作業の後', '`after: ^` for the task just above'),
+      [t('親に `sequential: true` で、子が上から順番に', '`sequential: true` on a parent runs its children in order')],
     ],
     t('依存が循環していると ⚠ で知らせる', 'A dependency cycle is flagged with ⚠'),
   ]);
