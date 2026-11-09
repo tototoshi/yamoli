@@ -173,3 +173,30 @@ test('a field or block cannot be zoomed into: its item opens instead', () => {
   ctl.onHashChange();
   expect(ctl.zoomId).toBe(item);
 });
+
+test('a field name is completed only once a suggestion is picked, then its values are offered', () => {
+  let a = '', b = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'a');
+    s.addField(a, 'status', 'done');
+    b = add(s.rootId, 'b');
+  });
+  ctl.addAttribute(b);
+  const f = ctl.store.node(b).children[0];
+  const input = document.createElement('input');
+  input.dataset.id = f;
+  input.dataset.fk = 'fkey:' + f;
+  input.value = 'st';
+  document.body.append(input);
+  ctl.onKeyInput(f, input);
+  expect(ctl.suggest).toMatchObject({ key: 'fkey:' + f, words: ['status'], selected: -1 });
+  ctl.onKeyKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }), input);
+  ctl.onKeyKeydown(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }), input);
+  expect(ctl.store.node(f).key).toBe('status');
+  expect(ctl.suggest).toMatchObject({ key: 'text:' + f, words: ['done'], selected: -1 });
+  // Enter with nothing picked is an ordinary Enter.
+  const ta = editor(ctl, f);
+  press(ctl, ta, 'ArrowDown');
+  press(ctl, ta, 'Enter');
+  expect(ctl.store.fieldValue(b, 'status')).toBe('done');
+});

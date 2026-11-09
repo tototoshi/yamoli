@@ -8,7 +8,7 @@ import type { ScheduleResult } from './schedule';
 import { addGuideSlides, addScheduleSample } from './sample';
 import { UndoHistory } from './history';
 import { browserLang, setLang, t, type Lang } from './i18n';
-import { linkCandidates, pickerQueryAt } from './links';
+import { keyCandidates, linkCandidates, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
 import { toMarkdownRows } from './serialize';
@@ -59,7 +59,7 @@ export const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** macOS's Emacs keys (Ctrl+P / N / B / F) as the arrow they stand for. */
 const EMACS: Record<string, string> = { KeyP: 'ArrowUp', KeyN: 'ArrowDown', KeyB: 'ArrowLeft', KeyF: 'ArrowRight' };
-const arrowOf = (e: KeyboardEvent) =>
+export const arrowOf = (e: KeyboardEvent) =>
   (IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && EMACS[e.code]) || e.key;
 
 /** State of the `[[` link picker attached to one editable field. */
@@ -85,6 +85,22 @@ export interface LinkPicker {
   selected: number;
 }
 
+/**
+ * Completion of a field's name from the names in use, or of its value from the
+ * values that name already has. Nothing is picked until ↓ / ↑, so typing on
+ * and Enter work as without it.
+ */
+export interface Suggest {
+  /** Focus key of the field (fkey:… for the name, text:… for the value). */
+  key: string;
+  words: string[];
+  /** Index of the highlighted word, -1 for none. */
+  selected: number;
+}
+
+/** Fields whose values are not worth offering again: dates, and links (which have the `[[` picker). */
+const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'due', DONE_KEY]);
+
 export class Controller {
   store: OutlineStore = load();
   zoomId!: string; // set from the URL in the constructor
@@ -108,6 +124,9 @@ export class Controller {
   /** Rows whose folded fields were opened by hand (fold mode). */
   openFields = new Set<string>();
   picker: LinkPicker | null = null;
+  suggest: Suggest | null = null;
+  /** The jump-to-item box (⌘P) is open. */
+  jumping = false;
   menu: ItemMenu | null = null;
   toast: Toast | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -157,12 +176,14 @@ export class Controller {
     if (this.activeField !== key) return;
     this.activeField = null;
     this.picker = null;
+    this.suggest = null;
     this.rerender();
   }
 
   private setPendingFocus(f: Focus | null) {
     this.pendingFocus = f;
     if (this.picker && this.picker.key !== f?.key) this.picker = null;
+    if (this.suggest && this.suggest.key !== f?.key) this.suggest = null;
     if (f && /^(text|fkey):/.test(f.key)) this.activeField = f.key;
   }
 
@@ -223,6 +244,88 @@ export class Controller {
     this.store.setText(p.key.slice('text:'.length), next);
     this.picker = null;
     this.commit({ key: p.key, start: p.from + link.length });
+  }
+
+  // ================================================================ suggestions
+
+  /** Offer the names in use for field id's name, as typed so far. */
+  private suggestKeys(id: string) {
+    const words = keyCandidates(this.store, this.store.node(id).key ?? '');
+    this.suggest = words.length ? { key: 'fkey:' + id, words, selected: -1 } : null;
+  }
+
+  /** Offer the values field id's name already has elsewhere, matching its value as typed so far. */
+  private suggestValues(id: string) {
+    const n = this.store.node(id);
+    const name = n.key?.trim().toLowerCase();
+    const words =
+      name && !NO_VALUE_SUGGEST.has(name) && !this.picker && !n.text.includes('\n')
+        ? valueCandidates(this.store, name, n.text).filter((v) => !/^\d{4}-\d\d-\d\d/.test(v))
+        : [];
+    this.suggest = words.length ? { key: 'text:' + id, words, selected: -1 } : null;
+  }
+
+  /** Keyboard handling while suggestions are shown. Returns true if the key was consumed. */
+  private suggestKeydown(e: KeyboardEvent, el: HTMLTextAreaElement | HTMLInputElement): boolean {
+    const s = this.suggest;
+    if (!s || s.key !== el.dataset.fk) return false;
+    const n = s.words.length;
+    const key = arrowOf(e);
+    if (key === 'ArrowDown' || key === 'ArrowUp') {
+      e.preventDefault();
+      s.selected = key === 'ArrowDown' ? (s.selected + 1) % n : s.selected <= 0 ? n - 1 : s.selected - 1;
+      this.rerender();
+      return true;
+    }
+    if ((e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && !e.metaKey && !e.ctrlKey && s.selected >= 0) {
+      e.preventDefault();
+      this.acceptSuggestion(s.words[s.selected]);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.suggest = null;
+      this.rerender();
+      return true;
+    }
+    return false;
+  }
+
+  /** Put the word in the field: a name moves on to the value (offering its values), a value ends there. */
+  acceptSuggestion(word: string) {
+    const s = this.suggest;
+    if (!s) return;
+    const id = s.key.slice(s.key.indexOf(':') + 1);
+    this.suggest = null;
+    if (s.key.startsWith('fkey:')) {
+      this.store.setKey(id, word);
+      this.commit(fText(id, 'end'));
+      if (!this.store.node(id).text) this.suggestValues(id);
+    } else {
+      this.store.setText(id, word);
+      this.commit(fText(id, 'end'));
+    }
+    this.rerender();
+  }
+
+  // ================================================================ jump
+
+  /** Open or close the jump-to-item box. */
+  setJumping(on: boolean) {
+    this.jumping = on;
+    this.rerender();
+  }
+
+  /** Items for the jump box, nearest to where one is first. */
+  jumpCandidates(query: string): string[] {
+    return linkCandidates(this.store, query, this.zoomId, { limit: 12 });
+  }
+
+  /** Zoom into id from the jump box. */
+  jumpTo(id: string) {
+    this.jumping = false;
+    this.zoomTo(id);
+    this.rerender();
   }
 
   private snapshot() {
@@ -660,6 +763,8 @@ export class Controller {
     this.revealFields();
     const f = this.store.addField(id, '');
     this.commit(fKey(f.id));
+    this.suggestKeys(f.id);
+    this.rerender();
   }
 
   // ================================================================ fields
@@ -677,10 +782,12 @@ export class Controller {
       store.setKey(id, m[1]);
       store.setText(id, value.slice(m[1].length + 2));
       this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
-      return;
+      this.suggestValues(id);
+      return this.rerender();
     }
     store.setText(id, value);
     this.updatePicker(ta, id);
+    if (n.key !== null) this.suggestValues(id);
     this.commit(undefined, 'text:' + id);
   }
 
@@ -689,19 +796,27 @@ export class Controller {
     // Typing the colon (YAML habit) moves on to the value.
     if (v.endsWith(':')) {
       this.store.setKey(id, v.slice(0, -1));
-      return this.commit(fText(id, 0));
+      this.commit(fText(id, 0));
+      if (!this.store.node(id).text) this.suggestValues(id);
+      return this.rerender();
     }
     this.store.setKey(id, v);
+    this.suggestKeys(id);
     this.commit(undefined, 'fkey:' + id);
   }
 
   onKeyKeydown(e: KeyboardEvent, input: HTMLInputElement) {
+    if (this.suggestKeydown(e, input)) return;
     const id = input.dataset.id!;
     const key = arrowOf(e);
     const caret = input.selectionStart === input.selectionEnd ? input.selectionStart : null;
     if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Escape') {
       e.preventDefault();
       this.focus(fText(id, e.key === 'Escape' ? 'end' : 0));
+      if (e.key !== 'Escape' && !this.store.node(id).text) {
+        this.suggestValues(id);
+        this.rerender();
+      }
     } else if (e.key === 'Backspace' && !input.value) {
       e.preventDefault();
       this.unfield(id, 0);
@@ -867,7 +982,7 @@ export class Controller {
   // ================================================================ keyboard
 
   onTextKeydown(e: KeyboardEvent, ta: HTMLTextAreaElement) {
-    if (this.pickerKeydown(e, ta)) return;
+    if (this.pickerKeydown(e, ta) || this.suggestKeydown(e, ta)) return;
     const { store, zoomId } = this;
     const id = ta.dataset.id!;
     const n = store.node(id);

@@ -1,6 +1,6 @@
 import type { ComponentChildren, TargetedEvent } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { applyFocus, Controller, IS_MAC, fKey, fText, type View } from './controller';
+import { applyFocus, arrowOf, captureFocus, Controller, IS_MAC, fKey, fText, type View } from './controller';
 import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
 import { lang, t } from './i18n';
 import { parseInline } from './inline';
@@ -41,6 +41,12 @@ export function App() {
         e.preventDefault();
         if (e.code === 'KeyY' || e.shiftKey) ctl.redo();
         else ctl.undo();
+        return;
+      }
+      // ⌘P on macOS (where Ctrl+P is the up arrow), Ctrl+P elsewhere; either way not the print dialog.
+      if ((IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyP') {
+        e.preventDefault();
+        ctl.setJumping(true);
         return;
       }
       // ⌘F on macOS, where Ctrl+F moves the caret.
@@ -127,6 +133,8 @@ export function App() {
         )}
       </main>
       <LinkPickerMenu />
+      <SuggestMenu />
+      {ctl.jumping && <JumpBox />}
       <ItemMenuView />
       <ToastView />
     </Ctx.Provider>
@@ -372,6 +380,7 @@ const shortcuts = (): [string, string][] => [
   [t('name: と入力', 'Type name: '), t('属性の行になる（値の先頭で Backspace で普通の行に戻す）', 'Makes a field (Backspace at the value’s start undoes it)')],
   ['Alt+A', t('属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）', 'Add a field (Tab under a field nests an object or list)')],
   ['Alt+D', t('ブロック（Markdown・CSV・コードなど複数行の値）を追加', 'Add a block: a multi-line value (Markdown, CSV, code …)')],
+  [t('属性の名前・値で ↓', '↓ in a field’s name or value'), t('使ったことのある名前・値から選ぶ（Enter で決定）', 'Pick a name or value already in use (Enter takes it)')],
   ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
   ['⌘/Ctrl+K', t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)')],
   ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
@@ -380,6 +389,7 @@ const shortcuts = (): [string, string][] => [
   [t('● をドラッグ', 'Drag a ●'), t('行を移動（Esc でキャンセル）', 'Move the row (Esc cancels)')],
   ['⌘/Ctrl+Z', t('元に戻す', 'Undo')],
   ['⌘/Ctrl+Shift+Z / Ctrl+Y', t('やり直す', 'Redo')],
+  [t('⌘P（Mac）/ Ctrl+P', '⌘P (Mac) / Ctrl+P'), t('名前の一部で項目へジャンプ', 'Jump to an item by part of its name')],
   ['⌘/Ctrl+F', t('検索（Esc でクリア、is:done で完了のみ）', 'Search (Esc clears; is:done for completed rows)')],
   ['is:ready / is:blocked', t('着手可 / 待ち の行を検索（after 属性の依存）', 'Rows ready to start / waiting (after dependencies)')],
   ['is:late / is:critical', t('期限超過 / クリティカルパス上の作業を検索', 'Late work / work on the critical path')],
@@ -902,6 +912,112 @@ function LinkPickerMenu() {
         <li class="empty">{t('一致するアイテムがありません', 'No matching items')}</li>
       )}
     </ul>
+  );
+}
+
+/** Names or values to complete a field with, under the field being typed in. */
+function SuggestMenu() {
+  const ctl = useCtl();
+  const s = ctl.suggest;
+  const ref = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => {
+    if (!s || !ref.current) return;
+    const field = document.querySelector(`[data-fk="${CSS.escape(s.key)}"]`);
+    if (!field) return;
+    const r = field.getBoundingClientRect();
+    ref.current.style.left = r.left + 'px';
+    ref.current.style.top = r.bottom + 4 + 'px';
+  });
+  if (!s) return null;
+  return (
+    <ul ref={ref} class="link-picker suggest">
+      {s.words.map((w, i) => (
+        <li
+          key={w}
+          class={i === s.selected ? 'selected' : undefined}
+          onMouseDown={(e) => {
+            e.preventDefault(); // keep the field focused
+            ctl.acceptSuggestion(w);
+          }}
+        >
+          <span class="pick-label">{w}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Jump to an item by part of its name (⌘P): Enter zooms into it, Esc goes back. */
+function JumpBox() {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(0);
+  const [back] = useState(captureFocus);
+  const input = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => input.current?.focus(), []);
+  const found = ctl.jumpCandidates(query);
+  const close = () => {
+    ctl.setJumping(false);
+    ctl.focus(back);
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (imeActive(e)) return;
+    const key = arrowOf(e);
+    if ((key === 'ArrowDown' || key === 'ArrowUp') && found.length) {
+      e.preventDefault();
+      setSelected((selected + (key === 'ArrowDown' ? 1 : -1) + found.length) % found.length);
+    } else if (e.key === 'Enter' && found[selected]) {
+      e.preventDefault();
+      ctl.jumpTo(found[selected]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  };
+  return (
+    <div class="jump-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div class="jump-box">
+        <input
+          ref={input}
+          class="jump-input"
+          placeholder={t('項目へジャンプ…', 'Jump to an item…')}
+          spellcheck={false}
+          value={query}
+          onInput={(e) => {
+            setQuery(e.currentTarget.value);
+            setSelected(0);
+          }}
+          onKeyDown={onKeyDown}
+        />
+        <ul class="link-picker jump-list">
+          {found.length ? (
+            found.map((id, i) => (
+              <li
+                key={id}
+                class={(i === selected ? 'selected' : '') + (store.node(id).completed ? ' done' : '')}
+                onMouseMove={() => i !== selected && setSelected(i)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  ctl.jumpTo(id);
+                }}
+              >
+                <span class="pick-label">{nodeLabel(store, id)}</span>
+                <span class="pick-path">
+                  {store
+                    .path(id)
+                    .slice(1, -1)
+                    .map((a) => nodeLabel(store, a))
+                    .join(' › ')}
+                </span>
+              </li>
+            ))
+          ) : (
+            <li class="empty">{t('一致するアイテムがありません', 'No matching items')}</li>
+          )}
+        </ul>
+      </div>
+    </div>
   );
 }
 

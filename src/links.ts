@@ -117,3 +117,43 @@ export function pickerQueryAt(value: string, caret: number): { from: number; que
   const m = value.slice(0, caret).match(/\[\[([^[\]\n]*)$/);
   return m ? { from: caret - m[0].length, query: m[1] } : null;
 }
+
+/** Field names in use, most used first, starting with (or else containing) prefix; prefix itself is left out. */
+export function keyCandidates(store: OutlineStore, prefix: string, limit = 8): string[] {
+  const count = new Map<string, number>();
+  for (const id of walk(store)) {
+    const k = store.node(id).key?.trim();
+    if (k) count.set(k, (count.get(k) ?? 0) + 1);
+  }
+  return ranked(count, prefix, limit);
+}
+
+/**
+ * Values already given to fields named key, most used first, for picking one
+ * again (`status: active`). Only one-line plain values: not links, not nested
+ * fields or blocks.
+ */
+export function valueCandidates(store: OutlineStore, key: string, prefix: string, limit = 8): string[] {
+  const k = norm(key.trim());
+  const count = new Map<string, number>();
+  for (const id of walk(store)) {
+    const n = store.node(id);
+    if (n.key === null || norm(n.key.trim()) !== k || n.format !== null || n.children.length) continue;
+    const v = n.text.trim();
+    if (v && !v.includes('\n') && !refIds(v).length) count.set(v, (count.get(v) ?? 0) + 1);
+  }
+  return ranked(count, prefix, limit);
+}
+
+/** Words matching typed text, prefix matches first, then by how often they occur. */
+function ranked(count: Map<string, number>, typed: string, limit: number): string[] {
+  const q = norm(typed.trim());
+  const scored: [number, number, string][] = [];
+  for (const [w, c] of count) {
+    const pos = norm(w).indexOf(q);
+    if (pos < 0 || norm(w) === q) continue;
+    scored.push([pos === 0 ? 0 : 1, -c, w]);
+  }
+  scored.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2].localeCompare(b[2]));
+  return scored.slice(0, limit).map((s) => s[2]);
+}

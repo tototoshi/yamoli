@@ -872,3 +872,46 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   white-space: pre;
   overflow-x: auto;
 }
+
+/* field name / value suggestions */
+.link-picker.suggest { min-width: 120px; }
+
+/* jump to an item (⌘P) */
+.jump-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 0;
+  background: rgba(0, 0, 0, 0.12);
+}
+.jump-box {
+  width: min(560px, 100%);
+  background: var(--bg);
+  border: 1px solid var(--faint);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.jump-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--fg);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--faint);
+  outline: none;
+}
+.link-picker.jump-list {
+  position: static;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.jump-list li.done .pick-label { color: var(--muted); text-decoration: line-through; }
