@@ -24,6 +24,7 @@ function system() {
   s.addField(web, 'to', `[[${api}]] gRPC`);
   s.addField(api, 'calls', `[[${db}]]`);
   s.addField(db, 'shape', 'db');
+  for (const f of [vpc, pub, priv]) s.addField(f, 'shape', 'frame');
   return { s, sys, user, cdn, vpc, pub, alb, priv, web, api, db };
 }
 
@@ -197,4 +198,31 @@ test('icons, emoji and frame styles; an unknown icon is left out', async () => {
   const plain = layout(buildDiagram(s, p)).boxes.get(a)!.w;
   s.setText(s.field(a, 'icon')!.id, 'nope');
   expect(layout(buildDiagram(s, p)).boxes.get(a)!.w).toBeLessThan(plain);
+});
+
+test('only `shape: frame` makes a frame; under other rows, the rows are listed in the box and their arrows are its', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const api = s.addChild(p, -1, 'API').id;
+  const auth = s.addChild(api, -1, 'auth').id;
+  s.addChild(auth, -1, 'JWT'); // deeper rows are not listed
+  const logs = s.addChild(api, -1, 'logs').id;
+  const db = s.addChild(p, -1, 'DB').id;
+  s.addField(auth, 'to', `[[${db}]] read`);
+  s.addField(logs, 'to', `[[${db}]] write`);
+  const group = s.addChild(p, -1, 'Empty group').id;
+  s.addField(group, 'shape', 'frame solid');
+
+  const d = buildDiagram(s, p);
+  expect(d.top).toEqual([api, db, group]);
+  expect(d.nodes.get(api)).toMatchObject({ isFrame: false, children: [], props: ['• auth', '• logs'] });
+  expect(d.nodes.has(auth)).toBe(false);
+  expect(d.edges).toMatchObject([{ from: api, to: db, label: 'read, write' }]); // alike lines become one
+  expect(d.nodes.get(group)).toMatchObject({ isFrame: true, frame: 'solid' });
+  // An empty frame is still drawn as one.
+  expect(layout(d).boxes.get(group)!.frame).toBe(true);
+
+  // A mind map draws every row, frames or not.
+  s.addField(p, 'diagram', 'tree');
+  expect(buildDiagram(s, p).nodes.has(auth)).toBe(true);
 });

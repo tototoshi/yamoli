@@ -198,16 +198,13 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
             </g>
           );
         })}
-        {d.edges.map((e) =>
-          e.label ? (
-            <EdgeLabel
-              key={e.from + '>' + e.to + '>' + e.label}
-              text={e.label}
-              at={routes.get(e)!.mid}
-              near={near(e)}
-            />
-          ) : null
-        )}
+        {d.edges.map((e) => {
+          if (!e.label) return null;
+          // Labels of lines between the same two boxes are stacked rather than drawn over each other.
+          const mid = routes.get(e)!.mid;
+          const nth = d.edges.filter((o) => o.label && ((o.from === e.from && o.to === e.to) || (o.from === e.to && o.to === e.from))).indexOf(e);
+          return <EdgeLabel key={e.from + '>' + e.to + '>' + e.label} text={e.label} at={[mid[0], mid[1] + nth * 18]} near={near(e)} />;
+        })}
       </svg>
       {!embedded && (
         <p class="diagram-hint">

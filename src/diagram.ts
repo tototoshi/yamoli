@@ -1,12 +1,13 @@
 /*
  * The zoomed item drawn as a diagram, from the outline as it is:
  *
- *   rows                 boxes; a row with rows under it is a frame around them
+ *   rows                 boxes, listing the rows under them (`• …`)
+ *   shape: frame         a frame around the rows under it, drawn as boxes;
+ *                        `frame solid` / `frame none` for its border
  *   [[links]] in fields  arrows, labelled with the words after the link
  *                        (`to: [[API]] gRPC`); `after` arrows run from the
  *                        dependency to the item waiting for it
- *   shape                box / actor / db / queue / external; on a frame
- *                        dashed (default) / solid / none
+ *   shape                box / actor / db / queue / external
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   icon                 server, database, cloud … (icons.ts) or an emoji
  *   other fields         small `key: value` lines inside the box
@@ -19,8 +20,9 @@
  *
  * On the zoomed item: `direction: LR | TB`, and `diagram: flow | tree`. A
  * flow (the default when there are arrows) puts each box after the ones its
- * arrows come from, frames laid out inside out; a tree (the default without
- * arrows) draws the item and its rows as a mind map.
+ * arrows come from, frames laid out inside out; an arrow to or from a row
+ * listed in a box is the box's. A tree (the default without arrows) draws
+ * the item and all its rows as a mind map, frames or not.
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
@@ -61,7 +63,9 @@ export interface DiagramNode {
   id: string;
   label: string;
   shape: Shape;
-  /** How the frame is drawn, when the node has rows under it. */
+  /** Marked `shape: frame`: drawn around the rows under it. */
+  isFrame: boolean;
+  /** How the frame's border is drawn. */
   frame: FrameStyle;
   color?: string;
   /** The `icon` value; icons.ts tells what it draws. */
@@ -117,12 +121,15 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
       if (store.fieldTexts(c).some((t) => refIds(t).length)) continue; // drawn as arrows
       props.push(clip(f.children.length ? `${key}: …` : `${key}: ${f.text.trim()}`));
     }
-    const shape = store.fieldValue(id, 'shape')?.toLowerCase();
+    // `frame`, `frame solid`; a border style alone (`solid`) also means a frame.
+    const shape = (store.fieldValue(id, 'shape') ?? '').toLowerCase().split(/\s+/);
+    const border = shape.find((w) => FRAME_STYLES.includes(w as FrameStyle)) as FrameStyle | undefined;
     nodes.set(id, {
       id,
       label: nodeLabel(store, id),
-      shape: SHAPES.includes(shape as Shape) ? (shape as Shape) : 'box',
-      frame: FRAME_STYLES.includes(shape as FrameStyle) ? (shape as FrameStyle) : 'dashed',
+      shape: SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
+      isFrame: shape.includes('frame') || !!border,
+      frame: border ?? 'dashed',
       color: colorOf(store.fieldValue(id, 'color')),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       props,
@@ -179,7 +186,51 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
     add(rootId, top);
     top = [rootId];
   }
+  if (kind === 'flow') return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind };
   return { nodes, top, edges, direction: dir === 'TB' ? 'TB' : 'LR', kind };
+}
+
+const LISTED_MAX = 6;
+
+/**
+ * For a flow: only frames hold boxes. Under any other row, the rows are
+ * listed in its box instead (and taken out of the drawing), and their arrows
+ * become the box's. Returns the arrows that are left.
+ */
+function listInBoxes(nodes: Map<string, DiagramNode>, top: string[], edges: DiagramEdge[]): DiagramEdge[] {
+  const parent = new Map<string, string>();
+  for (const n of nodes.values()) for (const c of n.children) parent.set(c, n.id);
+  const drop = (id: string) => {
+    nodes.get(id)!.children.forEach(drop);
+    nodes.delete(id);
+  };
+  const fold = (id: string) => {
+    const n = nodes.get(id)!;
+    if (n.isFrame) return n.children.forEach(fold);
+    if (!n.children.length) return;
+    const listed = n.children.map((c) => clip('• ' + nodes.get(c)!.label));
+    n.props.push(...(listed.length > LISTED_MAX ? [...listed.slice(0, LISTED_MAX - 1), `… +${listed.length - LISTED_MAX + 1}`] : listed));
+    n.children.forEach(drop);
+    n.children = [];
+  };
+  top.forEach(fold);
+
+  const box = (id: string) => {
+    let n = id;
+    while (!nodes.has(n)) n = parent.get(n)!;
+    return n;
+  };
+  // Lines that now join the same boxes and look alike become one, with their labels together.
+  const merged = new Map<string, DiagramEdge>();
+  for (const e of edges) {
+    const [from, to] = [box(e.from), box(e.to)];
+    if (from === to) continue;
+    const k = `${from}>${to}>${JSON.stringify(e.style)}`;
+    const m = merged.get(k);
+    if (!m) merged.set(k, { ...e, from, to });
+    else if (e.label && !m.label.split(', ').includes(e.label)) m.label = m.label ? `${m.label}, ${e.label}` : e.label;
+  }
+  return [...merged.values()];
 }
 
 // ================================================================ layout
@@ -220,6 +271,8 @@ const FRAME_PAD = 14;
 const RANK_GAP = 56;
 const ORDER_GAP = 18;
 const ACTOR = 30;
+/** Room inside a frame with nothing in it yet. */
+const EMPTY = { rs: 80, os: 24 };
 
 /** Room an icon takes before a label. */
 export const ICON_SPACE = 20;
@@ -275,7 +328,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
   const { nodes, direction: dir } = d;
   const parent = new Map<string, string>();
   for (const n of nodes.values()) for (const c of n.children) parent.set(c, n.id);
-  const frames = new Set([...nodes.values()].filter((n) => n.children.length).map((n) => n.id));
+  const frames = new Set([...nodes.values()].filter((n) => n.isFrame).map((n) => n.id));
 
   // Each unit laid out relative to its frame's corner; sizes come from inside out.
   const local = new Map<string, Placed>();
@@ -290,7 +343,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
   const place = (units: string[]): { rs: number; os: number } => {
     for (const u of units) {
       const n = nodes.get(u)!;
-      if (n.children.length) size.set(u, framed(place(n.children), titleWidth(n, measure)));
+      if (n.isFrame) size.set(u, framed(n.children.length ? place(n.children) : EMPTY, titleWidth(n, measure)));
       else size.set(u, extents(boxSize(n, measure), dir));
     }
     const set = new Set(units);
@@ -353,7 +406,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const abs = { ...p, r: p.r + r0, o: p.o + o0 };
       placed.set(u, abs);
       const n = nodes.get(u)!;
-      if (!n.children.length) continue;
+      if (!n.isFrame || !n.children.length) continue;
       // The contents are centred in the frame (which may be wider for its title).
       const inner = contentExtent(n.children);
       const x0 = dir === 'LR' ? abs.r : abs.o;

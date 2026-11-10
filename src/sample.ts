@@ -87,15 +87,15 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
     'markdown',
     t(
       '「図」に切り替えると構成図になります。\n\n' +
-        '- 行が箱、子を持つ行がそれを囲む枠\n' +
+        '- 行が箱、`shape: frame` の行が子の行を囲む枠（枠でない行の子は箱の中に並ぶ）\n' +
         '- `to: [[API]] gRPC` のように属性に書いたリンクが矢印、後ろの語がラベル\n' +
-        '- `shape` で形（actor / db / queue / external、枠は solid / none）、`color` で色、`icon` でアイコン\n' +
+        '- `shape` で形（actor / db / queue / external、枠の線は frame solid / frame none）、`color` で色、`icon` でアイコン\n' +
         '- `async:` に書いたリンクは点線、`both:` は両向き、`link:` は矢印なし\n' +
         '- `direction: TB` で縦向き。箱をクリックするとその行を編集',
       'Switch to “Diagram” to see it drawn.\n\n' +
-        '- Each row is a box, a row with rows under it a frame around them\n' +
+        '- Each row is a box; a row with `shape: frame` is a frame around the rows under it (other rows list theirs in the box)\n' +
         '- A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
-        '- `shape` picks the shape (actor / db / queue / external; solid / none for a frame), `color` the colour, `icon` an icon\n' +
+        '- `shape` picks the shape (actor / db / queue / external; frame solid / frame none for a frame’s border), `color` the colour, `icon` an icon\n' +
         '- Links under `async:` are dashed, under `both:` two-way, under `link:` without arrows\n' +
         '- `direction: TB` draws it top to bottom. Click a box to edit its row'
     )
@@ -110,14 +110,14 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   // Rows first, arrows after: an arrow needs the id of the row it points at.
   const user = add(sys.id, t('ユーザー', 'User'), { shape: 'actor' });
   const cdn = add(sys.id, 'CDN', { icon: 'globe' });
-  const vpc = add(sys.id, 'AWS VPC', { shape: 'solid', icon: 'cloud' });
-  const pub = add(vpc, t('パブリック', 'Public'));
+  const vpc = add(sys.id, 'AWS VPC', { shape: 'frame solid', icon: 'cloud' });
+  const pub = add(vpc, t('パブリック', 'Public'), { shape: 'frame' });
   const alb = add(pub, t('ロードバランサー', 'Load balancer'));
-  const app = add(vpc, t('アプリ', 'App'));
+  const app = add(vpc, t('アプリ', 'App'), { shape: 'frame' });
   const web = add(app, 'Web', { icon: 'browser', tech: 'Next.js' });
   const api = add(app, 'API', { icon: 'code', tech: 'Go', replicas: '3' });
   const worker = add(app, t('ワーカー', 'Worker'), { icon: 'gear', tech: 'Go' });
-  const data = add(vpc, t('データ', 'Data'));
+  const data = add(vpc, t('データ', 'Data'), { shape: 'frame' });
   const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
   const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });
@@ -229,7 +229,7 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
         'The sample architecture, embedded as a diagram. It is drawn from the outline’s rows and fields.'
       ),
     },
-    [t('行が箱、子を持つ行が枠、`to: [[…]]` が矢印 — 「図」ビューで開く', 'Rows are boxes, rows with rows under them frames, `to: [[…]]` arrows — open the Diagram view')]
+    [t('行が箱、`shape: frame` の行が枠、`to: [[…]]` が矢印 — 「図」ビューで開く', 'Rows are boxes, rows with `shape: frame` frames, `to: [[…]]` arrows — open the Diagram view')]
   );
 
   slide(t('ビュー', 'Views'), { layout: 'two-column' }, [
