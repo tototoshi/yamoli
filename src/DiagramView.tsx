@@ -3,9 +3,11 @@
  * links become boxes, frames and arrows). Clicking a box edits its row in the
  * outline.
  */
-import { useId, useState } from 'preact/hooks';
+import { useId, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
-import { buildDiagram, estimate, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
+import { buildDiagram, estimate, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
+import { fileName, saveFile, standaloneSvg, svgToPng } from './exportImage';
+import { iconOf } from './icons';
 import { lang, t } from './i18n';
 
 const M = 16; // margin around the drawing
@@ -110,6 +112,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   const id = rootId ?? ctl.zoomId;
   const marker = 'dg-arrow' + useId().replace(/\W/g, '');
   const [hover, setHover] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const showCompleted = ctl.prefs.showCompleted;
   // Built anew on each render: the store changes in place, and laying out a page of boxes is quick.
   const d = buildDiagram(store, id, { showCompleted });
@@ -150,7 +153,8 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
 
   return (
     <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
-      <svg class="diagram" viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`} width={W} height={H} onMouseLeave={() => setHover(null)}>
+      {!embedded && <ExportTools svg={svgRef} name={store.get(id) && id !== store.rootId ? store.node(id).text : 'Home'} size={[W, H]} />}
+      <svg ref={svgRef} class="diagram" viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`} width={W} height={H} onMouseLeave={() => setHover(null)}>
         <defs>
           <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
             <path d="M0,1 L10,5 L0,9 z" fill="context-stroke" />
@@ -165,8 +169,16 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
         {d.edges.map((e) => {
           const r = routes.get(e)!;
           return (
-            <g key={e.from + '>' + e.to + '>' + e.label} class={'dg-edge' + (near(e) ? ' near' : '')}>
-              <path d={r.d} marker-end={`url(#${marker})`} />
+            <g
+              key={e.from + '>' + e.to + '>' + e.label}
+              class={'dg-edge ' + e.style.dash + (near(e) ? ' near' : '')}
+              style={e.style.color ? `--edge: ${e.style.color}` : undefined}
+            >
+              <path
+                d={r.d}
+                marker-end={e.style.ends !== 'none' ? `url(#${marker})` : undefined}
+                marker-start={e.style.ends === 'both' ? `url(#${marker})` : undefined}
+              />
             </g>
           );
         })}
@@ -174,13 +186,18 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           b.frame ? null : <Shape key={nid} node={d.nodes.get(nid)!} box={b} onOpen={open} onHover={setHover} />
         )}
         {/* Titles and labels over the lines, so a line passing behind one keeps it readable. */}
-        {[...L.boxes].map(([nid, b]) =>
-          b.frame ? (
-            <text key={nid} class="dg-frame-title" x={b.x + 12} y={b.y + 17}>
-              {d.nodes.get(nid)!.label}
-            </text>
-          ) : null
-        )}
+        {[...L.boxes].map(([nid, b]) => {
+          if (!b.frame) return null;
+          const n = d.nodes.get(nid)!;
+          return (
+            <g key={nid}>
+              {n.icon && <Icon value={n.icon} x={b.x + 12} y={b.y + 5} size={15} color={n.color} />}
+              <text class="dg-frame-title" x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
+                {n.label}
+              </text>
+            </g>
+          );
+        })}
         {d.edges.map((e) =>
           e.label ? (
             <EdgeLabel
@@ -204,6 +221,41 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   );
 }
 
+/** Save the drawing as SVG or PNG, or copy it as an image. */
+function ExportTools({ svg, name, size: [w, h] }: { svg: { current: SVGSVGElement | null }; name: string; size: [number, number] }) {
+  const ctl = useCtl();
+  const source = () => standaloneSvg(svg.current!);
+  const fail = () => ctl.showToast(t('画像を作れませんでした', 'Couldn’t make the image'));
+  const copy = () => {
+    try {
+      // The PNG goes in as a promise so the copy stays within the click (Safari asks for that).
+      const png = svgToPng(source(), w, h);
+      navigator.clipboard
+        .write([new ClipboardItem({ 'image/png': png })])
+        .then(() => ctl.showToast(t('図を画像としてコピーしました', 'Copied the diagram as an image')), fail);
+    } catch {
+      fail();
+    }
+  };
+  return (
+    <div class="diagram-tools">
+      <button class="mini" title={t('SVG ファイルとして保存', 'Save as an SVG file')} onClick={() => saveFile(fileName(name, 'svg'), new Blob([source()], { type: 'image/svg+xml' }))}>
+        SVG
+      </button>
+      <button
+        class="mini"
+        title={t('PNG 画像として保存（2 倍の解像度）', 'Save as a PNG image (at twice the size)')}
+        onClick={() => svgToPng(source(), w, h).then((b) => saveFile(fileName(name, 'png'), b), fail)}
+      >
+        PNG
+      </button>
+      <button class="mini" title={t('PNG 画像をクリップボードへ（資料に貼り付け）', 'PNG image to the clipboard, to paste into documents')} onClick={copy}>
+        {t('画像をコピー', 'Copy image')}
+      </button>
+    </div>
+  );
+}
+
 interface Drawn {
   node: DiagramNode;
   box: Box;
@@ -211,12 +263,34 @@ interface Drawn {
   onHover: (id: string | null) => void;
 }
 
-const tint = (color: string | undefined) => (color ? { stroke: color, fill: `color-mix(in srgb, ${color} 12%, var(--bg))` } : undefined);
+const tint = (color: string | undefined, amount = 12) =>
+  color ? { stroke: color, fill: `color-mix(in srgb, ${color} ${amount}%, var(--bg))` } : undefined;
+
+/** An icon from icons.ts, or an emoji, in a size×size square at x, y. */
+function Icon({ value, x, y, size, color }: { value: string; x: number; y: number; size: number; color?: string }) {
+  const icon = iconOf(value);
+  if (!icon) return null;
+  if ('text' in icon) {
+    return (
+      <text class="dg-icon-text" x={x + size / 2} y={y + size * 0.85} font-size={size}>
+        {icon.text}
+      </text>
+    );
+  }
+  return (
+    <path
+      class="dg-icon"
+      d={icon.path}
+      transform={`translate(${x},${y}) scale(${size / 24})`}
+      style={color ? { stroke: color } : undefined}
+    />
+  );
+}
 
 function Frame({ node, box, onOpen, onHover }: Drawn) {
   return (
     <g
-      class={'dg-frame' + (node.done ? ' done' : '')}
+      class={'dg-frame ' + node.frame + (node.done ? ' done' : '')}
       transform={`translate(${box.x},${box.y})`}
       onMouseEnter={() => onHover(node.id)}
       onClick={(e) => {
@@ -224,7 +298,7 @@ function Frame({ node, box, onOpen, onHover }: Drawn) {
         onOpen(node.id);
       }}
     >
-      <rect width={box.w} height={box.h} rx={8} style={tint(node.color)} />
+      <rect width={box.w} height={box.h} rx={8} style={node.frame === 'none' ? undefined : tint(node.color, 6)} />
     </g>
   );
 }
@@ -235,10 +309,16 @@ function Shape({ node, box, onOpen, onHover }: Drawn) {
   const actor = node.shape === 'actor';
   const top = actor ? 36 : PAD + (node.shape === 'db' ? 12 : 0);
   const cx = node.shape === 'queue' ? (w - 16) / 2 : w / 2;
+  // The icon goes before the label, the two centred together; an actor's icon replaces the figure.
+  const iconBeside = node.icon && !actor;
+  const labelX = iconBeside ? cx + ICON_SPACE / 2 : cx;
+  const iconX = cx - (measure(node.label, LABEL_SIZE) + ICON_SPACE) / 2;
   let outline;
   switch (node.shape) {
     case 'actor':
-      outline = (
+      outline = node.icon ? (
+        <Icon value={node.icon} x={w / 2 - 14} y={2} size={28} color={node.color} />
+      ) : (
         <g class="dg-actor" style={style && { stroke: style.stroke }}>
           <circle cx={w / 2} cy={7} r={6} />
           <path d={`M${w / 2},13 v10 M${w / 2 - 9},17 h18 M${w / 2},23 l-7,9 M${w / 2},23 l7,9`} />
@@ -275,7 +355,8 @@ function Shape({ node, box, onOpen, onHover }: Drawn) {
     >
       <title>{node.label}</title>
       {outline}
-      <text class="dg-label" x={cx} y={top + LABEL_SIZE}>
+      {iconBeside && <Icon value={node.icon!} x={iconX} y={top - 1} size={16} color={node.color} />}
+      <text class="dg-label" x={labelX} y={top + LABEL_SIZE}>
         {node.label}
       </text>
       {node.props.map((p, i) => (

@@ -89,12 +89,14 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
       '「図」に切り替えると構成図になります。\n\n' +
         '- 行が箱、子を持つ行がそれを囲む枠\n' +
         '- `to: [[API]] gRPC` のように属性に書いたリンクが矢印、後ろの語がラベル\n' +
-        '- `shape` で形（actor / db / queue / external）、`color` で色\n' +
+        '- `shape` で形（actor / db / queue / external、枠は solid / none）、`color` で色、`icon` でアイコン\n' +
+        '- `async:` に書いたリンクは点線、`both:` は両向き、`link:` は矢印なし\n' +
         '- `direction: TB` で縦向き。箱をクリックするとその行を編集',
       'Switch to “Diagram” to see it drawn.\n\n' +
         '- Each row is a box, a row with rows under it a frame around them\n' +
         '- A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
-        '- `shape` picks the shape (actor / db / queue / external), `color` the colour\n' +
+        '- `shape` picks the shape (actor / db / queue / external; solid / none for a frame), `color` the colour, `icon` an icon\n' +
+        '- Links under `async:` are dashed, under `both:` two-way, under `link:` without arrows\n' +
         '- `direction: TB` draws it top to bottom. Click a box to edit its row'
     )
   );
@@ -107,26 +109,29 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
 
   // Rows first, arrows after: an arrow needs the id of the row it points at.
   const user = add(sys.id, t('ユーザー', 'User'), { shape: 'actor' });
-  const cdn = add(sys.id, 'CDN');
-  const vpc = add(sys.id, 'AWS VPC');
+  const cdn = add(sys.id, 'CDN', { icon: 'globe' });
+  const vpc = add(sys.id, 'AWS VPC', { shape: 'solid', icon: 'cloud' });
   const pub = add(vpc, t('パブリック', 'Public'));
   const alb = add(pub, t('ロードバランサー', 'Load balancer'));
   const app = add(vpc, t('アプリ', 'App'));
-  const web = add(app, 'Web', { tech: 'Next.js' });
-  const api = add(app, 'API', { tech: 'Go', replicas: '3' });
-  const worker = add(app, t('ワーカー', 'Worker'), { tech: 'Go' });
+  const web = add(app, 'Web', { icon: 'browser', tech: 'Next.js' });
+  const api = add(app, 'API', { icon: 'code', tech: 'Go', replicas: '3' });
+  const worker = add(app, t('ワーカー', 'Worker'), { icon: 'gear', tech: 'Go' });
   const data = add(vpc, t('データ', 'Data'));
   const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
   const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });
-  const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', tech: 'SendGrid' });
+  const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', icon: 'mail', tech: 'SendGrid' });
 
   s.addField(user, 'to', to(cdn, 'HTTPS'));
   s.addField(cdn, 'to', to(alb));
   s.addField(alb, 'to', to(web));
   s.addField(web, 'to', to(api, 'gRPC'));
-  s.addField(api, 'to', [to(db, 'SQL'), to(queue, t('投入', 'enqueue')), to(pay, 'HTTPS')].join(', '));
-  s.addField(worker, 'to', [to(queue, t('取得', 'poll')), to(db), to(mail, 'API')].join(', '));
+  s.addField(api, 'to', [to(db, 'SQL'), to(pay, 'HTTPS')].join(', '));
+  // `async` lines are dashed.
+  s.addField(api, 'async', to(queue, t('投入', 'enqueue')));
+  s.addField(worker, 'async', to(queue, t('取得', 'poll')));
+  s.addField(worker, 'to', [to(db), to(mail, 'API')].join(', '));
   return sys.id;
 }
 

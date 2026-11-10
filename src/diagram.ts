@@ -5,9 +5,17 @@
  *   [[links]] in fields  arrows, labelled with the words after the link
  *                        (`to: [[API]] gRPC`); `after` arrows run from the
  *                        dependency to the item waiting for it
- *   shape                box / actor / db / queue / external
+ *   shape                box / actor / db / queue / external; on a frame
+ *                        dashed (default) / solid / none
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
+ *   icon                 server, database, cloud … (icons.ts) or an emoji
  *   other fields         small `key: value` lines inside the box
+ *
+ * A line's look comes from the name of the field it is written in: `async`
+ * is dashed, `both` has arrows at both ends, `link` none, anything else (`to`)
+ * a plain arrow. `lines` on the zoomed item sets more, as fields under it:
+ * `calls: dotted red`, `sync: both` (words: solid / dashed / dotted, arrow /
+ * both / none, a colour).
  *
  * On the zoomed item: `direction: LR | TB`, and `diagram: flow | tree`. A
  * flow (the default when there are arrows) puts each box after the ones its
@@ -15,6 +23,7 @@
  * arrows) draws the item and its rows as a mind map.
  */
 import { DEP_KEY, dependencies } from './deps';
+import { iconOf } from './icons';
 import { nodeLabel, refIds } from './links';
 import type { OutlineStore } from './model';
 
@@ -23,13 +32,40 @@ const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
-const DRAWING_KEYS = new Set(['shape', 'color', 'direction', 'diagram', 'completed', DEP_KEY, 'sequential']);
+const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'diagram', 'lines', 'completed', DEP_KEY, 'sequential']);
+
+export type FrameStyle = 'dashed' | 'solid' | 'none';
+const FRAME_STYLES: FrameStyle[] = ['dashed', 'solid', 'none'];
+
+export interface LineStyle {
+  dash: 'solid' | 'dashed' | 'dotted';
+  ends: 'arrow' | 'both' | 'none';
+  color?: string;
+}
+
+/** Field names with a look of their own, and no label of their name. */
+const LINE_KEYS: Record<string, string> = { to: '', async: 'dashed', both: 'both', link: 'none' };
+
+/** A line's look from words like `dotted both red`, on top of base. */
+export function lineStyle(words: string, base: LineStyle = { dash: 'solid', ends: 'arrow' }): LineStyle {
+  const out = { ...base };
+  for (const w of words.toLowerCase().split(/[\s,]+/).filter(Boolean)) {
+    if (w === 'solid' || w === 'dashed' || w === 'dotted') out.dash = w;
+    else if (w === 'arrow' || w === 'both' || w === 'none') out.ends = w;
+    else if (colorOf(w)) out.color = colorOf(w);
+  }
+  return out;
+}
 
 export interface DiagramNode {
   id: string;
   label: string;
   shape: Shape;
+  /** How the frame is drawn, when the node has rows under it. */
+  frame: FrameStyle;
   color?: string;
+  /** The `icon` value; icons.ts tells what it draws. */
+  icon?: string;
   /** `key: value` lines shown under the label. */
   props: string[];
   /** Rows drawn inside this one (a frame), in outline order. */
@@ -41,6 +77,7 @@ export interface DiagramEdge {
   from: string;
   to: string;
   label: string;
+  style: LineStyle;
 }
 
 export interface Diagram {
@@ -80,12 +117,14 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
       if (store.fieldTexts(c).some((t) => refIds(t).length)) continue; // drawn as arrows
       props.push(clip(f.children.length ? `${key}: …` : `${key}: ${f.text.trim()}`));
     }
-    const shape = store.fieldValue(id, 'shape')?.toLowerCase() as Shape | undefined;
+    const shape = store.fieldValue(id, 'shape')?.toLowerCase();
     nodes.set(id, {
       id,
       label: nodeLabel(store, id),
-      shape: shape && SHAPES.includes(shape) ? shape : 'box',
+      shape: SHAPES.includes(shape as Shape) ? (shape as Shape) : 'box',
+      frame: FRAME_STYLES.includes(shape as FrameStyle) ? (shape as FrameStyle) : 'dashed',
       color: colorOf(store.fieldValue(id, 'color')),
+      icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       props,
       children,
       done: store.node(id).completed,
@@ -100,15 +139,24 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
     for (let n: string | undefined = store.owner(id); n; n = store.parentOf(n)) if (nodes.has(n)) return n;
     return null;
   };
+  // Looks of lines by field name: the built-in ones, then those set under `lines`.
+  const looks = new Map(Object.entries(LINE_KEYS).map(([k, w]) => [k, lineStyle(w)]));
+  const lines = store.field(rootId, 'lines');
+  for (const c of lines?.children ?? []) {
+    const k = store.node(c).key?.trim().toLowerCase();
+    if (k) looks.set(k, lineStyle(store.node(c).text, looks.get(k)));
+  }
+  const look = (key: string) => looks.get(key) ?? lineStyle('');
+
   const edges: DiagramEdge[] = [];
   const seen = new Set<string>();
-  const push = (from: string | null, to: string | null, label: string) => {
+  const push = (from: string | null, to: string | null, label: string, style: LineStyle) => {
     const k = `${from}>${to}>${label}`;
-    if (from && to && from !== to && !seen.has(k)) edges.push({ from, to, label });
+    if (from && to && from !== to && !seen.has(k)) edges.push({ from, to, label, style });
     seen.add(k);
   };
   for (const id of nodes.keys()) {
-    for (const dep of dependencies(store, id)) push(drawn(dep), id, '');
+    for (const dep of dependencies(store, id)) push(drawn(dep), id, '', look(DEP_KEY));
     for (const c of store.node(id).children) {
       const key = store.node(c).key?.trim().toLowerCase();
       if (!key || key === DEP_KEY) continue;
@@ -117,7 +165,7 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
           const ref = refIds(part)[0];
           if (!ref || !store.get(ref)) continue;
           const words = part.replace(/\[\[[^\]]*\]\]/g, '').trim();
-          push(id, drawn(ref), words || (key === 'to' ? '' : store.node(c).key!.trim()));
+          push(id, drawn(ref), words || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), look(key));
         }
       }
     }
@@ -173,9 +221,16 @@ const RANK_GAP = 56;
 const ORDER_GAP = 18;
 const ACTOR = 30;
 
+/** Room an icon takes before a label. */
+export const ICON_SPACE = 20;
+
+/** Width of a box's label or a frame's title, with its icon. */
+export const titleWidth = (n: DiagramNode, measure: Measure) =>
+  measure(n.label, LABEL_SIZE) + (n.icon && n.shape !== 'actor' ? ICON_SPACE : 0);
+
 /** Size of a box (not a frame) by its contents. */
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
-  const text = Math.max(measure(n.label, LABEL_SIZE), ...n.props.map((p) => measure(p, PROP_SIZE)));
+  const text = Math.max(titleWidth(n, measure), ...n.props.map((p) => measure(p, PROP_SIZE)));
   const lines = LINE + n.props.length * PROP_LINE;
   if (n.shape === 'actor') return { w: Math.max(text + 8, 44), h: ACTOR + 6 + lines };
   const w = Math.max(Math.ceil(text) + 2 * PAD, 64);
@@ -235,7 +290,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
   const place = (units: string[]): { rs: number; os: number } => {
     for (const u of units) {
       const n = nodes.get(u)!;
-      if (n.children.length) size.set(u, framed(place(n.children), measure(n.label, LABEL_SIZE)));
+      if (n.children.length) size.set(u, framed(place(n.children), titleWidth(n, measure)));
       else size.set(u, extents(boxSize(n, measure), dir));
     }
     const set = new Set(units);

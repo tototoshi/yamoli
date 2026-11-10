@@ -37,7 +37,7 @@ test('rows become boxes, rows with rows under them frames, links in fields arrow
   expect(d.nodes.get(db)!.shape).toBe('db');
   // Fields drawn as arrows or shapes are not repeated in the box.
   expect(d.nodes.get(web)!.props).toEqual(['tech: Next.js']);
-  expect(d.edges).toEqual([
+  expect(d.edges).toMatchObject([
     { from: user, to: cdn, label: 'HTTPS' },
     { from: cdn, to: alb, label: '' },
     { from: alb, to: web, label: '' },
@@ -53,7 +53,7 @@ test('`after` arrows run from the dependency to the item waiting for it', () => 
   const b = s.addChild(p, -1, 'Build').id;
   s.addField(b, 'after', '^');
   const d = buildDiagram(s, p);
-  expect(d.edges).toEqual([{ from: a, to: b, label: '' }]);
+  expect(d.edges).toMatchObject([{ from: a, to: b, label: '' }]);
 });
 
 test('a link to a field or to a row inside a hidden part points at the drawn row holding it', () => {
@@ -63,7 +63,7 @@ test('a link to a field or to a row inside a hidden part points at the drawn row
   const b = s.addChild(p, -1, 'B').id;
   const port = s.addField(b, 'port', '80');
   s.addField(a, 'to', `[[${port.id}]]`);
-  expect(buildDiagram(s, p).edges).toEqual([{ from: a, to: b, label: '' }]);
+  expect(buildDiagram(s, p).edges).toMatchObject([{ from: a, to: b, label: '' }]);
 });
 
 test('without arrows it is a mind map from the zoomed item; direction and kind can be set', () => {
@@ -147,4 +147,54 @@ test('the architecture sample draws as a flow, and the guide embeds it and the p
     [proj, 'gantt'],
     [sys, 'diagram'],
   ]);
+});
+
+test('a line looks as its field name says, and `lines` on the zoomed item says more', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const [a, b, c, d, e] = ['A', 'B', 'C', 'D', 'E'].map((x) => s.addChild(p, -1, x).id);
+  s.addField(a, 'to', `[[${b}]]`);
+  s.addField(a, 'async', `[[${c}]] events`);
+  s.addField(b, 'both', `[[${d}]]`);
+  s.addField(c, 'link', `[[${d}]]`);
+  s.addField(d, 'calls', `[[${e}]]`);
+  const looks = () => buildDiagram(s, p).edges.map((x) => [x.label, x.style]);
+  expect(looks()).toEqual([
+    ['', { dash: 'solid', ends: 'arrow' }],
+    ['events', { dash: 'dashed', ends: 'arrow' }],
+    ['', { dash: 'solid', ends: 'both' }],
+    ['', { dash: 'solid', ends: 'none' }],
+    ['calls', { dash: 'solid', ends: 'arrow' }],
+  ]);
+  const lines = s.addField(p, 'lines').id;
+  s.addField(lines, 'calls', 'dotted red');
+  s.addField(lines, 'async', 'both');
+  expect(looks()[4][1]).toEqual({ dash: 'dotted', ends: 'arrow', color: '#d9534f' });
+  expect(looks()[1][1]).toEqual({ dash: 'dashed', ends: 'both' }); // still dashed, now with both ends
+  expect(buildDiagram(s, p).nodes.get(a)!.props).toEqual([]); // `lines` is not a box
+});
+
+test('icons, emoji and frame styles; an unknown icon is left out', async () => {
+  const { iconOf } = await import('./icons');
+  expect(iconOf('server')).toHaveProperty('path');
+  expect(iconOf('DB')).toEqual(iconOf('database'));
+  expect(iconOf('🔥')).toEqual({ text: '🔥' });
+  expect(iconOf('no-such-icon')).toBeUndefined();
+
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const g = s.addChild(p, -1, 'Region').id;
+  const a = s.addChild(g, -1, 'Application server').id; // wider than a box's least width
+  s.addField(g, 'shape', 'solid');
+  s.addField(a, 'icon', 'server');
+  s.addField(p, 'diagram', 'flow');
+  const d = buildDiagram(s, p);
+  expect(d.nodes.get(g)!.frame).toBe('solid');
+  expect(d.nodes.get(a)!.frame).toBe('dashed');
+  expect(d.nodes.get(a)!.icon).toBe('server');
+  expect(d.nodes.get(a)!.props).toEqual([]);
+  // The icon makes room for itself.
+  const plain = layout(buildDiagram(s, p)).boxes.get(a)!.w;
+  s.setText(s.field(a, 'icon')!.id, 'nope');
+  expect(layout(buildDiagram(s, p)).boxes.get(a)!.w).toBeLessThan(plain);
 });

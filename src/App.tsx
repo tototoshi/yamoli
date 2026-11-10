@@ -9,6 +9,7 @@ import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles, mis
 import { startBulletDrag, startRowSelect } from './drag';
 import { Ctx, useCtl } from './context';
 import { DiagramView } from './DiagramView';
+import { saveFile } from './exportImage';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
 import { DataView } from './DataView';
@@ -196,13 +197,7 @@ function Popup({ label, title, children }: { label: string; title: string; child
   );
 }
 
-function download(name: string, text: string, type: string) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
+const download = (name: string, text: string, type: string) => saveFile(name, new Blob([text], { type }));
 
 /** Less frequent actions: undo, files, samples. */
 function MoreMenu() {

@@ -124,13 +124,16 @@ The Diagram view draws the zoomed item from its rows, for example a system's arc
 | --- | --- |
 | A row | A box; a row with rows under it is a frame around them |
 | `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency |
-| `shape` | `box` / `actor` / `db` / `queue` / `external` |
+| `shape` | `box` / `actor` / `db` / `queue` / `external`; on a frame `dashed` (default) / `solid` / `none` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
+| `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
 | Other fields | Small `key: value` lines in the box |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
 | `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are any); `tree`: a mind map |
 
-Lines that would cross a box go around it. Clicking a box edits its row. A slide shows a diagram with `embed: [[item]] diagram`.
+A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name: `calls: dotted red`, `sync: both` (`solid` / `dashed` / `dotted`, `arrow` / `both` / `none`, a colour).
+
+Lines that would cross a box go around it. Clicking a box edits its row. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents. A slide shows a diagram with `embed: [[item]] diagram`.
 
 ### Search
 
