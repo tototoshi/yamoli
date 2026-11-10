@@ -1157,9 +1157,10 @@ export class Controller {
       }
       return;
     }
-    // Delete (or macOS Ctrl+D) at the end pulls the next row up into this one.
-    const forwardDelete =
-      e.key === 'Delete' || (IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.code === 'KeyD');
+    // Delete (or macOS Ctrl+D, or Ctrl+K with nothing left to delete) at the end pulls the next row up
+    // into this one. Before the end, macOS's Ctrl+K deletes to the end of the line itself.
+    const emacs = IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+    const forwardDelete = e.key === 'Delete' || (emacs && (e.code === 'KeyD' || e.code === 'KeyK'));
     if (forwardDelete && start === ta.value.length && end === start && !isTitle && n.key === null) {
       e.preventDefault();
       const next = vis[idx + 1];

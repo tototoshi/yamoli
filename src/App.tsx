@@ -38,8 +38,9 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if (imeActive(e)) return;
       if (ctl.selectionKeydown(e)) return;
-      // Our history replaces the browser's per-field undo everywhere.
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.code === 'KeyZ' || (e.code === 'KeyY' && e.ctrlKey))) {
+      // Our history replaces the browser's per-field undo everywhere. Ctrl+Y redoes outside macOS,
+      // where it puts back what Ctrl+K deleted.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.code === 'KeyZ' || (e.code === 'KeyY' && e.ctrlKey && !IS_MAC))) {
         e.preventDefault();
         if (e.code === 'KeyY' || e.shiftKey) ctl.redo();
         else ctl.undo();
@@ -385,13 +386,16 @@ const shortcuts = (): [string, string][] => [
   ['Alt+D', t('ブロック（Markdown・CSV・コードなど複数行の値）を追加', 'Add a block: a multi-line value (Markdown, CSV, code …)')],
   [t('属性の名前・値で ↓', '↓ in a field’s name or value'), t('使ったことのある名前・値から選ぶ（Enter で決定）', 'Pick a name or value already in use (Enter takes it)')],
   ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
-  ['⌘/Ctrl+K', t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)')],
+  [IS_MAC ? '⌘K' : 'Ctrl+K', t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)')],
   ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
   [t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'), t('次の行を結合（空の行なら行を削除）', 'Join the next row (removes an empty row)')],
+  ...(IS_MAC
+    ? [['Ctrl+K', t('カーソルから行末まで削除（行末なら次の行を結合、Ctrl+Y で貼り戻す）', 'Delete to the end of the line (at the end, join the next row; Ctrl+Y puts it back)')] as [string, string]]
+    : []),
   ['⌘/Ctrl+Shift+Backspace', t('行を削除（子も含む）', 'Delete the row and what’s below it')],
   [t('● をドラッグ', 'Drag a ●'), t('行を移動（Esc でキャンセル）', 'Move the row (Esc cancels)')],
   ['⌘/Ctrl+Z', t('元に戻す', 'Undo')],
-  ['⌘/Ctrl+Shift+Z / Ctrl+Y', t('やり直す', 'Redo')],
+  [IS_MAC ? '⌘Shift+Z' : 'Ctrl+Shift+Z / Ctrl+Y', t('やり直す', 'Redo')],
   [t('⌘P（Mac）/ Ctrl+P', '⌘P (Mac) / Ctrl+P'), t('名前の一部で項目へジャンプ', 'Jump to an item by part of its name')],
   ['⌘/Ctrl+F', t('検索（Esc でクリア、is:done で完了のみ）', 'Search (Esc clears; is:done for completed rows)')],
   ['is:ready / is:blocked', t('着手可 / 待ち の行を検索（after 属性の依存）', 'Rows ready to start / waiting (after dependencies)')],

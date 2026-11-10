@@ -5,12 +5,13 @@
  * so no style may change the width of a character: bold is a stroke, not a
  * heavier font, and code gets a background but no padding.
  *
- * With the caret on a link, a bubble shows where it goes; ⌘/Ctrl+K edits or
- * adds a link, and pasting a URL over selected text links it.
+ * With the caret on a link, a bubble shows where it goes; ⌘K (Ctrl+K outside
+ * macOS, where Ctrl+K deletes to the end of the line) edits or adds a link, and pasting a URL over selected text links it.
  */
 import type { TextareaHTMLAttributes } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
+import { IS_MAC } from './controller';
 import { t } from './i18n';
 import { linkAt, markupSpans, type LinkAt } from './inline';
 import { nodeLabel } from './links';
@@ -104,7 +105,8 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
         onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
         onKeyDown={(e) => {
           if (imeActive(e)) return;
-          if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyK') {
+          // ⌘K on macOS, where Ctrl+K deletes to the end of the line; Ctrl+K elsewhere.
+          if ((IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyK') {
             e.preventDefault();
             return editLink(e.currentTarget);
           }
@@ -152,7 +154,7 @@ function LinkBubble({ link, onEdit, replace }: { link: LinkAt; onEdit: () => voi
       <a href={link.href} target="_blank" rel="noopener noreferrer" title={t('新しいタブで開く', 'Open in a new tab')}>
         {link.href}
       </a>
-      <button class="mini" onClick={onEdit} title="⌘/Ctrl+K">
+      <button class="mini" onClick={onEdit} title={IS_MAC ? '⌘K' : 'Ctrl+K'}>
         {t('編集', 'Edit')}
       </button>
       {link.kind === 'link' && (
