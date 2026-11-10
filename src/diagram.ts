@@ -10,6 +10,8 @@
  *   shape                box / actor / db / queue / external
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   icon                 server, database, cloud … (icons.ts) or an emoji
+ *   note / description   a few wrapped lines of text under the name (also a
+ *                        `note` block), all of it on hover
  *   other fields         small `key: value` lines inside the box
  *
  * A line's look comes from the name of the field it is written in: `async`
@@ -26,7 +28,7 @@
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
-import { nodeLabel, refIds } from './links';
+import { nodeLabel, refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 
 export type Shape = 'box' | 'actor' | 'db' | 'queue' | 'external';
@@ -70,6 +72,8 @@ export interface DiagramNode {
   color?: string;
   /** The `icon` value; icons.ts tells what it draws. */
   icon?: string;
+  /** Text about it (`note`, `description`), on one line; wrapped when drawn. */
+  desc?: string;
   /** `key: value` lines shown under the label. */
   props: string[];
   /** Rows drawn inside this one (a frame), in outline order. */
@@ -106,6 +110,19 @@ const COLORS: Record<string, string> = {
 
 const colorOf = (v: string | undefined) => (v ? COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined) : undefined);
 
+/** Fields whose text describes the row, shown as text rather than `key: value`. */
+const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
+
+/** A field's text as one plain line: Markdown marks and line breaks dropped. */
+const plain = (texts: string[]) =>
+  texts
+    .join('\n')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s*(?:#+|[-*+]|\d+[.)])\s+/gm, '')
+    .replace(/[*_`~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const PROP_MAX = 32;
 const clip = (s: string) => (s.length > PROP_MAX ? s.slice(0, PROP_MAX - 1) + '…' : s);
 
@@ -114,9 +131,14 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
   const add = (id: string, children = rows(id)) => {
     const props: string[] = [];
+    let desc: string | undefined;
     for (const c of store.node(id).children) {
       const f = store.node(c);
       const key = f.key?.trim();
+      if (key && DESC_KEYS.has(key.toLowerCase())) {
+        desc ??= withLabels(store, plain(store.fieldTexts(c).filter((x) => x.trim()))) || undefined;
+        continue;
+      }
       if (!key || f.format !== null || DRAWING_KEYS.has(key.toLowerCase())) continue;
       if (store.fieldTexts(c).some((t) => refIds(t).length)) continue; // drawn as arrows
       props.push(clip(f.children.length ? `${key}: …` : `${key}: ${f.text.trim()}`));
@@ -132,6 +154,7 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
       frame: border ?? 'dashed',
       color: colorOf(store.fieldValue(id, 'color')),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
+      desc,
       props,
       children,
       done: store.node(id).completed,
@@ -284,9 +307,39 @@ export const titleWidth = (n: DiagramNode, measure: Measure) =>
   measure(n.label, LABEL_SIZE) + (n.icon && n.shape !== 'actor' ? ICON_SPACE : 0);
 
 /** Size of a box (not a frame) by its contents. */
+/** How wide a description runs before it wraps, and how many lines of it are shown. */
+const DESC_WIDTH = 140;
+const DESC_LINES = 4;
+
+/**
+ * Text broken into lines no wider than width: between words, or anywhere in
+ * Japanese. Past maxLines the rest is cut, with an ellipsis.
+ */
+export function wrap(text: string, width: number, size: number, measure: Measure, maxLines = DESC_LINES): string[] {
+  const out: string[] = [];
+  let line = '';
+  for (const tok of text.match(/[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+/g) ?? []) {
+    if (!line.trim() || measure((line + tok).trimEnd(), size) <= width) line += tok;
+    else {
+      out.push(line.trim());
+      line = tok.trimStart();
+    }
+  }
+  if (line.trim()) out.push(line.trim());
+  if (out.length > maxLines) {
+    out.length = maxLines;
+    out[maxLines - 1] = out[maxLines - 1].slice(0, -1) + '…';
+  }
+  return out;
+}
+
+/** The description's lines as drawn in the box. */
+export const descLines = (n: DiagramNode, measure: Measure) => (n.desc ? wrap(n.desc, DESC_WIDTH, PROP_SIZE, measure) : []);
+
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
-  const text = Math.max(titleWidth(n, measure), ...n.props.map((p) => measure(p, PROP_SIZE)));
-  const lines = LINE + n.props.length * PROP_LINE;
+  const desc = descLines(n, measure);
+  const text = Math.max(titleWidth(n, measure), ...[...desc, ...n.props].map((p) => measure(p, PROP_SIZE)));
+  const lines = LINE + (desc.length + n.props.length) * PROP_LINE;
   if (n.shape === 'actor') return { w: Math.max(text + 8, 44), h: ACTOR + 6 + lines };
   const w = Math.max(Math.ceil(text) + 2 * PAD, 64);
   const h = lines + 2 * PAD + (n.shape === 'db' ? 12 : 0);

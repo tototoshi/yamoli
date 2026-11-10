@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDiagram, layout, type Box } from './diagram';
+import { buildDiagram, estimate, layout, wrap, type Box } from './diagram';
 import { OutlineStore } from './model';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
@@ -237,4 +237,29 @@ test('a frame asks for a flow even without arrows', () => {
   const d = buildDiagram(s, p);
   expect(d.kind).toBe('flow');
   expect(layout(d).boxes.get(g)!.frame).toBe(true);
+});
+
+test('a note or description is shown as text under the name, also from a block', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const a = s.addChild(p, -1, 'API').id;
+  const b = s.addChild(p, -1, 'Worker').id;
+  s.addField(a, 'description', 'Serves the **app**');
+  s.addField(a, 'tech', 'Go');
+  s.addBlock(b, 'note', 'markdown', '# Jobs\n\n- sends [mail](https://x.example)\n- cleans up');
+  s.addField(p, 'diagram', 'flow');
+  const d = buildDiagram(s, p);
+  expect(d.nodes.get(a)).toMatchObject({ desc: 'Serves the app', props: ['tech: Go'] });
+  expect(d.nodes.get(b)!.desc).toBe('Jobs sends mail cleans up');
+  // The text makes the box taller.
+  const plainHeight = layout(buildDiagram(s, s.rootId)).boxes.get(p)!.h;
+  expect(layout(d).boxes.get(a)!.h).toBeGreaterThan(plainHeight);
+});
+
+test('descriptions wrap between words, anywhere in Japanese, and are cut after a few lines', () => {
+  expect(wrap('one two three four', 42, 10, estimate)).toEqual(['one two', 'three', 'four']);
+  expect(wrap('認証とセッション管理', 50, 10, estimate)).toEqual(['認証とセッ', 'ション管理']);
+  const long = wrap('a '.repeat(200), 30, 10, estimate);
+  expect(long.length).toBe(4);
+  expect(long[3].endsWith('…')).toBe(true);
 });

@@ -5,7 +5,7 @@
  */
 import { useId, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
-import { buildDiagram, estimate, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
+import { buildDiagram, descLines, estimate, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
 import { fileName, saveFile, standaloneSvg, svgToPng } from './exportImage';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
@@ -310,6 +310,7 @@ function Shape({ node, box, onOpen, onHover }: Drawn) {
   const iconBeside = node.icon && !actor;
   const labelX = iconBeside ? cx + ICON_SPACE / 2 : cx;
   const iconX = cx - (measure(node.label, LABEL_SIZE) + ICON_SPACE) / 2;
+  const desc = descLines(node, measure);
   let outline;
   switch (node.shape) {
     case 'actor':
@@ -350,15 +351,15 @@ function Shape({ node, box, onOpen, onHover }: Drawn) {
       onMouseEnter={() => onHover(node.id)}
       onClick={() => onOpen(node.id)}
     >
-      <title>{node.label}</title>
+      <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
       {outline}
       {iconBeside && <Icon value={node.icon!} x={iconX} y={top - 1} size={16} color={node.color} />}
       <text class="dg-label" x={labelX} y={top + LABEL_SIZE}>
         {node.label}
       </text>
-      {node.props.map((p, i) => (
-        <text key={i} class="dg-prop" x={cx} y={top + LABEL_SIZE + 4 + (i + 1) * (PROP_SIZE + 3)}>
-          {p}
+      {[...desc.map((d) => ['dg-desc', d]), ...node.props.map((p) => ['dg-prop', p])].map(([cls, text], i) => (
+        <text key={i} class={cls} x={cx} y={top + LABEL_SIZE + 4 + (i + 1) * (PROP_SIZE + 3)}>
+          {text}
         </text>
       ))}
     </g>
