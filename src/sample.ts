@@ -91,14 +91,14 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- `to: [[API]] gRPC` のように属性に書いたリンクが矢印、後ろの語がラベル\n' +
         '- `shape` で形（actor / db / queue / external、枠の線は frame solid / frame none）、`color` で色、`icon` でアイコン\n' +
         '- `async:` に書いたリンクは点線、`both:` は両向き、`link:` は矢印なし\n' +
-        '- `note:` に書いた説明は箱の中に文章で表示\n' +
+        '- `note:` に書いた説明は箱（枠なら名前の下）に文章で表示\n' +
         '- `direction: TB` で縦向き。箱をクリックするとその行を編集',
       'Switch to “Diagram” to see it drawn.\n\n' +
         '- Each row is a box; a row with `shape: frame` is a frame around the rows under it (other rows list theirs in the box)\n' +
         '- A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
         '- `shape` picks the shape (actor / db / queue / external; frame solid / frame none for a frame’s border), `color` the colour, `icon` an icon\n' +
         '- Links under `async:` are dashed, under `both:` two-way, under `link:` without arrows\n' +
-        '- A `note:` shows in the box as text\n' +
+        '- A `note:` shows in the box (under a frame’s name) as text\n' +
         '- `direction: TB` draws it top to bottom. Click a box to edit its row'
     )
   );
@@ -128,7 +128,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
     note: t('メール送信や集計など、時間のかかる処理', 'Slow work: sending email, totals'),
     tech: 'Go',
   });
-  const data = add(vpc, t('データ', 'Data'), { shape: 'frame' });
+  const data = add(vpc, t('データ', 'Data'), { shape: 'frame', note: t('毎晩バックアップ', 'Backed up nightly') });
   const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
   const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });

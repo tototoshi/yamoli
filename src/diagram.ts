@@ -10,8 +10,8 @@
  *   shape                box / actor / db / queue / external
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   icon                 server, database, cloud … (icons.ts) or an emoji
- *   note / description   a few wrapped lines of text under the name (also a
- *                        `note` block), all of it on hover
+ *   note / description   a few wrapped lines of text under the name, in a box
+ *                        or a frame (also a `note` block), all of it on hover
  *   other fields         small `key: value` lines inside the box
  *
  * A line's look comes from the name of the field it is written in: `async`
@@ -336,6 +336,9 @@ export function wrap(text: string, width: number, size: number, measure: Measure
 /** The description's lines as drawn in the box. */
 export const descLines = (n: DiagramNode, measure: Measure) => (n.desc ? wrap(n.desc, DESC_WIDTH, PROP_SIZE, measure) : []);
 
+/** The height of a frame's head: its title, and its description under it. */
+export const frameHead = (n: DiagramNode, measure: Measure) => FRAME_HEAD + descLines(n, measure).length * PROP_LINE;
+
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
   const desc = descLines(n, measure);
   const text = Math.max(titleWidth(n, measure), ...[...desc, ...n.props].map((p) => measure(p, PROP_SIZE)));
@@ -398,7 +401,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
   const place = (units: string[]): { rs: number; os: number } => {
     for (const u of units) {
       const n = nodes.get(u)!;
-      if (n.isFrame) size.set(u, framed(n.children.length ? place(n.children) : EMPTY, titleWidth(n, measure)));
+      if (n.isFrame) size.set(u, framed(n.children.length ? place(n.children) : EMPTY, n));
       else size.set(u, extents(boxSize(n, measure), dir));
     }
     const set = new Set(units);
@@ -444,11 +447,12 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
     return { rs: Math.max(...filled.map((layer, i) => rankStart[i] + Math.max(...layer.map((u) => size.get(u)!.rs)))), os: widest };
   };
 
-  /** A frame's size around its contents (the title sits on top, whatever the direction). */
-  const framed = (inner: { rs: number; os: number }, titleWidth: number) => {
+  /** A frame's size around its contents (the title and description sit on top, whatever the direction). */
+  const framed = (inner: { rs: number; os: number }, n: DiagramNode) => {
+    const head = Math.max(titleWidth(n, measure), ...descLines(n, measure).map((l) => measure(l, PROP_SIZE)));
     const w = (dir === 'LR' ? inner.rs : inner.os) + 2 * FRAME_PAD;
-    const h = (dir === 'LR' ? inner.os : inner.rs) + 2 * FRAME_PAD + FRAME_HEAD;
-    return extents({ w: Math.max(w, titleWidth + 2 * FRAME_PAD), h }, dir);
+    const h = (dir === 'LR' ? inner.os : inner.rs) + 2 * FRAME_PAD + frameHead(n, measure);
+    return extents({ w: Math.max(w, head + 2 * FRAME_PAD), h }, dir);
   };
 
   place(d.top);
@@ -469,7 +473,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const w = dir === 'LR' ? abs.rs : abs.os;
       const innerW = dir === 'LR' ? inner.rs : inner.os;
       const cx = x0 + (w - innerW) / 2;
-      const cy = y0 + FRAME_HEAD + FRAME_PAD;
+      const cy = y0 + frameHead(n, measure) + FRAME_PAD;
       if (dir === 'LR') settle(n.children, cx, cy);
       else settle(n.children, cy, cx);
     }

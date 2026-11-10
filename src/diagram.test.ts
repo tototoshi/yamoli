@@ -239,6 +239,21 @@ test('a frame asks for a flow even without arrows', () => {
   expect(layout(d).boxes.get(g)!.frame).toBe(true);
 });
 
+test('a frame with a note makes room for it above its rows', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const g = s.addChild(p, -1, 'Group').id;
+  const a = s.addChild(g, -1, 'A').id;
+  s.addField(g, 'shape', 'frame');
+  const before = layout(buildDiagram(s, p));
+  s.addField(g, 'note', 'Everything the users never see directly');
+  const d = buildDiagram(s, p);
+  expect(d.nodes.get(g)!.desc).toBe('Everything the users never see directly');
+  const L = layout(d);
+  expect(L.boxes.get(g)!.h).toBeGreaterThan(before.boxes.get(g)!.h);
+  expect(L.boxes.get(a)!.y - L.boxes.get(g)!.y).toBeGreaterThan(before.boxes.get(a)!.y - before.boxes.get(g)!.y);
+});
+
 test('a note or description is shown as text under the name, also from a block', () => {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'P').id;

@@ -195,6 +195,11 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
               <text class="dg-frame-title" x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
                 {n.label}
               </text>
+              {descLines(n, measure).map((l, i) => (
+                <text key={i} class="dg-frame-desc" x={b.x + 12} y={b.y + 17 + (i + 1) * (PROP_SIZE + 3)}>
+                  {l}
+                </text>
+              ))}
             </g>
           );
         })}
@@ -295,6 +300,7 @@ function Frame({ node, box, onOpen, onHover }: Drawn) {
         onOpen(node.id);
       }}
     >
+      <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
       <rect width={box.w} height={box.h} rx={8} style={node.frame === 'none' ? undefined : tint(node.color, 6)} />
     </g>
   );
