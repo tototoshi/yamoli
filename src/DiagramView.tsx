@@ -5,7 +5,7 @@
  */
 import { useId, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
-import { buildDiagram, descLines, estimate, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
+import { buildDiagram, descLines, estimate, frameDesc, frameHead, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
 import { fileName, saveFile, standaloneSvg, svgToPng } from './exportImage';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
@@ -138,8 +138,20 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
 
   const near = (e: { from: string; to: string }) => hover !== null && (e.from === hover || e.to === hover);
   const open = (nid: string) => !embedded && ctl.openRow(nid);
+  // A frame's description is in the way of lines too (its title alone has room above the contents),
+  // except of lines to that frame.
+  const heads = new Map<string, Box>();
+  for (const [nid, b] of L.boxes) {
+    const n = d.nodes.get(nid)!;
+    if (b.frame && n.desc) heads.set(nid, { x: b.x, y: b.y + 4, w: b.w, h: frameHead(n, b.w, measure) - 4, frame: false });
+  }
   const all = [...L.boxes.values()];
-  const routes = new Map(d.edges.map((e) => [e, route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, all, e.label ? measure(e.label, PROP_SIZE) + 8 : 0)]));
+  const routes = new Map(
+    d.edges.map((e) => {
+      const others = [...all, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
+      return [e, route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, e.label ? measure(e.label, PROP_SIZE) + 8 : 0)];
+    })
+  );
   // The drawing's bounds: the boxes, and lines going around them with their labels.
   let [x0, y0, x1, y1] = [0, 0, L.width, L.height];
   for (const e of d.edges) {
@@ -195,7 +207,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
               <text class="dg-frame-title" x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
                 {n.label}
               </text>
-              {descLines(n, measure).map((l, i) => (
+              {frameDesc(n, b.w, measure).map((l, i) => (
                 <text key={i} class="dg-frame-desc" x={b.x + 12} y={b.y + 17 + (i + 1) * (PROP_SIZE + 3)}>
                   {l}
                 </text>

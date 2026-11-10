@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDiagram, descLines, estimate, layout, wrap, type Box } from './diagram';
+import { buildDiagram, descLines, estimate, frameDesc, layout, wrap, type Box } from './diagram';
 import { OutlineStore } from './model';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
@@ -295,6 +295,12 @@ test('a long description is shown in full, in a wider box before a taller one', 
   const width = (t: string) => Math.max(...descLines(node(t), estimate).map((l) => estimate(l, 11)));
   expect(width('word '.repeat(4).trim())).toBeLessThanOrEqual(140);
   expect(width(text)).toBeGreaterThan(200);
+});
+
+test("a frame's description runs across the frame", () => {
+  const n = { desc: 'Everything here is backed up every night and read from replicas' } as never;
+  expect(frameDesc(n, 400, estimate).length).toBeLessThan(descLines(n, estimate).length);
+  expect(frameDesc(n, 400, estimate).join(' ')).toBe('Everything here is backed up every night and read from replicas');
 });
 
 test('the lines of a description come out about even', () => {

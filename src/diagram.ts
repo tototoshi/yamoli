@@ -367,32 +367,34 @@ export function wrap(text: string, width: number, size: number, measure: Measure
 }
 
 /**
- * The description's lines as drawn in the box: all of it, at the narrowest
- * width that keeps it to a few lines, then narrowed as far as it goes in as
- * many lines, so they come out about even (no word left alone on the last).
+ * text wrapped within width, then narrowed as far as it goes in as many
+ * lines, so they come out about even (no word left alone on the last).
  */
-export function descLines(n: DiagramNode, measure: Measure): string[] {
-  if (!n.desc) return [];
-  let width = DESC_WIDTHS[0];
-  let lines: string[] = [];
-  for (const w of DESC_WIDTHS) {
-    width = w;
-    lines = wrap(n.desc, w, PROP_SIZE, measure);
-    if (lines.length <= DESC_LINES) break;
-  }
+function evenWrap(text: string, width: number, measure: Measure): string[] {
+  const lines = wrap(text, width, PROP_SIZE, measure);
   if (lines.length < 2) return lines;
   let lo = width / 2;
   let hi = width;
   while (hi - lo > 2) {
     const mid = (lo + hi) / 2;
-    if (wrap(n.desc, mid, PROP_SIZE, measure).length <= lines.length) hi = mid;
+    if (wrap(text, mid, PROP_SIZE, measure).length <= lines.length) hi = mid;
     else lo = mid;
   }
-  return wrap(n.desc, hi, PROP_SIZE, measure);
+  return wrap(text, hi, PROP_SIZE, measure);
 }
 
+/** The description's lines as drawn in the box: all of it, at the narrowest width that keeps it to a few lines. */
+export function descLines(n: DiagramNode, measure: Measure): string[] {
+  if (!n.desc) return [];
+  const width = DESC_WIDTHS.find((w) => wrap(n.desc!, w, PROP_SIZE, measure).length <= DESC_LINES) ?? DESC_WIDTHS[DESC_WIDTHS.length - 1];
+  return evenWrap(n.desc, width, measure);
+}
+
+/** A frame's description, run across the frame (of width w) rather than kept narrow like a box's. */
+export const frameDesc = (n: DiagramNode, w: number, measure: Measure) => (n.desc ? evenWrap(n.desc, w - 2 * FRAME_PAD, measure) : []);
+
 /** The height of a frame's head: its title, and its description under it. */
-export const frameHead = (n: DiagramNode, measure: Measure) => FRAME_HEAD + descLines(n, measure).length * PROP_LINE;
+export const frameHead = (n: DiagramNode, w: number, measure: Measure) => FRAME_HEAD + frameDesc(n, w, measure).length * PROP_LINE;
 
 /** Size of a box (not a frame) by its contents. */
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
@@ -505,10 +507,11 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
 
   /** A frame's size around its contents (the title and description sit on top, whatever the direction). */
   const framed = (inner: { rs: number; os: number }, n: DiagramNode) => {
+    // At least as wide as the description would be in a box; wider contents give it more room.
     const head = Math.max(titleWidth(n, measure), ...descLines(n, measure).map((l) => measure(l, PROP_SIZE)));
-    const w = (dir === 'LR' ? inner.rs : inner.os) + 2 * FRAME_PAD;
-    const h = (dir === 'LR' ? inner.os : inner.rs) + 2 * FRAME_PAD + frameHead(n, measure);
-    return extents({ w: Math.max(w, head + 2 * FRAME_PAD), h }, dir);
+    const w = Math.max((dir === 'LR' ? inner.rs : inner.os) + 2 * FRAME_PAD, head + 2 * FRAME_PAD);
+    const h = (dir === 'LR' ? inner.os : inner.rs) + 2 * FRAME_PAD + frameHead(n, w, measure);
+    return extents({ w, h }, dir);
   };
 
   place(d.top);
@@ -529,7 +532,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const w = dir === 'LR' ? abs.rs : abs.os;
       const innerW = dir === 'LR' ? inner.rs : inner.os;
       const cx = x0 + (w - innerW) / 2;
-      const cy = y0 + frameHead(n, measure) + FRAME_PAD;
+      const cy = y0 + frameHead(n, w, measure) + FRAME_PAD;
       if (dir === 'LR') settle(n.children, cx, cy);
       else settle(n.children, cy, cx);
     }
