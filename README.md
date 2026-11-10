@@ -131,7 +131,7 @@ The Diagram view draws the zoomed item from its rows, for example a system's arc
 | `shape` | `box` / `actor` / `db` / `queue` / `external` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
-| `note` / `description` | Text under the name of a box or a frame, wrapped (a few lines; all of it on hover). A `note` block works too |
+| `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too |
 | Other fields | Small `key: value` lines in the box |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
 | `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are arrows or frames); `tree`: a mind map |

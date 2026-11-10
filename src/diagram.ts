@@ -10,8 +10,8 @@
  *   shape                box / actor / db / queue / external
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   icon                 server, database, cloud … (icons.ts) or an emoji
- *   note / description   a few wrapped lines of text under the name, in a box
- *                        or a frame (also a `note` block), all of it on hover
+ *   note / description   wrapped text under the name, in a box or a frame
+ *                        (also a `note` block); long text makes the box wider
  *   other fields         small `key: value` lines inside the box
  *
  * A line's look comes from the name of the field it is written in: `async`
@@ -306,16 +306,15 @@ export const ICON_SPACE = 20;
 export const titleWidth = (n: DiagramNode, measure: Measure) =>
   measure(n.label, LABEL_SIZE) + (n.icon && n.shape !== 'actor' ? ICON_SPACE : 0);
 
-/** Size of a box (not a frame) by its contents. */
-/** How wide a description runs before it wraps, and how many lines of it are shown. */
-const DESC_WIDTH = 140;
+/** How wide a description runs before it wraps: wider steps for longer text, so a box doesn't grow too tall. */
+const DESC_WIDTHS = [140, 200, 260];
 const DESC_LINES = 4;
 
 /**
  * Text broken into lines no wider than width: between words, or anywhere in
- * Japanese. Past maxLines the rest is cut, with an ellipsis.
+ * Japanese. Past maxLines (if given) the rest is cut, with an ellipsis.
  */
-export function wrap(text: string, width: number, size: number, measure: Measure, maxLines = DESC_LINES): string[] {
+export function wrap(text: string, width: number, size: number, measure: Measure, maxLines = Infinity): string[] {
   const out: string[] = [];
   let line = '';
   for (const tok of text.match(/[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+/g) ?? []) {
@@ -333,12 +332,21 @@ export function wrap(text: string, width: number, size: number, measure: Measure
   return out;
 }
 
-/** The description's lines as drawn in the box. */
-export const descLines = (n: DiagramNode, measure: Measure) => (n.desc ? wrap(n.desc, DESC_WIDTH, PROP_SIZE, measure) : []);
+/** The description's lines as drawn in the box: all of it, at the narrowest width that keeps it to a few lines. */
+export function descLines(n: DiagramNode, measure: Measure): string[] {
+  if (!n.desc) return [];
+  let lines: string[] = [];
+  for (const w of DESC_WIDTHS) {
+    lines = wrap(n.desc, w, PROP_SIZE, measure);
+    if (lines.length <= DESC_LINES) break;
+  }
+  return lines;
+}
 
 /** The height of a frame's head: its title, and its description under it. */
 export const frameHead = (n: DiagramNode, measure: Measure) => FRAME_HEAD + descLines(n, measure).length * PROP_LINE;
 
+/** Size of a box (not a frame) by its contents. */
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
   const desc = descLines(n, measure);
   const text = Math.max(titleWidth(n, measure), ...[...desc, ...n.props].map((p) => measure(p, PROP_SIZE)));

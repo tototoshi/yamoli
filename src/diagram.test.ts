@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDiagram, estimate, layout, wrap, type Box } from './diagram';
+import { buildDiagram, descLines, estimate, layout, wrap, type Box } from './diagram';
 import { OutlineStore } from './model';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
@@ -274,7 +274,21 @@ test('a note or description is shown as text under the name, also from a block',
 test('descriptions wrap between words, anywhere in Japanese, and are cut after a few lines', () => {
   expect(wrap('one two three four', 42, 10, estimate)).toEqual(['one two', 'three', 'four']);
   expect(wrap('認証とセッション管理', 50, 10, estimate)).toEqual(['認証とセッ', 'ション管理']);
-  const long = wrap('a '.repeat(200), 30, 10, estimate);
+  const long = wrap('a '.repeat(200), 30, 10, estimate, 4);
   expect(long.length).toBe(4);
   expect(long[3].endsWith('…')).toBe(true);
+});
+
+test('a long description is shown in full, in a wider box before a taller one', () => {
+  const s = OutlineStore.create();
+  const node = (desc: string) => ({ ...buildDiagram(s, s.rootId).nodes.values().next().value, desc }) as never;
+  s.addChild(s.rootId, -1, 'A');
+  const text = 'word '.repeat(60).trim();
+  const lines = descLines(node(text), estimate);
+  expect(lines.join(' ')).toBe(text);
+  expect(lines.length).toBeGreaterThan(4);
+  // Short text keeps to the narrow width; longer text spreads out first.
+  const width = (t: string) => Math.max(...descLines(node(t), estimate).map((l) => estimate(l, 11)));
+  expect(width('word '.repeat(4).trim())).toBeLessThanOrEqual(140);
+  expect(width(text)).toBeGreaterThan(200);
 });
