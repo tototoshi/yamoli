@@ -526,9 +526,7 @@ export class Controller {
     } else if (isMod(e) && !e.altKey && (e.code === 'KeyC' || e.code === 'KeyX')) {
       e.preventDefault();
       const roots = this.selectionRoots();
-      const text = toMarkdownRows(store, roots, (id) => this.shownChildren(id));
-      this.copied = { text, rows: roots.map((r) => copyOf(store, r)) };
-      void navigator.clipboard.writeText(text);
+      void this.copyRows(roots, (id) => this.shownChildren(id));
       if (e.code === 'KeyX') {
         const before = vis[vis.indexOf(rows[0]) - 1];
         for (const r of roots) store.remove(r);
@@ -690,6 +688,28 @@ export class Controller {
   }
 
   /** Put a [[link]] to id on the clipboard, to paste into text or an `after`. */
+  /**
+   * Put rows on the clipboard as a Markdown list (with what children picks
+   * under them), and keep them whole for pasting back here as they were.
+   */
+  private copyRows(ids: string[], children: (id: string) => string[]): Promise<void> {
+    const text = toMarkdownRows(this.store, ids, children);
+    this.copied = { text, rows: ids.map((r) => copyOf(this.store, r)) };
+    return navigator.clipboard.writeText(text);
+  }
+
+  /** Copy an item with everything under it, hidden and folded rows too. */
+  copyTree(id: string) {
+    const count = 1 + this.store.descendantCount(id);
+    this.copyRows([id], (c) => this.store.node(c).children).then(
+      () =>
+        this.showToast(
+          t(`${count} 行をコピーしました。行に貼り付けると、そのままの形で入ります`, `Copied ${count} rows. Paste into a row to put them back as they are`)
+        ),
+      () => this.showToast(t('クリップボードにコピーできませんでした', 'Couldn’t copy to the clipboard'))
+    );
+  }
+
   copyLink(id: string) {
     navigator.clipboard.writeText(`[[${id}]]`).then(
       () =>
@@ -1330,8 +1350,9 @@ export class Controller {
     const { store } = this;
     const add = (parent: string, index: number, r: Copied): string => {
       const n = store.addChild(parent, index, r.text);
-      Object.assign(n, { key: r.key, format: r.format, completed: r.completed, task: r.task, collapsed: r.collapsed });
       r.children.forEach((c) => add(n.id, -1, c));
+      // After the children, as adding one opens its parent.
+      Object.assign(n, { key: r.key, format: r.format, completed: r.completed, task: r.task, collapsed: r.collapsed });
       return n.id;
     };
     this.pasteRows(e, ta, rows, add);

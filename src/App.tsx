@@ -1132,6 +1132,9 @@ function ItemMenuView() {
         {t('複製', 'Duplicate')}
         {below ? t(`（中の ${below} 件も）`, ` (with ${below} below)`) : ''}
       </button>
+      <button role="menuitem" onClick={run(() => ctl.copyTree(m.id))}>
+        {below ? t(`ツリーをコピー（中の ${below} 件も）`, `Copy tree (with ${below} below)`) : t('コピー', 'Copy')}
+      </button>
       <button role="menuitem" onClick={run(() => ctl.copyLink(m.id))}>
         {t('リンクをコピー', 'Copy link')}
       </button>

@@ -293,3 +293,30 @@ test('a Markdown list from elsewhere keeps fields on their row and multi-line te
   expect(store.node(line).text).toBe('line one\nline two');
   expect(texts(ctl, line)).toEqual(['grandchild']);
 });
+
+test('Copy tree takes everything under an item, hidden rows too, and pastes it back whole', async () => {
+  let a = '';
+  let target = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'A');
+    s.addField(a, 'owner', 'toshi');
+    const b = add(a, 'B');
+    add(b, 'C');
+    s.setCompleted(add(a, 'done one'), true);
+    s.node(a).collapsed = true;
+    target = add(s.rootId, '');
+  });
+  let written = '';
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => void (written = t) }, configurable: true });
+  ctl.copyTree(a);
+  await Promise.resolve();
+  expect(written).toBe('- A\n  - owner: toshi\n  - B\n    - C\n  - [x] done one\n');
+
+  paste(ctl, editor(ctl, target), written);
+  const { store } = ctl;
+  const copy = store.node(store.rootId).children[1];
+  expect(store.node(copy)).toMatchObject({ text: 'A', collapsed: true });
+  expect(store.fieldValue(copy, 'owner')).toBe('toshi');
+  expect(texts(ctl, copy).slice(1)).toEqual(['B', 'done one']);
+  expect(store.node(store.items(copy)[1]).completed).toBe(true);
+});
