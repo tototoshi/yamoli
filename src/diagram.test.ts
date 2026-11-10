@@ -226,3 +226,15 @@ test('only `shape: frame` makes a frame; under other rows, the rows are listed i
   s.addField(p, 'diagram', 'tree');
   expect(buildDiagram(s, p).nodes.has(auth)).toBe(true);
 });
+
+test('a frame asks for a flow even without arrows', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const g = s.addChild(p, -1, 'Group').id;
+  s.addChild(g, -1, 'A');
+  expect(buildDiagram(s, p).kind).toBe('tree');
+  s.addField(g, 'shape', 'frame');
+  const d = buildDiagram(s, p);
+  expect(d.kind).toBe('flow');
+  expect(layout(d).boxes.get(g)!.frame).toBe(true);
+});

@@ -133,7 +133,7 @@ The Diagram view draws the zoomed item from its rows, for example a system's arc
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
 | Other fields | Small `key: value` lines in the box |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
-| `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are any); `tree`: a mind map |
+| `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are arrows or frames); `tree`: a mind map |
 
 A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name: `calls: dotted red`, `sync: both` (`solid` / `dashed` / `dotted`, `arrow` / `both` / `none`, a colour).
 

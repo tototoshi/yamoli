@@ -19,10 +19,10 @@
  * both / none, a colour).
  *
  * On the zoomed item: `direction: LR | TB`, and `diagram: flow | tree`. A
- * flow (the default when there are arrows) puts each box after the ones its
+ * flow (the default when there are arrows or frames) puts each box after the ones its
  * arrows come from, frames laid out inside out; an arrow to or from a row
- * listed in a box is the box's. A tree (the default without arrows) draws
- * the item and all its rows as a mind map, frames or not.
+ * listed in a box is the box's. A tree (the default without arrows or
+ * frames) draws the item and all its rows as a mind map.
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
@@ -180,7 +180,9 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
 
   const dir = store.fieldValue(rootId, 'direction')?.toUpperCase();
   const asked = store.fieldValue(rootId, 'diagram')?.toLowerCase();
-  const kind = asked === 'tree' || asked === 'flow' ? asked : edges.length ? 'flow' : 'tree';
+  // Arrows or frames ask for a flow; without either, it is a mind map.
+  const framed = [...nodes.values()].some((n) => n.isFrame);
+  const kind = asked === 'tree' || asked === 'flow' ? asked : edges.length || framed ? 'flow' : 'tree';
   // A mind map grows from the zoomed item itself.
   if (kind === 'tree' && rootId !== store.rootId) {
     add(rootId, top);
