@@ -8,6 +8,7 @@
  *   id: 52e815d313f8      when something links to it ([[id]])
  *   text: 要件定義
  *   done: true            when completed
+ *   todo: true            when marked as a task, not yet done
  *   duration: 3d          its fields
  *   children: [...]       its sub-items
  *
@@ -53,7 +54,8 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   const fields = n.children.filter((c) => store.isField(c));
   const items = store.items(id);
   const hasId = linked.has(id);
-  if (!fields.length && !items.length && !n.completed && !hasId) return n.text;
+  const todo = n.task && !n.completed;
+  if (!fields.length && !items.length && !n.completed && !todo && !hasId) return n.text;
 
   const fieldValues: Record<string, Value> = {};
   for (const f of fields) fieldValues[store.node(f).key!] = rowValue(store, f);
@@ -66,6 +68,7 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   if (hasId) own('id', id);
   own('text', n.text);
   if (n.completed) own('done', true);
+  if (todo) own('todo', true);
   Object.assign(out, fieldValues);
   if (items.length) own('children', items.map((c) => itemValue(store, c, linked)));
   return out;
@@ -104,8 +107,8 @@ function scalar(text: string): Value {
 
 /**
  * The rows under id as a nested Markdown list, for pasting elsewhere: links
- * become the linked item's label, completed items are struck through and
- * fields read `name: value`. Blocks (multi-line values) are left out.
+ * become the linked item's label, tasks are checklist items (`[ ]`, `[x]`)
+ * and fields read `name: value`. Blocks (multi-line values) are left out.
  * children(id) picks the rows to include, so the view's filters apply.
  */
 export function toMarkdownList(store: OutlineStore, id: string, children: (id: string) => string[]): string {
@@ -121,7 +124,7 @@ export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id
     const pad = '  '.repeat(depth);
     let text = withLabels(store, n.text).trim();
     if (n.key !== null) text = `${n.key}: ${text}`.trimEnd();
-    else if (n.completed && text) text = `~~${text}~~`;
+    else if (store.isTask(c)) text = `[${n.completed ? 'x' : ' '}] ${text}`;
     lines.push(`${pad}- ${text}`.trimEnd().replace(/\n/g, `\n${pad}  `));
     for (const k of children(c)) add(k, depth + 1);
   };

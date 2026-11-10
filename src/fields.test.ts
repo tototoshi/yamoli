@@ -85,3 +85,13 @@ test('block scalars become block fields, tagged with their format', () => {
     { key: 'next', text: '1', format: undefined, children: [] },
   ]);
 });
+
+test('a pasted checklist keeps which lines are to do and which are done', () => {
+  const rows = parseOutlineText('- [ ] milk\n- [x] eggs\n  - [ ] free range\n- bread');
+  expect(rows.map((r) => [r.text, r.task])).toEqual([
+    ['milk', 'open'],
+    ['eggs', 'done'],
+    ['bread', undefined],
+  ]);
+  expect(rows[1].children[0]).toMatchObject({ text: 'free range', task: 'open' });
+});

@@ -86,7 +86,7 @@ test('linked items carry their id so references resolve', () => {
   expect(toYaml(toValue(s, a))).toBe(`id: ${a}\ntext: a\n`);
 });
 
-test('toMarkdownList: a nested list with link labels, fields and struck-through done items', () => {
+test('toMarkdownList: a nested list with link labels, fields and tasks as checklist items', () => {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'plan').id;
   const a = s.addChild(p, -1, '**design**').id;
@@ -95,10 +95,11 @@ test('toMarkdownList: a nested list with link labels, fields and struck-through 
   s.addField(b, 'after', `[[${a}]]`);
   s.addBlock(b, 'note', 'markdown', '# left out');
   s.addChild(b, -1, 'step');
+  s.setTask(s.addChild(p, -1, 'ship').id, true);
   const all = (id: string) => s.node(id).children;
   expect(toMarkdownList(s, p, all)).toBe(
-    '- ~~**design**~~\n- build\n  second line\n  - after: design\n  - step\n'
+    '- [x] **design**\n- build\n  second line\n  - after: design\n  - step\n- [ ] ship\n'
   );
-  expect(toMarkdownList(s, s.rootId, all)).toMatch(/^- plan\n  - ~~/);
+  expect(toMarkdownList(s, s.rootId, all)).toMatch(/^- plan\n  - \[x\]/);
   expect(toMarkdownList(s, a, all)).toBe('');
 });

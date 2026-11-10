@@ -39,6 +39,7 @@ A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/y
 ### Rows and fields
 
 - **Enter** starts a new row, **Tab / Shift+Tab** indents and outdents. Click a ● to zoom into that item.
+- **Tasks** are rows that are something to do, rather than notes. A row's **Task** button (or **⌘L**) makes it one, after which the button completes it (✓, ⌘Enter) and reopens it (↺). Completed rows, and rows with `duration` or `due`, count as tasks too. **Tasks only** in the view bar shows just them, with the rows they sit under dimmed; search with `is:task` / `is:todo`. The Text view writes tasks as `- [ ]` / `- [x]`, and a pasted checklist comes in as tasks.
 - Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Enter then act on all of them, and dragging one's ● moves them together.
 - Typing `name: ` at the start of a row makes it a **field**. Backspace at the start of the value turns it back into an ordinary row.
 - A field without a value can hold nested rows: fields below it make an object, ordinary rows a list.
@@ -146,12 +147,13 @@ Search (⌘F) finds the rows matching all the terms you write.
 | `budget.amount:1200` | A nested field |
 | `due:` | Has a field `due` |
 | `is:done` | Completed rows |
+| `is:task` / `is:todo` | Tasks / tasks not yet done |
 | `is:ready` / `is:blocked` | Ready to start / waiting on a dependency |
 | `is:late` / `is:critical` / `is:milestone` | Late / on the critical path / milestones |
 | `is:cycle` | On a dependency cycle |
 | `-term` | Negation |
 
-`is:` terms also have Japanese names (`is:完了`, `is:着手可`, `is:待ち`, `is:遅延`, …). Matching ignores case and full-/half-width differences.
+`is:` terms also have Japanese names (`is:完了`, `is:タスク`, `is:未完了`, `is:着手可`, `is:待ち`, `is:遅延`, …). Matching ignores case and full-/half-width differences.
 
 ## Views
 
@@ -161,7 +163,7 @@ Switch with the view bar; each item remembers the view last used for it.
 - **Gantt**: the schedule as a chart, with dependency arrows, due-date lines and adjustable day width.
 - **Diagram**: see above.
 - **Slides**: see above.
-- **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name; the Completed and Fields toggles apply.
+- **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
 - **YAML / JSON**: the zoomed item as data (read-only, with a copy button). Items that something links to carry their `id`.
 
 ## Code layout

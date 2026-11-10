@@ -191,6 +191,8 @@ ul.children ul.children {
 .row { position: relative; display: flex; align-items: flex-start; border-radius: 4px; }
 /* The row under the pointer, so its buttons at the far end read as its own. */
 .row:hover { background: var(--hover); }
+/* Shown only because tasks are under it (Tasks only). */
+.node.task-context > .row { opacity: 0.45; }
 .node.selected > .row, .node.selected > .row:hover { background: var(--select-bg); }
 body.row-selecting { user-select: none; cursor: default; }
 

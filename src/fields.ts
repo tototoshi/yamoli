@@ -18,6 +18,8 @@ export interface TextRow {
   children: TextRow[];
   /** A block field's format (`key: !markdown |`). */
   format?: string;
+  /** A checklist line: `- [ ]` open, `- [x]` done. */
+  task?: 'open' | 'done';
 }
 
 /** A field value opening a block scalar: `|`, `|-`, `>` …, optionally tagged `!format`. */
@@ -44,6 +46,8 @@ export function parseOutlineText(text: string): TextRow[] {
     let line = raw.trim();
     const marker = line.match(/^(?:[-*+]|\d+[.)])\s+/);
     if (marker) line = line.slice(marker[0].length);
+    const check = marker ? line.match(/^\[([ xX])\]\s+/) : null;
+    if (check) line = line.slice(check[0].length);
     while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
     const parent = stack[stack.length - 1].row;
     const field = line.match(FIELD_LINE);
@@ -62,7 +66,8 @@ export function parseOutlineText(text: string): TextRow[] {
       stack[stack.length - 2].indent = indent - 1;
       continue;
     }
-    const row = field ? fieldRow(field) : { key: null, text: line, children: [] };
+    const row: TextRow = field ? fieldRow(field) : { key: null, text: line, children: [] };
+    if (check && !field) row.task = check[1] === ' ' ? 'open' : 'done';
     if (field) i = readBlock(lines, i, indent, row);
     parent.children.push(row);
     stack.push({ indent, row });

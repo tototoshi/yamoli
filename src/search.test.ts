@@ -87,3 +87,20 @@ test('is:ready / is:blocked / is:cycle use dependency status', () => {
   s.addField(c.id, 'after', `[[${a.id}]]`);
   expect(ids('is:cycle')).toEqual([a.id, c.id]);
 });
+
+test('is:task and is:todo find what is to do: marked, completed or scheduled', () => {
+  const s = OutlineStore.create();
+  const add = (text: string) => s.addChild(s.rootId, -1, text).id;
+  const note = add('just a note');
+  const marked = add('buy milk');
+  s.setTask(marked, true);
+  const done = add('paid rent');
+  s.setCompleted(done, true);
+  const dated = add('report');
+  s.addField(dated, 'due', '2026-11-20');
+  const find = (q: string) => [...searchTree(s, s.rootId, parseQuery(q)).matches];
+  expect(find('is:task')).toEqual([marked, done, dated]);
+  expect(find('is:todo')).toEqual([marked, dated]);
+  expect(find('is:タスク')).toEqual(find('is:task'));
+  expect(find('-is:task').filter((id) => !s.isField(id))).toEqual([note]); // field rows aren't tasks either
+});

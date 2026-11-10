@@ -24,6 +24,8 @@ export type FieldsMode = 'show' | 'fold' | 'hide';
 
 export interface Prefs {
   showCompleted: boolean;
+  /** Show only tasks, with the rows they sit under for context. */
+  tasksOnly: boolean;
   /** Field rows (`key: value`) in the outline: shown, folded into a summary per row, or hidden. */
   fields: FieldsMode;
   /** How items were last viewed, when not as an outline. */
@@ -35,7 +37,7 @@ export interface Prefs {
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true, fields: 'show', views: {}, ganttScale: 2 };
+  const defaults: Prefs = { showCompleted: true, tasksOnly: false, fields: 'show', views: {}, ganttScale: 2 };
   try {
     const { ganttItems, showFields, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
     const prefs: Prefs = { ...defaults, ...saved };

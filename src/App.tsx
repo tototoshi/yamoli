@@ -88,6 +88,7 @@ export function App() {
 
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
+  ctl.taskRows = ctl.prefs.tasksOnly && (ctl.view === 'outline' || ctl.view === 'text') ? ctl.findTaskRows() : null;
   ctl.cycles = findCycles(store);
   ctl.selected = new Set(ctl.selectedRows());
   if (ctl.selection && !ctl.selected.size) ctl.selection = null;
@@ -376,6 +377,7 @@ const shortcuts = (): [string, string][] => [
   ],
   ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
   ['⌘/Ctrl+Enter', t('完了 / 未完了', 'Complete / reopen')],
+  ['⌘/Ctrl+L', t('タスクにする / やめる（「タスクだけ」で絞り込み、検索 is:todo）', 'Mark as a task or not (filter with “Tasks only”, search is:todo)')],
   ['Alt+→ / ⌘+.', t('ズームイン（●クリックでも可）', 'Zoom in (or click the ●)')],
   ['Alt+← / ⌘+,', t('ズームアウト（ブラウザの戻るでも可）', 'Zoom out (or the browser’s Back)')],
   [t('name: と入力', 'Type name: '), t('属性の行になる（値の先頭で Backspace で普通の行に戻す）', 'Makes a field (Backspace at the value’s start undoes it)')],
@@ -446,6 +448,12 @@ function ViewToggles() {
   if (view !== 'outline' && view !== 'gantt' && view !== 'diagram' && view !== 'text') return null;
   return (
     <div class="view-toggles">
+      {(view === 'outline' || view === 'text') && (
+        <label title={t('タスクと、それが入っている行だけを表示', 'Show only tasks, and the rows they are under')}>
+          <input type="checkbox" checked={prefs.tasksOnly} onChange={() => ctl.toggleTasksOnly()} />
+          {t('タスクだけ', 'Tasks only')}
+        </label>
+      )}
       <label title={t('完了した行を表示', 'Show completed rows')}>
         <input type="checkbox" checked={prefs.showCompleted} onChange={() => ctl.toggleShowCompleted()} />
         {t('完了', 'Completed')}
@@ -495,6 +503,7 @@ function NodeItem({ id }: { id: string }) {
   if ((kids.length && !expanded) || (isBlock && n.collapsed)) cls += ' collapsed';
   if (n.completed) cls += ' completed';
   if (ctl.selected.has(id)) cls += ' selected';
+  if (ctl.isContextRow(id)) cls += ' task-context';
   if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
 
   return (
@@ -746,16 +755,22 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
   const ctl = useCtl();
   return (
     <span class={cls}>
-      {id !== ctl.zoomId && (
-        <button
-          class="mini"
-          title={t('完了 / 未完了 (⌘/Ctrl+Enter)', 'Complete / reopen (⌘/Ctrl+Enter)')}
-          onMouseDown={keepFocus}
-          onClick={() => ctl.toggleComplete(id)}
-        >
-          ✓
-        </button>
-      )}
+      {/* A plain row can become a task; a task can be completed, and reopened. */}
+      {id !== ctl.zoomId &&
+        (!ctl.store.isTask(id) ? (
+          <button class="mini" title={t('やることとして登録 (⌘/Ctrl+L)', 'Mark as something to do (⌘/Ctrl+L)')} onMouseDown={keepFocus} onClick={() => ctl.toggleTask([id])}>
+            {t('タスク', 'Task')}
+          </button>
+        ) : (
+          <button
+            class="mini"
+            title={ctl.store.node(id).completed ? t('未完了に戻す (⌘/Ctrl+Enter)', 'Reopen (⌘/Ctrl+Enter)') : t('完了にする (⌘/Ctrl+Enter)', 'Complete (⌘/Ctrl+Enter)')}
+            onMouseDown={keepFocus}
+            onClick={() => ctl.toggleComplete(id)}
+          >
+            {ctl.store.node(id).completed ? '↺' : '✓'}
+          </button>
+        ))}
       <button class="mini" title={t('属性を追加 (Alt+A)', 'Add a field (Alt+A)')} onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
         {t('+ 属性', '+ Field')}
       </button>
@@ -1093,6 +1108,9 @@ function ItemMenuView() {
       <hr />
       <button role="menuitem" onClick={run(() => ctl.toggleComplete(m.id))}>
         {n.completed ? t('未完了に戻す', 'Reopen') : t('完了にする', 'Complete')}
+      </button>
+      <button role="menuitem" onClick={run(() => ctl.toggleTask([m.id]))}>
+        {store.isTask(m.id) ? t('タスクをやめる', 'Not a task') : t('タスクにする', 'Mark as a task')}
       </button>
       {outline && (
         <>

@@ -200,3 +200,44 @@ test('a field name is completed only once a suggestion is picked, then its value
   press(ctl, ta, 'Enter');
   expect(ctl.store.fieldValue(b, 'status')).toBe('done');
 });
+
+test('a row becomes a task and back; completing makes it one; ⌘L does it from the keyboard', () => {
+  let a = '', b = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'note');
+    b = add(s.rootId, 'chore');
+  });
+  const { store } = ctl;
+  expect(store.isTask(a)).toBe(false);
+  press(ctl, editor(ctl, a), 'l', { code: 'KeyL', metaKey: true });
+  expect(store.isTask(a)).toBe(true);
+  ctl.toggleComplete(b);
+  ctl.toggleComplete(b); // reopened, still to do
+  expect([store.isTask(b), store.node(b).completed]).toEqual([true, false]);
+  // No longer a task: not completed either.
+  ctl.toggleComplete(a);
+  ctl.toggleTask([a]);
+  expect([store.isTask(a), store.node(a).completed, store.field(a, 'completed')]).toEqual([false, false, undefined]);
+});
+
+test('Tasks only shows tasks, the rows they are under (even collapsed) and their fields', () => {
+  let home = '', shop = '', milk = '', note = '', idea = '';
+  const ctl = setup((s, add) => {
+    home = add(s.rootId, 'Home');
+    shop = add(home, 'Shopping');
+    milk = add(shop, 'milk');
+    s.setTask(milk, true);
+    s.addField(milk, 'where', 'store');
+    note = add(shop, 'opens at 9');
+    idea = add(s.rootId, 'Ideas');
+    add(idea, 'someday');
+    s.setCollapsed(shop, true); // collapsed, yet its tasks show
+  });
+  ctl.toggleTasksOnly();
+  ctl.taskRows = ctl.findTaskRows();
+  expect(ctl.visibleRows()).toEqual([home, shop, milk, ctl.store.field(milk, 'where')!.id]);
+  expect(ctl.isContextRow(shop)).toBe(true);
+  expect(ctl.isContextRow(milk)).toBe(false);
+  expect(ctl.visibleRows()).not.toContain(note);
+  ctl.toggleTasksOnly(); // prefs are saved: leave them as they were
+});

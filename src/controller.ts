@@ -121,6 +121,8 @@ export class Controller {
   selection: { anchor: string; head: string } | null = null;
   /** The selected rows, worked out at each render. */
   selected = new Set<string>();
+  /** With only tasks shown: the tasks under the zoomed item and the rows they sit under; null otherwise. Worked out at each render. */
+  taskRows: Set<string> | null = null;
   /** Rows whose folded fields were opened by hand (fold mode). */
   openFields = new Set<string>();
   picker: LinkPicker | null = null;
@@ -389,17 +391,22 @@ export class Controller {
     const { search, store } = this;
     const hideDone = !this.prefs.showCompleted && !wantsCompleted(this.terms);
     const hideFields = !this.fieldsShown(id);
+    const tasks = this.taskRows;
+    // With only tasks shown, fields stay with tasks (and inside other fields).
+    const keepFields = !tasks || store.isData(id) || store.isTask(id);
     return store.node(id).children.filter((c) => {
       const n = store.node(c);
       if (search && !search.shown.has(c)) return false;
       if (hideDone && n.completed) return false;
+      if (tasks && (n.key === null ? !tasks.has(c) : !keepFields)) return false;
       return !(hideFields && n.key !== null && n.format === null); // blocks are content, kept
     });
   }
 
-  /** Whether id's displayed children are rendered: always while searching. */
+  /** Whether id's displayed children are rendered: always while searching, and for the rows leading to tasks with only tasks shown. */
   isExpanded(id: string): boolean {
-    return this.search ? this.shownChildren(id).length > 0 : !this.store.node(id).collapsed;
+    if (this.search || this.isContextRow(id)) return this.shownChildren(id).length > 0;
+    return !this.store.node(id).collapsed;
   }
 
   /** Rows on screen in order. */
@@ -511,6 +518,9 @@ export class Controller {
     } else if (e.key === 'Enter' && isMod(e)) {
       e.preventDefault();
       this.toggleCompleteAll(this.selectionRoots());
+    } else if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyL') {
+      e.preventDefault();
+      this.toggleTask(this.selectionRoots());
     } else {
       return false;
     }
@@ -554,6 +564,44 @@ export class Controller {
   /** Before adding a field: make sure it will be seen (hidden fields become folded, and this one is edited). */
   private revealFields() {
     if (this.prefs.fields === 'hide') this.setFieldsMode('fold');
+  }
+
+  /** The tasks under the zoomed item and the rows leading to them, for showing only tasks. */
+  findTaskRows(): Set<string> {
+    const { store } = this;
+    const out = new Set<string>();
+    const walk = (id: string): boolean => {
+      let any = false;
+      for (const c of store.items(id)) if (walk(c)) any = true;
+      if (any || store.isTask(id)) out.add(id);
+      return any || store.isTask(id);
+    };
+    walk(this.zoomId);
+    return out;
+  }
+
+  /** A row shown only because tasks sit under it (with only tasks shown). */
+  isContextRow(id: string): boolean {
+    return !!this.taskRows && this.store.node(id).key === null && !this.store.isTask(id);
+  }
+
+  toggleTasksOnly() {
+    this.prefs = { ...this.prefs, tasksOnly: !this.prefs.tasksOnly };
+    savePrefs(this.prefs);
+    this.rerender();
+  }
+
+  /** Make rows tasks, or (when they all are) plain rows again; a row no longer a task is not completed either. */
+  toggleTask(ids: string[]) {
+    const { store } = this;
+    const items = ids.filter((id) => store.node(id).key === null && id !== store.rootId);
+    if (!items.length) return;
+    const on = !items.every((id) => store.isTask(id));
+    for (const id of items) {
+      if (!on) this.setDone(id, false);
+      store.setTask(id, on);
+    }
+    this.commit();
   }
 
   toggleShowCompleted() {
@@ -661,6 +709,7 @@ export class Controller {
     if (store.node(id).completed === done) return;
     store.setCompleted(id, done);
     if (store.node(id).key !== null) return;
+    store.setTask(id, true); // what was completed was something to do
     const f = store.field(id, DONE_KEY);
     if (done && !f) store.addField(id, DONE_KEY, formatDate(today()));
     else if (done && f && !f.text.trim()) store.setText(f.id, formatDate(today()));
@@ -1113,6 +1162,11 @@ export class Controller {
       if (!isTitle) this.toggleComplete(id);
       return;
     }
+    if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyL') {
+      e.preventDefault();
+      this.toggleTask([id]);
+      return;
+    }
 
     // ---- zoom
     if ((e.key === 'ArrowRight' && e.altKey) || (e.key === '.' && isMod(e))) {
@@ -1245,6 +1299,9 @@ export class Controller {
       const n = store.addChild(parent, index, r.text);
       n.key = r.key;
       n.format = r.key !== null ? (r.format ?? null) : null;
+      // A checklist line (`- [ ]`, `- [x]`) comes in as a task.
+      if (r.task) n.task = true;
+      if (r.task === 'done') this.setDone(n.id, true);
       r.children.forEach((c) => add(n.id, -1, c));
       return n.id;
     };
@@ -1264,7 +1321,7 @@ export class Controller {
     const text = e.clipboardData?.getData('text') ?? '';
     if (!text.includes('\n')) return;
     const tree = parseOutlineText(text);
-    if (tree.some((r) => r.key !== null || r.children.length)) return this.pasteTree(e, ta, tree);
+    if (tree.some((r) => r.key !== null || r.children.length || r.task)) return this.pasteTree(e, ta, tree);
     const lines = text
       .replace(/\r\n?/g, '\n')
       .split('\n')

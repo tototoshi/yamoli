@@ -13,7 +13,9 @@
  *       ・https://…               - https://…
  *     ・design                (a sub-item, not a field)
  *
- * Rows inside a field are data; the rest are items (tasks, notes, …).
+ * Rows inside a field are data; the rest are items. An item is a task (something
+ * to do, rather than a note) when marked so, completed, or scheduled (`duration`,
+ * `due`).
  *
  * A field with a format is a block: its value is multi-line text shown as
  * that format (Markdown, CSV, code, …), YAML's `key: !markdown |`.
@@ -24,6 +26,8 @@ export interface OutlineNode {
   text: string;
   collapsed: boolean;
   completed: boolean;
+  /** Marked as something to do. */
+  task: boolean;
   children: string[];
   /** Set on field rows: the field's name. null on ordinary rows. */
   key: string | null;
@@ -42,7 +46,7 @@ export function uid(): string {
 }
 
 function makeNode(text = ''): OutlineNode {
-  return { id: uid(), text, collapsed: false, completed: false, children: [], key: null, format: null };
+  return { id: uid(), text, collapsed: false, completed: false, task: false, children: [], key: null, format: null };
 }
 
 function normalizeNode(id: string, raw: any): OutlineNode {
@@ -52,6 +56,7 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     text: typeof n.text === 'string' ? n.text : '',
     collapsed: !!n.collapsed,
     completed: !!n.completed,
+    task: !!n.task,
     children: Array.isArray(n.children) ? n.children.slice() : [],
     key: typeof n.key === 'string' ? n.key : null,
     format: typeof n.key === 'string' && typeof n.format === 'string' ? n.format : null,
@@ -333,6 +338,22 @@ export class OutlineStore {
       this.insert(c, dstId, -1);
     }
     this.remove(srcId);
+  }
+
+  // ---------- tasks
+
+  /** Whether id is something to do: marked as a task, completed, or scheduled (`duration`, `due`). */
+  isTask(id: string): boolean {
+    const n = this.node(id);
+    if (n.key !== null || id === this.rootId || this.isData(id)) return false;
+    return n.task || n.completed || !!this.field(id, 'duration') || !!this.field(id, 'due');
+  }
+
+  setTask(id: string, task: boolean): boolean {
+    const n = this.node(id);
+    if (n.task === task) return false;
+    n.task = task;
+    return true;
   }
 
   // ---------- fields
