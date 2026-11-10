@@ -14,6 +14,7 @@
  */
 import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
+import { jsonTokens, tokensHtml } from './highlight';
 import { t } from './i18n';
 
 export interface Format {
@@ -79,21 +80,10 @@ registerFormat('markdown', {
 
 // ---------------------------------------------------------------- json
 
-function highlightJson(json: string): string {
-  return escapeHtml(json).replace(
-    /(&quot;(?:\\.|[^\\&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
-    (m, str, colon, lit) => {
-      if (str) return colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`;
-      if (lit) return `<span class="j-lit">${m}</span>`;
-      return `<span class="j-num">${m}</span>`;
-    }
-  );
-}
-
 registerFormat('json', {
   label: 'JSON',
   placeholder: '{ "key": "value" }',
-  render: (c) => `<pre class="fmt-json">${highlightJson(JSON.stringify(JSON.parse(c), null, 2))}</pre>`,
+  render: (c) => `<pre class="fmt-json">${tokensHtml(jsonTokens(JSON.stringify(JSON.parse(c), null, 2)))}</pre>`,
 });
 
 // ---------------------------------------------------------------- csv

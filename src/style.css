@@ -608,6 +608,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .j-str { color: var(--j-str); }
 .j-num { color: var(--j-num); }
 .j-lit { color: var(--j-lit); }
+.j-tag { color: var(--j-num); font-style: italic; }
+.j-punct { color: var(--muted); }
 
 .fmt-markdown > :first-child { margin-top: 0; }
 .fmt-markdown > :last-child { margin-bottom: 0; }
