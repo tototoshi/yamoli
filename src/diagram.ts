@@ -310,18 +310,52 @@ export const titleWidth = (n: DiagramNode, measure: Measure) =>
 const DESC_WIDTHS = [140, 200, 260];
 const DESC_LINES = 4;
 
+const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('ja', { granularity: 'word' }) : undefined;
+/** Marks that may not begin a line, and ones that may not end it. */
+const NO_START = /^[、。，．,.:;:!?！？）」』】〕・ー…ぁぃぅぇぉっゃゅょァィゥェォッャュョ]/;
+const NO_END = /[（「『【〔(]$/;
+
 /**
- * Text broken into lines no wider than width: between words, or anywhere in
- * Japanese. Past maxLines (if given) the rest is cut, with an ellipsis.
+ * The pieces a line may break between: words, with the particles and
+ * punctuation after them (送信や / 集計など、), roughly as Japanese is broken
+ * by phrase. Spaces are pieces of their own.
+ */
+function phrases(text: string): string[] {
+  const words = segmenter ? [...segmenter.segment(text)].map((s) => s.segment) : (text.match(/[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+/g) ?? []);
+  const out: string[] = [];
+  for (const w of words) {
+    const prev = out[out.length - 1];
+    const trails = NO_START.test(w) || /^[\u3040-\u309f]+$/.test(w);
+    // A particle after a word and a space (REST と) still goes with the word.
+    if (trails && prev && /^\s+$/.test(prev) && out.length > 1) out[out.length - 2] += out.pop()! + w;
+    else if (prev && !/\s$/.test(prev) && !/^\s/.test(w) && (trails || NO_END.test(prev))) out[out.length - 1] += w;
+    else out.push(w);
+  }
+  return out;
+}
+
+/**
+ * Text broken into lines no wider than width, between phrases (a phrase
+ * wider than a line is broken where it must). Past maxLines (if given) the
+ * rest is cut, with an ellipsis.
  */
 export function wrap(text: string, width: number, size: number, measure: Measure, maxLines = Infinity): string[] {
   const out: string[] = [];
   let line = '';
-  for (const tok of text.match(/[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+/g) ?? []) {
-    if (!line.trim() || measure((line + tok).trimEnd(), size) <= width) line += tok;
+  const fits = (t: string) => measure(t.trimEnd(), size) <= width;
+  for (const tok of phrases(text)) {
+    if (!line.trim() || fits(line + tok)) line += tok;
     else {
       out.push(line.trim());
       line = tok.trimStart();
+    }
+    // A phrase longer than a whole line goes on a character at a time.
+    while (!fits(line) && [...line.trim()].length > 1) {
+      const chars = [...line.trim()];
+      let n = chars.length - 1;
+      while (n > 1 && !fits(chars.slice(0, n).join(''))) n--;
+      out.push(chars.slice(0, n).join(''));
+      line = chars.slice(n).join('');
     }
   }
   if (line.trim()) out.push(line.trim());
@@ -332,15 +366,29 @@ export function wrap(text: string, width: number, size: number, measure: Measure
   return out;
 }
 
-/** The description's lines as drawn in the box: all of it, at the narrowest width that keeps it to a few lines. */
+/**
+ * The description's lines as drawn in the box: all of it, at the narrowest
+ * width that keeps it to a few lines, then narrowed as far as it goes in as
+ * many lines, so they come out about even (no word left alone on the last).
+ */
 export function descLines(n: DiagramNode, measure: Measure): string[] {
   if (!n.desc) return [];
+  let width = DESC_WIDTHS[0];
   let lines: string[] = [];
   for (const w of DESC_WIDTHS) {
+    width = w;
     lines = wrap(n.desc, w, PROP_SIZE, measure);
     if (lines.length <= DESC_LINES) break;
   }
-  return lines;
+  if (lines.length < 2) return lines;
+  let lo = width / 2;
+  let hi = width;
+  while (hi - lo > 2) {
+    const mid = (lo + hi) / 2;
+    if (wrap(n.desc, mid, PROP_SIZE, measure).length <= lines.length) hi = mid;
+    else lo = mid;
+  }
+  return wrap(n.desc, hi, PROP_SIZE, measure);
 }
 
 /** The height of a frame's head: its title, and its description under it. */

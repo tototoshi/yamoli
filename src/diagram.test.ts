@@ -271,9 +271,13 @@ test('a note or description is shown as text under the name, also from a block',
   expect(layout(d).boxes.get(a)!.h).toBeGreaterThan(plainHeight);
 });
 
-test('descriptions wrap between words, anywhere in Japanese, and are cut after a few lines', () => {
+test('descriptions wrap between words and phrases, and are cut after a few lines', () => {
   expect(wrap('one two three four', 42, 10, estimate)).toEqual(['one two', 'three', 'four']);
-  expect(wrap('認証とセッション管理', 50, 10, estimate)).toEqual(['認証とセッ', 'ション管理']);
+  // Japanese breaks between words, a particle or mark staying with the word before it.
+  expect(wrap('認証とセッション管理', 50, 10, estimate)).toEqual(['認証と', 'セッション', '管理']);
+  expect(wrap('メール送信や集計など、時間のかかる処理', 70, 10, estimate)).toEqual(['メール送信や', '集計など、', '時間のかかる', '処理']);
+  // A word wider than a line is broken where it must.
+  expect(wrap('セッションセッション', 50, 10, estimate)).toEqual(['セッション', 'セッション']);
   const long = wrap('a '.repeat(200), 30, 10, estimate, 4);
   expect(long.length).toBe(4);
   expect(long[3].endsWith('…')).toBe(true);
@@ -291,4 +295,11 @@ test('a long description is shown in full, in a wider box before a taller one', 
   const width = (t: string) => Math.max(...descLines(node(t), estimate).map((l) => estimate(l, 11)));
   expect(width('word '.repeat(4).trim())).toBeLessThanOrEqual(140);
   expect(width(text)).toBeGreaterThan(200);
+});
+
+test('the lines of a description come out about even', () => {
+  const lines = descLines({ desc: 'メール送信や集計など、時間のかかる処理' } as never, estimate);
+  const lengths = lines.map((l) => [...l].length);
+  expect(lines.join('')).toBe('メール送信や集計など、時間のかかる処理');
+  expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(4);
 });
