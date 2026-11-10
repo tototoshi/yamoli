@@ -95,3 +95,11 @@ test('a pasted checklist keeps which lines are to do and which are done', () => 
   ]);
   expect(rows[1].children[0]).toMatchObject({ text: 'free range', task: 'open' });
 });
+
+test('a Markdown list reads `- name: value` as a field and indented lines as more text', () => {
+  expect(show(parseOutlineText('- API\n  - tech: Go\n  - one\n    two\n    - three'))).toEqual([
+    ['API', [['tech: Go'], ['one\ntwo', [['three']]]]],
+  ]);
+  // YAML, with an object's other keys under its first, is still read as YAML.
+  expect(show(parseOutlineText('- name: x\n  role: PM'))).toEqual([['', [['name: x'], ['role: PM']]]]);
+});

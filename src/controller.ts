@@ -101,6 +101,22 @@ export interface Suggest {
 /** Fields whose values are not worth offering again: dates, and links (which have the `[[` picker). */
 const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'due', DONE_KEY]);
 
+
+/** A row as it was copied, with the rows under it. */
+interface Copied {
+  text: string;
+  key: string | null;
+  format: string | null;
+  completed: boolean;
+  task: boolean;
+  collapsed: boolean;
+  children: Copied[];
+}
+
+const copyOf = (store: OutlineStore, id: string): Copied => {
+  const { text, key, format, completed, task, collapsed, children } = store.node(id);
+  return { text, key, format, completed, task, collapsed, children: children.map((c) => copyOf(store, c)) };
+};
 export class Controller {
   store: OutlineStore = load();
   zoomId!: string; // set from the URL in the constructor
@@ -119,6 +135,8 @@ export class Controller {
   activeField: string | null = null;
   /** Rows selected as a whole (Shift+↑↓ past a row's ends, Shift+click, dragging across rows): from anchor to head. */
   selection: { anchor: string; head: string } | null = null;
+  /** The rows last copied here, whole, for pasting them back as they were (not as the text written out). */
+  private copied: { text: string; rows: Copied[] } | null = null;
   /** The selected rows, worked out at each render. */
   selected = new Set<string>();
   /** With only tasks shown: the tasks under the zoomed item and the rows they sit under; null otherwise. Worked out at each render. */
@@ -508,7 +526,9 @@ export class Controller {
     } else if (isMod(e) && !e.altKey && (e.code === 'KeyC' || e.code === 'KeyX')) {
       e.preventDefault();
       const roots = this.selectionRoots();
-      void navigator.clipboard.writeText(toMarkdownRows(store, roots, (id) => this.shownChildren(id)));
+      const text = toMarkdownRows(store, roots, (id) => this.shownChildren(id));
+      this.copied = { text, rows: roots.map((r) => copyOf(store, r)) };
+      void navigator.clipboard.writeText(text);
       if (e.code === 'KeyX') {
         const before = vis[vis.indexOf(rows[0]) - 1];
         for (const r of roots) store.remove(r);
@@ -1286,15 +1306,12 @@ export class Controller {
   }
 
 
-  /** Pasting multiple lines into a row creates one sibling per line. */
   /**
    * Paste indented text (YAML, a nested list): the rows go after the current
    * one, keeping their nesting; `key: value` lines become fields.
    */
   private pasteTree(e: ClipboardEvent, ta: HTMLTextAreaElement, tree: TextRow[]) {
-    e.preventDefault();
     const { store } = this;
-    const id = ta.dataset.id!;
     const add = (parent: string, index: number, r: TextRow): string => {
       const n = store.addChild(parent, index, r.text);
       n.key = r.key;
@@ -1305,6 +1322,26 @@ export class Controller {
       r.children.forEach((c) => add(n.id, -1, c));
       return n.id;
     };
+    this.pasteRows(e, ta, tree, add);
+  }
+
+  /** Paste rows copied here: copies of them as they were, fields, blocks and all. */
+  private pasteCopied(e: ClipboardEvent, ta: HTMLTextAreaElement, rows: Copied[]) {
+    const { store } = this;
+    const add = (parent: string, index: number, r: Copied): string => {
+      const n = store.addChild(parent, index, r.text);
+      Object.assign(n, { key: r.key, format: r.format, completed: r.completed, task: r.task, collapsed: r.collapsed });
+      r.children.forEach((c) => add(n.id, -1, c));
+      return n.id;
+    };
+    this.pasteRows(e, ta, rows, add);
+  }
+
+  /** Put rows after the row being edited (or into it, when it is empty), each made by add. */
+  private pasteRows<T>(e: ClipboardEvent, ta: HTMLTextAreaElement, tree: T[], add: (parent: string, index: number, r: T) => string) {
+    e.preventDefault();
+    const { store } = this;
+    const id = ta.dataset.id!;
     // Into an empty row: it becomes the first pasted row. Under the zoomed item: as its first children.
     let parent: string;
     let index: number;
@@ -1317,8 +1354,11 @@ export class Controller {
     this.commit(fText(last));
   }
 
+  /** Pasting multiple lines into a row creates one sibling per line (or rows, for indented text). */
   onTextPaste(e: ClipboardEvent, ta: HTMLTextAreaElement) {
     const text = e.clipboardData?.getData('text') ?? '';
+    const lf = (t: string) => t.replace(/\r\n?/g, '\n').trimEnd();
+    if (this.copied && lf(text) === lf(this.copied.text)) return this.pasteCopied(e, ta, this.copied.rows);
     if (!text.includes('\n')) return;
     const tree = parseOutlineText(text);
     if (tree.some((r) => r.key !== null || r.children.length || r.task)) return this.pasteTree(e, ta, tree);

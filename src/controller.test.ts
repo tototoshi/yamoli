@@ -241,3 +241,55 @@ test('Tasks only shows tasks, the rows they are under (even collapsed) and their
   expect(ctl.visibleRows()).not.toContain(note);
   ctl.toggleTasksOnly(); // prefs are saved: leave them as they were
 });
+
+/** A paste of text into ta. */
+function paste(ctl: Ctl, ta: HTMLTextAreaElement, text: string) {
+  const e = new Event('paste', { cancelable: true }) as ClipboardEvent;
+  Object.defineProperty(e, 'clipboardData', { value: { getData: () => text } });
+  ctl.onTextPaste(e, ta);
+  return e;
+}
+
+test('rows copied here paste back as they were: fields, blocks, multi-line text, done', () => {
+  let api = '';
+  let target = '';
+  const ctl = setup((s, add) => {
+    api = add(s.rootId, 'API');
+    s.addField(api, 'tech', 'Go');
+    const note = s.addField(api, 'note', '# Heading\nbody');
+    note.format = 'markdown';
+    add(api, 'line one\nline two');
+    target = add(s.rootId, '');
+  });
+  let written = '';
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => void (written = t) }, configurable: true });
+  ctl.selectRows(api, api);
+  ctl.selectionKeydown(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', metaKey: true, cancelable: true }));
+  expect(written).toContain('- API');
+
+  const e = paste(ctl, editor(ctl, target), written.replace(/\n/g, '\r\n'));
+  expect(e.defaultPrevented).toBe(true);
+  const { store } = ctl;
+  const top = store.node(store.rootId).children;
+  expect(top).toHaveLength(2); // the empty row became the copy
+  const copy = top[1];
+  expect(copy).not.toBe(api);
+  expect(store.fieldValue(copy, 'tech')).toBe('Go');
+  expect(store.field(copy, 'note')).toMatchObject({ format: 'markdown', text: '# Heading\nbody' });
+  expect(store.items(copy).map((c) => store.node(c).text)).toEqual(['line one\nline two']);
+});
+
+test('a Markdown list from elsewhere keeps fields on their row and multi-line text in one row', () => {
+  let target = '';
+  const ctl = setup((s, add) => {
+    target = add(s.rootId, '');
+  });
+  paste(ctl, editor(ctl, target), '- API\n  - tech: Go\n  - line one\n    line two\n    - grandchild\n');
+  const { store } = ctl;
+  const [api] = store.node(store.rootId).children;
+  expect(store.node(api).text).toBe('API');
+  expect(store.fieldValue(api, 'tech')).toBe('Go');
+  const [line] = store.items(api);
+  expect(store.node(line).text).toBe('line one\nline two');
+  expect(texts(ctl, line)).toEqual(['grandchild']);
+});

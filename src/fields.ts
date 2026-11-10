@@ -34,24 +34,35 @@ const TAGGED = /^!([\w-]+)\s+(.*)$/;
  * holding that field, and further lines at the field's indentation join it.
  * A block scalar (`name: |` or `name: !markdown |` and the lines indented
  * below it) becomes a block field.
+ *
+ * A Markdown list (every line a list item, as copied rows are written) is
+ * read as rows instead: `- name: value` is a field of the row above, and a
+ * line indented under an item's text continues that text.
  */
 export function parseOutlineText(text: string): TextRow[] {
   const root: TextRow = { key: null, text: '', children: [] };
   const stack: { indent: number; row: TextRow }[] = [{ indent: -1, row: root }];
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const list = isMarkdownList(lines);
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     if (!raw.trim() || /^\s*#/.test(raw)) continue;
     let indent = raw.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length;
     let line = raw.trim();
     const marker = line.match(/^(?:[-*+]|\d+[.)])\s+/);
+    if (list && !marker) {
+      // More of the text of the item above.
+      const above = stack[stack.length - 1].row;
+      above.text += '\n' + line;
+      continue;
+    }
     if (marker) line = line.slice(marker[0].length);
     const check = marker ? line.match(/^\[([ xX])\]\s+/) : null;
     if (check) line = line.slice(check[0].length);
     while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
     const parent = stack[stack.length - 1].row;
     const field = line.match(FIELD_LINE);
-    if (marker && field) {
+    if (marker && field && !list) {
       // `- name: value`: an object in a list.
       const item: TextRow = { key: null, text: '', children: [] };
       parent.children.push(item);
@@ -73,6 +84,28 @@ export function parseOutlineText(text: string): TextRow[] {
     stack.push({ indent, row });
   }
   return root.children;
+}
+
+/**
+ * Whether lines are a Markdown list: each one an item, a line of an item's
+ * text indented under it, or part of a block field's value.
+ */
+function isMarkdownList(lines: string[]): boolean {
+  let textAt = -1; // where the last item's text starts, for lines continuing it
+  let blockAt = -1; // the indentation of a block field, for its value's lines
+  for (const raw of lines) {
+    if (!raw.trim()) continue;
+    const indent = raw.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length;
+    if (blockAt >= 0 && indent > blockAt) continue;
+    blockAt = -1;
+    const marker = raw.trim().match(/^(?:[-*+]|\d+[.)])\s+/);
+    if (marker) {
+      const field = raw.trim().slice(marker[0].length).match(FIELD_LINE);
+      if (field && BLOCK_START.test(field[2] ?? '')) blockAt = indent;
+      textAt = field ? -1 : indent + marker[0].length;
+    } else if (textAt < 0 || indent < textAt) return false;
+  }
+  return true;
 }
 
 function fieldRow(m: RegExpMatchArray): TextRow {
