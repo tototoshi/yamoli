@@ -389,10 +389,11 @@ const shortcuts = (): [string, string][] => [
   ['Alt(⌘)+Shift+↑↓', t('行を移動', 'Move the row')],
   [
     t('Shift+↑↓（行の端で）/ Shift+クリック / 行をまたいでドラッグ', 'Shift+↑↓ (at a row’s ends) / Shift+click / drag across rows'),
-    t('複数行を選択：Tab・Shift+Tab・削除・⌘C・⌘X・⌘Enter、● のドラッグでまとめて移動', 'Select rows: Tab, Shift+Tab, delete, ⌘C, ⌘X, ⌘Enter; drag a ● to move them all'),
+    t('複数行を選択：Tab・Shift+Tab・削除・⌘C・⌘X・⌘Shift+Enter、● のドラッグでまとめて移動', 'Select rows: Tab, Shift+Tab, delete, ⌘C, ⌘X, ⌘Shift+Enter; drag a ● to move them all'),
   ],
   ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
-  ['⌘/Ctrl+Enter', t('完了 / 未完了', 'Complete / reopen')],
+  ['⌘/Ctrl+Enter', t('下に新しい行（カーソルの位置によらず、子の行の後ろに）', 'A new row below (wherever the caret is, after the rows under it)')],
+  ['⌘/Ctrl+Shift+Enter', t('完了 / 未完了', 'Complete / reopen')],
   ['⌘/Ctrl+L', t('タスクにする / やめる（「タスクだけ」で絞り込み、検索 is:todo）', 'Mark as a task or not (filter with “Tasks only”, search is:todo)')],
   ['Alt+→ / ⌘+.', t('ズームイン（●クリックでも可）', 'Zoom in (or click the ●)')],
   ['Alt+← / ⌘+,', t('ズームアウト（ブラウザの戻るでも可）', 'Zoom out (or the browser’s Back)')],
@@ -789,7 +790,7 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
         ) : (
           <button
             class="mini"
-            title={ctl.store.node(id).completed ? t('未完了に戻す (⌘/Ctrl+Enter)', 'Reopen (⌘/Ctrl+Enter)') : t('完了にする (⌘/Ctrl+Enter)', 'Complete (⌘/Ctrl+Enter)')}
+            title={ctl.store.node(id).completed ? t('未完了に戻す (⌘/Ctrl+Shift+Enter)', 'Reopen (⌘/Ctrl+Shift+Enter)') : t('完了にする (⌘/Ctrl+Shift+Enter)', 'Complete (⌘/Ctrl+Shift+Enter)')}
             onMouseDown={keepFocus}
             onClick={() => ctl.toggleComplete(id)}
           >

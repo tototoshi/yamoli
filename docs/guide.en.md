@@ -8,21 +8,21 @@ The interface is in English or Japanese, following the browser's language; switc
 
 ### Rows
 
-- **Enter** starts a new row, **Tab / Shift+Tab** indents and outdents. Click a ● to zoom into that item; the breadcrumbs at the top zoom back out.
+- **Enter** starts a new row (splitting the row at the caret), **⌘Enter** a new row below wherever the caret is (after the rows under it). **Tab / Shift+Tab** indents and outdents. Click a ● to zoom into that item; the breadcrumbs at the top zoom back out.
 - Formatting (`**bold**`, `` `code` ``, `[text](https://…)`) is styled as you type, its markup dimmed. With the caret on a link, a bubble shows where it goes; **⌘K** (Ctrl+K outside macOS) adds or edits a link, and pasting a URL over selected text links it.
 - `[[` inserts a link to another item. **⌘P** (Ctrl+P outside macOS) jumps to an item by part of its name.
 - On macOS, **Ctrl+K** deletes to the end of the line and **Ctrl+Y** puts it back; at the end of a row, Ctrl+K (like Ctrl+D) joins the next row.
 
 ### Selecting, copying and pasting
 
-- Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Enter then act on all of them, and dragging one's ● moves them together.
+- Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Shift+Enter then act on all of them, and dragging one's ● moves them together.
 - **Copy tree** in a row's menu (right-click its ●) copies the item with everything under it, folded and hidden rows too.
 - Rows copied in Yamoli paste back as they were: fields, blocks, multi-line text, done or not. Elsewhere they paste as a Markdown list.
 - Pasted text with several lines becomes rows. A Markdown list keeps its nesting (`- name: value` becoming a field of the row above); YAML comes in as fields, nesting and blocks; a checklist (`- [ ]` / `- [x]`) as tasks.
 
 ### Tasks
 
-**Tasks** are rows that are something to do, rather than notes. A row's **Task** button (or **⌘L**) makes it one, after which the button completes it (✓, ⌘Enter) and reopens it (↺). Completed rows, and rows with `duration`, `end` or `due`, count as tasks too.
+**Tasks** are rows that are something to do, rather than notes. A row's **Task** button (or **⌘L**) makes it one, after which the button completes it (✓, ⌘Shift+Enter) and reopens it (↺). Completed rows, and rows with `duration`, `end` or `due`, count as tasks too.
 
 **Tasks only** in the view bar shows just them, with the rows they sit under dimmed; search with `is:task` / `is:todo`. The Text view writes tasks as `- [ ]` / `- [x]`.
 
@@ -78,7 +78,7 @@ These fields are read for the Gantt chart.
 | `after` | `[[Requirements]], [[API design]]` | Dependencies: starts once they have all finished. A parent's dependencies apply to its children. `^` is the item just above |
 | `sequential` | `true` | On a parent: each child starts after the one above it, unless it has its own `after` |
 | `due` | `2026-11-20` | Deadline; finishing later is shown as late |
-| `completed` | `2026-11-09` | Set to the day an item is completed (⌘Enter); removed when it is reopened |
+| `completed` | `2026-11-09` | Set to the day an item is completed (⌘Shift+Enter); removed when it is reopened |
 | `workdays` | `mon-fri` | Working days of the week (default `mon-fri`). Inherited by children |
 | `holidays` | `jp`, `2026-12-29..2027-01-03` | Days off. `jp` adds Japanese public holidays |
 

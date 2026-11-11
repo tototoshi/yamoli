@@ -134,7 +134,7 @@ test('selected rows indent and outdent together, keeping their order', () => {
   expect([a, b, c].every((id) => ctl.store.parentOf(id) === ctl.store.rootId)).toBe(true);
 });
 
-test('⌘Enter on selected rows completes them all in one undo step', () => {
+test('⌘Shift+Enter on selected rows completes them all in one undo step', () => {
   let a = '', b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'a');
@@ -142,7 +142,7 @@ test('⌘Enter on selected rows completes them all in one undo step', () => {
   });
   ctl.toggleComplete(a); // one already done: the rest follow, none are reopened
   ctl.selectRows(a, b);
-  ctl.selectionKeydown(new KeyboardEvent('keydown', { key: 'Enter', metaKey: true, cancelable: true }));
+  ctl.selectionKeydown(new KeyboardEvent('keydown', { key: 'Enter', metaKey: true, shiftKey: true, cancelable: true }));
   expect([a, b].map((id) => ctl.store.node(id).completed)).toEqual([true, true]);
   ctl.undo();
   expect([a, b].map((id) => ctl.store.node(id).completed)).toEqual([true, false]);
@@ -345,4 +345,21 @@ test('starting on #/docs shows the guide with home underneath', () => {
   expect(ctl.docs).toBe(true);
   expect(ctl.zoomId).toBe(ctl.store.rootId);
   location.hash = '';
+});
+
+test('⌘Enter adds a row below, after the rows under it, wherever the caret is; ⌘Shift+Enter completes', () => {
+  let a = '', b = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'parent');
+    add(a, 'child');
+    b = add(s.rootId, 'next');
+  });
+  const { store } = ctl;
+  press(ctl, editor(ctl, a, 2), 'Enter', { metaKey: true });
+  expect(store.node(store.rootId).children.map((c) => store.node(c).text)).toEqual(['parent', '', 'next']);
+  expect(store.node(a).text).toBe('parent'); // not split at the caret
+  expect(texts(ctl, a)).toEqual(['child']);
+
+  press(ctl, editor(ctl, b), 'Enter', { metaKey: true, shiftKey: true });
+  expect(store.node(b).completed).toBe(true);
 });

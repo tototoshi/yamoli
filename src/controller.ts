@@ -535,7 +535,7 @@ export class Controller {
         this.selection = null;
         this.commit(before ? fText(before) : null);
       }
-    } else if (e.key === 'Enter' && isMod(e)) {
+    } else if (e.key === 'Enter' && isMod(e) && e.shiftKey) {
       e.preventDefault();
       this.toggleCompleteAll(this.selectionRoots());
     } else if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyL') {
@@ -1210,10 +1210,15 @@ export class Controller {
       if (!isTitle && store.setCollapsed(id, e.key === 'ArrowUp')) this.commit(fText(id, start, end));
       return;
     }
-    if (e.key === 'Enter' && isMod(e)) {
+    if (e.key === 'Enter' && isMod(e) && !e.altKey) {
       e.preventDefault();
-      if (!isTitle) this.toggleComplete(id);
-      return;
+      if (e.shiftKey) {
+        if (!isTitle) this.toggleComplete(id);
+        return;
+      }
+      // A new row right below this one and the rows under it, wherever the caret is.
+      if (isTitle) return this.commit(fText(store.addChild(id, 0).id, 0));
+      return this.commit(fText(store.addSiblingAfter(id).id, 0));
     }
     if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyL') {
       e.preventDefault();
