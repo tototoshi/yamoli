@@ -959,3 +959,27 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-edge-label text { text-anchor: middle; font-size: 11px; fill: var(--summary); }
 .dg-edge-label { pointer-events: none; }
 .dg-edge-label.near text { fill: var(--accent); }
+
+/* ================================================================ usage guide (#/docs) */
+
+.docs-link { display: block; padding: 8px 10px; border-bottom: 1px solid var(--faint); color: var(--accent); font-size: 13px; text-decoration: none; }
+.docs-link:hover { background: var(--hover); }
+.docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; align-items: start; }
+.docs-toc { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 1px; max-height: calc(100vh - 80px); overflow-y: auto; font-size: 13px; }
+.docs-back { margin-bottom: 10px; color: var(--muted); text-decoration: none; }
+.docs-back:hover { color: var(--accent); }
+.docs-toc-item { padding: 3px 8px; border: 0; border-radius: 4px; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.docs-toc-item:hover { background: var(--hover); }
+.docs-toc-item.level-3 { padding-left: 20px; color: var(--summary); }
+.docs-body { max-width: 820px; line-height: 1.7; }
+.docs-body h1 { font-size: 1.8em; }
+.docs-body h2 { margin-top: 1.8em; padding-bottom: 4px; border-bottom: 1px solid var(--faint); scroll-margin-top: 64px; }
+.docs-body h3 { margin-top: 1.4em; scroll-margin-top: 64px; }
+.docs-body table { border-collapse: collapse; font-size: 13px; }
+.docs-body th, .docs-body td { padding: 4px 10px; border: 1px solid var(--faint); text-align: left; vertical-align: top; }
+.docs-body th { background: var(--hover); font-weight: 600; }
+.docs-body pre { overflow-x: auto; font-size: 12px; line-height: 1.5; }
+@media (max-width: 720px) {
+  .docs { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .docs-toc { position: static; max-height: none; }
+}

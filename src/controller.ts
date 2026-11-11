@@ -141,6 +141,8 @@ export class Controller {
   selected = new Set<string>();
   /** With only tasks shown: the tasks under the zoomed item and the rows they sit under; null otherwise. Worked out at each render. */
   taskRows: Set<string> | null = null;
+  /** The usage guide is open (#/docs) instead of an item. */
+  docs = false;
   /** Rows whose folded fields were opened by hand (fold mode). */
   openFields = new Set<string>();
   picker: LinkPicker | null = null;
@@ -763,6 +765,12 @@ export class Controller {
    * view, an item opens the way it was last viewed.
    */
   private readHash() {
+    // The usage guide: the outline stays as it was underneath.
+    this.docs = /^#\/docs(?:\?|$)/.test(location.hash);
+    if (this.docs) {
+      this.zoomId ??= this.store.rootId; // opened straight onto the guide: home is underneath
+      return;
+    }
     const m = location.hash.match(/^#\/([^?]*)(?:\?(.*))?$/);
     const raw = m?.[1] ? decodeURIComponent(m[1]) : this.store.rootId;
     // A field or block can't be zoomed into: its item is shown instead.
@@ -837,6 +845,10 @@ export class Controller {
     const prev = this.zoomId;
     const prevView = this.view;
     this.readHash();
+    if (this.docs) {
+      window.scrollTo(0, 0);
+      return this.rerender();
+    }
     if (this.zoomId === prev && this.view !== prevView) {
       // Only the view changed: keep scroll, focus the item's first row.
       const first = this.view === 'outline' ? this.visibleRows()[0] : undefined;

@@ -320,3 +320,29 @@ test('Copy tree takes everything under an item, hidden rows too, and pastes it b
   expect(texts(ctl, copy).slice(1)).toEqual(['B', 'done one']);
   expect(store.node(store.items(copy)[1]).completed).toBe(true);
 });
+
+test('#/docs opens the guide over the outline, and leaving it comes back', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'A');
+  });
+  ctl.bind(() => {});
+  location.hash = `#/${a}`;
+  ctl.onHashChange();
+  location.hash = '#/docs';
+  ctl.onHashChange();
+  expect(ctl.docs).toBe(true);
+  expect(ctl.zoomId).toBe(a); // the outline underneath is as it was
+  location.hash = `#/${a}`;
+  ctl.onHashChange();
+  expect(ctl.docs).toBe(false);
+  location.hash = '';
+});
+
+test('starting on #/docs shows the guide with home underneath', () => {
+  location.hash = '#/docs';
+  const ctl = setup(() => {});
+  expect(ctl.docs).toBe(true);
+  expect(ctl.zoomId).toBe(ctl.store.rootId);
+  location.hash = '';
+});

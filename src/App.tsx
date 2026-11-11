@@ -13,6 +13,7 @@ import { saveFile } from './exportImage';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
 import { DataView } from './DataView';
+import { DocsView } from './DocsView';
 import { SegView } from './InlineText';
 import { formatDate, parseDate, shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
@@ -97,6 +98,20 @@ export function App() {
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
   document.title = (zoomId === store.rootId ? 'Home' : zoom.text || t('無題', 'Untitled')) + ' – Yamoli';
+
+  if (ctl.docs) {
+    document.title = t('使い方', 'Guide') + ' – Yamoli';
+    return (
+      <Ctx.Provider value={ctl}>
+        <TopBar />
+        <main class="page wide">
+          <DocsView />
+        </main>
+        {ctl.jumping && <JumpBox />}
+        <ToastView />
+      </Ctx.Provider>
+    );
+  }
 
   return (
     <Ctx.Provider value={ctl}>
@@ -411,10 +426,15 @@ const shortcuts = (): [string, string][] => [
 function HelpMenu() {
   return (
     <Popup label="?" title={t('ショートカット', 'Shortcuts')}>
-      {() => (
-        <dl class="shortcuts">
-          {shortcuts().map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
-        </dl>
+      {(close) => (
+        <>
+          <a class="docs-link" href="#/docs" onClick={close}>
+            {t('使い方ガイドを開く', 'Open the guide')} →
+          </a>
+          <dl class="shortcuts">
+            {shortcuts().map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
+          </dl>
+        </>
       )}
     </Popup>
   );
