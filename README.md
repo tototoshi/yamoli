@@ -39,7 +39,7 @@ A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/y
 ### Rows and fields
 
 - **Enter** starts a new row, **Tab / Shift+Tab** indents and outdents. Click a ● to zoom into that item.
-- **Tasks** are rows that are something to do, rather than notes. A row's **Task** button (or **⌘L**) makes it one, after which the button completes it (✓, ⌘Enter) and reopens it (↺). Completed rows, and rows with `duration` or `due`, count as tasks too. **Tasks only** in the view bar shows just them, with the rows they sit under dimmed; search with `is:task` / `is:todo`. The Text view writes tasks as `- [ ]` / `- [x]`, and a pasted checklist comes in as tasks.
+- **Tasks** are rows that are something to do, rather than notes. A row's **Task** button (or **⌘L**) makes it one, after which the button completes it (✓, ⌘Enter) and reopens it (↺). Completed rows, and rows with `duration`, `end` or `due`, count as tasks too. **Tasks only** in the view bar shows just them, with the rows they sit under dimmed; search with `is:task` / `is:todo`. The Text view writes tasks as `- [ ]` / `- [x]`, and a pasted checklist comes in as tasks.
 - Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Enter then act on all of them, and dragging one's ● moves them together.
 - Typing `name: ` at the start of a row makes it a **field**. Backspace at the start of the value turns it back into an ordinary row.
 - A field without a value can hold nested rows: fields below it make an object, ordinary rows a list.
@@ -80,6 +80,7 @@ Because of `after`, Design is scheduled to start on the working day after Requir
 | --- | --- | --- |
 | `duration` | `3d` / `2w` / `10cd` / `0d` | Length in working days / weeks / calendar days. `0d` is a milestone |
 | `start` | `2026-11-10` | Don't start before this date. Inherited by children |
+| `end` | `2026-11-14` | Instead of `duration`: the last day, the bar running from `start` to here (calendar days, so weekends count). Dependencies that end later move it whole |
 | `after` | `[[Requirements]], [[API design]]` | Dependencies: starts once they have all finished. A parent's dependencies apply to its children. `^` is the item just above |
 | `sequential` | `true` | On a parent: each child starts after the one above it, unless it has its own `after` |
 | `due` | `2026-11-20` | Deadline; finishing later is shown as late |

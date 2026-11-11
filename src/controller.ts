@@ -99,7 +99,7 @@ export interface Suggest {
 }
 
 /** Fields whose values are not worth offering again: dates, and links (which have the `[[` picker). */
-const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'due', DONE_KEY]);
+const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'end', 'due', DONE_KEY]);
 
 
 /** A row as it was copied, with the rows under it. */

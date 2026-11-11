@@ -152,3 +152,30 @@ test('work after a milestone starts the same day', () => {
   s.addField(t.id, 'after', `[[${m.id}]]`);
   expect(dates(run(s).byId.get(t.id))).toEqual(['2026-11-09', '2026-11-09']);
 });
+
+test('an end instead of a duration: a bar from the start to it, moved whole by later dependencies', () => {
+  const { s, p, design } = project();
+  const add = (text: string, attrs: Record<string, string>) => {
+    const n = s.addChild(p, -1, text);
+    for (const [k, v] of Object.entries(attrs)) s.addField(n.id, k, v);
+    return n.id;
+  };
+  const own = add('展示会', { start: '2026-11-14', end: '2026-11-16' });
+  const inherited = add('準備', { end: '2026-11-11' }); // from the project's start
+  const moved = add('撤収', { start: '2026-11-11', end: '2026-11-12', after: `[[${design}]]` });
+  const backwards = add('逆', { start: '2026-11-20', end: '2026-11-19' });
+  const loose = s.addChild(s.rootId, -1, 'どこにも開始がない').id;
+  s.addField(loose, 'end', '2026-11-30');
+  const r = run(s);
+  expect(dates(r.byId.get(own))).toEqual(['2026-11-14', '2026-11-16']); // weekend days count
+  expect(r.byId.get(own)!.kind).toBe('task');
+  expect(r.byId.get(own)!.critical).toBe(false); // its own start doesn't make it a project of its own
+  expect(dates(r.byId.get(inherited))).toEqual(['2026-11-10', '2026-11-11']);
+  // Design ends 11-12: two days from 11-13.
+  expect(dates(r.byId.get(moved))).toEqual(['2026-11-13', '2026-11-14']);
+  expect(r.byId.get(moved)!.delayed).toBe(true);
+  expect(r.byId.has(backwards)).toBe(false);
+  expect(r.invalid.get(backwards)).toBe('end: 2026-11-19');
+  expect(r.unscheduled.has(loose)).toBe(true);
+  expect(s.isTask(own)).toBe(true);
+});

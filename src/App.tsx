@@ -402,6 +402,7 @@ const shortcuts = (): [string, string][] => [
   ['is:late / is:critical', t('期限超過 / クリティカルパス上の作業を検索', 'Late work / work on the critical path')],
   ['duration: 3d / 2w / 10cd', t('作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）', 'Length in working days / weeks / calendar days (0d: milestone)')],
   ['start / due', t('開始日（子にも継承）/ 期限 — 例 2026-11-10', 'Start (inherited by children) / deadline — e.g. 2026-11-10')],
+  ['end', t('終了日（duration の代わりに start から end までのバー）', 'Last day (instead of a duration: a bar from start to end)')],
   [t('スライド表示で ← →', '← → in slides'), t('ページ送り（F 全画面、N ノート、Home / End）', 'Page through (F full screen, N notes, Home / End)')],
   ['layout / notes / theme', t('スライドの属性（center・two-column・title / ノート / dark）', 'Slide fields (center, two-column, title / speaker notes / dark)')],
   ['workdays / holidays', t('稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）', 'Working days (default mon-fri) / days off (jp: Japanese holidays, a..b: a range)')],
@@ -599,9 +600,9 @@ function FieldsSummary({ id }: { id: string }) {
   );
 }
 
-const DATE_KEYS = new Set(['start', 'due']);
+const DATE_KEYS = new Set(['start', 'end', 'due']);
 
-/** A calendar button on date fields (`start`, `due`, or any `YYYY-MM-DD`), opening the browser's date picker. */
+/** A calendar button on date fields (`start`, `end`, `due`, or any `YYYY-MM-DD`), opening the browser's date picker. */
 function DatePick({ node }: { node: OutlineNode }) {
   const ctl = useCtl();
   const current = parseDate(node.text);

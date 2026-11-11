@@ -346,7 +346,7 @@ export class OutlineStore {
   isTask(id: string): boolean {
     const n = this.node(id);
     if (n.key !== null || id === this.rootId || this.isData(id)) return false;
-    return n.task || n.completed || !!this.field(id, 'duration') || !!this.field(id, 'due');
+    return n.task || n.completed || !!this.field(id, 'duration') || !!this.field(id, 'end') || !!this.field(id, 'due');
   }
 
   setTask(id: string, task: boolean): boolean {

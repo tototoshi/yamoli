@@ -3,6 +3,8 @@
  *
  *   duration: 3d          makes an item a task (0d = milestone)
  *   start: 2026-11-10     earliest start; inherited by descendants
+ *   end: 2026-11-14       last day, for an item without a duration: it runs
+ *                         from its (inherited) start to here
  *   due: 2026-11-20       deadline; lateness is reported
  *   workdays / holidays   working calendar; inherited by descendants
  *   after: [[x]]          dependencies (see deps.ts); an ancestor's
@@ -32,7 +34,7 @@ export interface Sched {
 
 export interface ScheduleResult {
   byId: Map<string, Sched>;
-  /** Tasks (with a duration) that could not be placed: no start anywhere. */
+  /** Tasks (with a duration or an end) that could not be placed: no start anywhere. */
   unscheduled: Set<string>;
   /** Items with an attribute value that could not be parsed, and which one. */
   invalid: Map<string, string>;
@@ -178,6 +180,34 @@ export function computeSchedule(
     });
   };
 
+  /**
+   * An item given its last day instead of a duration: from its (inherited)
+   * start, or else the end of its dependencies, to that day. Dependencies
+   * finishing later move it whole, as they would a task of that length.
+   */
+  const until = (id: string, last: Day): Sched | null => {
+    const own = dateAttr(id, 'start');
+    const base = inheritedStart(id);
+    const { after, by } = afterDeps(id);
+    const from = base ?? after;
+    if (from === undefined) {
+      res.unscheduled.add(id);
+      return null;
+    }
+    if (last < from) {
+      res.invalid.set(id, `end: ${store.fieldValue(id, 'end')}`);
+      return null;
+    }
+    const start = Math.max(after ?? -Infinity, base ?? -Infinity);
+    driver.set(id, after !== undefined && after >= (base ?? -Infinity) ? by : null);
+    return finish(id, {
+      start,
+      end: start + (last - from),
+      kind: 'task',
+      delayed: own !== undefined && after !== undefined && after > own,
+    });
+  };
+
   const summary = (id: string): Sched | null => {
     let start: Day | undefined;
     let end: Day | undefined;
@@ -201,6 +231,8 @@ export function computeSchedule(
       if (dur) return task(id, dur);
       res.invalid.set(id, `duration: ${raw}`);
     }
+    const last = dateAttr(id, 'end');
+    if (last !== undefined) return until(id, last);
     return summary(id);
   };
 
@@ -208,14 +240,19 @@ export function computeSchedule(
     if (store.isData(id)) continue;
     // Validate dates even on items that end up unscheduled.
     dateAttr(id, 'start');
+    dateAttr(id, 'end');
     dateAttr(id, 'due');
     const s = schedOf(id);
     if (s) res.byId.set(id, s);
   }
 
-  // Critical chain: per project (nearest item with a start), walk back from the
+  // Critical chain: per project (nearest item above with a start; a task's own
+  // start doesn't make it a project of its own), walk back from the
   // latest-finishing task through whatever determined each item's dates.
-  const projectOf = (id: string) => ancestry(id).find((a) => dateAttr(a, 'start') !== undefined) ?? '';
+  const projectOf = (id: string) =>
+    ancestry(id)
+      .slice(store.items(id).length ? 0 : 1)
+      .find((a) => dateAttr(a, 'start') !== undefined) ?? '';
   const latest = new Map<string, { end: Day; ids: string[] }>();
   for (const [id, s] of res.byId) {
     if (s.kind === 'summary') continue;
