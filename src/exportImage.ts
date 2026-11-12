@@ -91,4 +91,10 @@ export function saveFile(name: string, blob: Blob) {
 }
 
 /** A file name from an item's text: characters file systems refuse replaced. */
-export const fileName = (text: string, ext: string) => (text.trim().replace(/[\\/:*?"<>|\n]+/g, '_').slice(0, 80) || 'diagram') + '.' + ext;
+export const fileName = (text: string, ext: string) =>
+  (text
+    .trim()
+    .replace(/[\\/:*?"<>|\n]+/g, '_')
+    .slice(0, 80) || 'diagram') +
+  '.' +
+  ext;

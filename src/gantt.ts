@@ -61,7 +61,7 @@ export interface MonthBand {
 /** Month bands within the range, labelled "2026年11月" (or "Nov 2026"). */
 export function monthBands({ from, to }: DayRange): MonthBand[] {
   const bands: MonthBand[] = [];
-  for (let d = from; d <= to; ) {
+  for (let d = from; d <= to;) {
     const [y, m] = formatDate(d).split('-').map(Number);
     const nextMonth = Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 1) / 86_400_000;
     const end = Math.min(nextMonth - 1, to);
@@ -95,14 +95,20 @@ export function dependencyLinks(store: OutlineStore, rows: string[], schedule: S
 export function schedTooltip(s: Sched): string {
   const span = s.end - s.start + 1;
   return [
-    s.kind === 'summary' ? t('子の作業の期間', 'Span of the work below') : s.kind === 'milestone' ? t('マイルストーン', 'Milestone') : t('作業', 'Task'),
+    s.kind === 'summary'
+      ? t('子の作業の期間', 'Span of the work below')
+      : s.kind === 'milestone'
+        ? t('マイルストーン', 'Milestone')
+        : t('作業', 'Task'),
     s.kind === 'milestone'
       ? formatDate(s.start)
       : t(`${formatDate(s.start)} 〜 ${formatDate(s.end)}（${span}日間）`, `${formatDate(s.start)} – ${formatDate(s.end)} (${span} days)`),
     s.due !== undefined && t(`期限 ${formatDate(s.due)}`, `Due ${formatDate(s.due)}`),
     s.late > 0 && t(`${s.late}日超過`, `${s.late} days late`),
     s.delayed && t('依存のため指定の開始日より遅れて開始', 'Starts after its start date because of dependencies'),
-    s.critical && s.kind !== 'summary' && t('クリティカルパス上（遅れると全体が遅れる）', 'On the critical path (a delay delays everything)'),
+    s.critical &&
+      s.kind !== 'summary' &&
+      t('クリティカルパス上（遅れると全体が遅れる）', 'On the critical path (a delay delays everything)'),
   ]
     .filter(Boolean)
     .join('\n');

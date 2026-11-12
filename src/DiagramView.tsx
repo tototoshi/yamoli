@@ -5,7 +5,22 @@
  */
 import { useId, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
-import { buildDiagram, descLines, estimate, frameDesc, frameHead, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
+import {
+  buildDiagram,
+  descLines,
+  estimate,
+  frameDesc,
+  frameHead,
+  ICON_SPACE,
+  layout,
+  LABEL_SIZE,
+  PAD,
+  PROP_SIZE,
+  type Box,
+  type DiagramNode,
+  type Direction,
+  type Measure,
+} from './diagram';
 import { standaloneSvg } from './exportImage';
 import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
@@ -226,7 +241,9 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           if (!e.label) return null;
           // Labels of lines between the same two boxes are stacked rather than drawn over each other.
           const mid = routes.get(e)!.mid;
-          const nth = d.edges.filter((o) => o.label && ((o.from === e.from && o.to === e.to) || (o.from === e.to && o.to === e.from))).indexOf(e);
+          const nth = d.edges
+            .filter((o) => o.label && ((o.from === e.from && o.to === e.to) || (o.from === e.to && o.to === e.from)))
+            .indexOf(e);
           return <EdgeLabel key={e.from + '>' + e.to + '>' + e.label} text={e.label} at={[mid[0], mid[1] + nth * 18]} near={near(e)} />;
         })}
       </svg>

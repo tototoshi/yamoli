@@ -21,6 +21,7 @@ On first launch the outline comes with a usage-guide slide deck, a sample projec
 | `npm run build` | Type check and production build (`dist/`) |
 | `npm run preview` | Serve the build, with the data file |
 | `npm test` | Tests (Vitest) |
+| `npm run format` | Format the code (Prettier); `format:check` only checks |
 
 ## Where data is saved
 

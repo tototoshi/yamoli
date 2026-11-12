@@ -38,7 +38,11 @@ export function DocsView() {
           ← {t('アウトラインに戻る', 'Back to the outline')}
         </a>
         {toc.map((h, i) => (
-          <button key={i} class={'docs-toc-item level-' + h.level} onClick={() => document.getElementById(`doc-${i}`)?.scrollIntoView({ behavior: 'smooth' })}>
+          <button
+            key={i}
+            class={'docs-toc-item level-' + h.level}
+            onClick={() => document.getElementById(`doc-${i}`)?.scrollIntoView({ behavior: 'smooth' })}
+          >
             {h.text}
           </button>
         ))}

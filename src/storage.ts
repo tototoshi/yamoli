@@ -229,7 +229,10 @@ function push() {
       console.error('Failed to save outline file', e);
       setState({
         kind: 'error',
-        message: t('ファイルに保存できません（サーバーが止まっている？）。自動で再試行します', 'Can’t save to the file (is the server down?). Retrying'),
+        message: t(
+          'ファイルに保存できません（サーバーが止まっている？）。自動で再試行します',
+          'Can’t save to the file (is the server down?). Retrying'
+        ),
       });
       retryTimer = setTimeout(push, 5000);
     })
@@ -281,7 +284,8 @@ document.addEventListener('visibilitychange', () => document.visibilityState ===
 window.addEventListener('beforeunload', (e) => {
   flush();
   if (unsaved === null || state.kind === 'conflict') return;
-  if (inflight) e.preventDefault(); // a write is under way; ask the user to wait
+  if (inflight)
+    e.preventDefault(); // a write is under way; ask the user to wait
   else fetch(API, putInit(unsaved, true)).catch(() => {}); // too large for keepalive: the browser copy remains
 });
 
@@ -293,7 +297,10 @@ function seed(): OutlineStore {
   s.addChild(
     welcome.id,
     -1,
-    t('左の ● をクリックするとその項目にズームイン（パンくずでズームアウト）', 'Click the ● on the left to zoom into an item (the breadcrumbs zoom out)')
+    t(
+      '左の ● をクリックするとその項目にズームイン（パンくずでズームアウト）',
+      'Click the ● on the left to zoom into an item (the breadcrumbs zoom out)'
+    )
   );
   s.addChild(
     welcome.id,

@@ -40,7 +40,10 @@ test('a deck: title slide, one slide per item, fields as settings', () => {
 
 test('two columns split by length', () => {
   const b = (id: string, n = 0) => ({ id, children: Array.from({ length: n }, (_, i) => ({ id: id + i, children: [] })) });
-  expect(splitColumns([b('a'), b('b'), b('c'), b('d')]).map((c) => c.map((x) => x.id))).toEqual([['a', 'b'], ['c', 'd']]);
+  expect(splitColumns([b('a'), b('b'), b('c'), b('d')]).map((c) => c.map((x) => x.id))).toEqual([
+    ['a', 'b'],
+    ['c', 'd'],
+  ]);
   expect(splitColumns([b('a', 3), b('b'), b('c')]).map((c) => c.map((x) => x.id))).toEqual([['a'], ['b', 'c']]);
   expect(splitColumns([b('a')]).map((c) => c.length)).toEqual([1, 0]);
 });

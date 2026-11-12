@@ -32,7 +32,11 @@ export function ExportTools({ drawing, name, class: cls }: { drawing: () => Draw
   };
   return (
     <div class={cls}>
-      <button class="mini" title={t('SVG ファイルとして保存', 'Save as an SVG file')} onClick={() => saveFile(fileName(name, 'svg'), new Blob([drawing().svg], { type: 'image/svg+xml' }))}>
+      <button
+        class="mini"
+        title={t('SVG ファイルとして保存', 'Save as an SVG file')}
+        onClick={() => saveFile(fileName(name, 'svg'), new Blob([drawing().svg], { type: 'image/svg+xml' }))}
+      >
         SVG
       </button>
       <button
@@ -42,7 +46,11 @@ export function ExportTools({ drawing, name, class: cls }: { drawing: () => Draw
       >
         PNG
       </button>
-      <button class="mini" title={t('PNG 画像をクリップボードへ（資料に貼り付け）', 'PNG image to the clipboard, to paste into documents')} onClick={copy}>
+      <button
+        class="mini"
+        title={t('PNG 画像をクリップボードへ（資料に貼り付け）', 'PNG image to the clipboard, to paste into documents')}
+        onClick={copy}
+      >
         {t('画像をコピー', 'Copy image')}
       </button>
     </div>

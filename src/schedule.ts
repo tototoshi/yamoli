@@ -42,7 +42,6 @@ export interface ScheduleResult {
   needsJp: boolean;
 }
 
-
 /**
  * Everything scheduling and dependencies read, as one string: the tree's
  * shape, which rows are fields, and the text of fields and what is inside

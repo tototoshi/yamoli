@@ -76,12 +76,12 @@ export function markupSpans(src: string): MarkSpan[] {
     const g = m.groups!;
     const i = m.index! + (g.pre?.length ?? 0);
     put(src.slice(last, i));
-    if (g.ref !== undefined) put('[[', 'mk'), put(g.ref, 'ref'), put(']]', 'mk');
-    else if (g.code !== undefined) put('`', 'mk'), put(g.code, 'code'), put('`', 'mk');
-    else if (g.strong !== undefined) put('**', 'mk'), put(g.strong, 'strong'), put('**', 'mk');
-    else if (g.del !== undefined) put('~~', 'mk'), put(g.del, 'del'), put('~~', 'mk');
-    else if (g.em !== undefined) put('*', 'mk'), put(g.em, 'em'), put('*', 'mk');
-    else if (g.label !== undefined) put('[', 'mk'), put(g.label, 'link'), put(`](${g.href})`, 'mk');
+    if (g.ref !== undefined) (put('[[', 'mk'), put(g.ref, 'ref'), put(']]', 'mk'));
+    else if (g.code !== undefined) (put('`', 'mk'), put(g.code, 'code'), put('`', 'mk'));
+    else if (g.strong !== undefined) (put('**', 'mk'), put(g.strong, 'strong'), put('**', 'mk'));
+    else if (g.del !== undefined) (put('~~', 'mk'), put(g.del, 'del'), put('~~', 'mk'));
+    else if (g.em !== undefined) (put('*', 'mk'), put(g.em, 'em'), put('*', 'mk'));
+    else if (g.label !== undefined) (put('[', 'mk'), put(g.label, 'link'), put(`](${g.href})`, 'mk'));
     else if (g.url !== undefined) put(g.url, 'link');
     else put(g.tag, 'tag');
     last = m.index! + m[0].length;
@@ -92,9 +92,7 @@ export function markupSpans(src: string): MarkSpan[] {
 
 /** A link in the source, from its first to past its last character. */
 export type LinkAt = { start: number; end: number } & (
-  | { kind: 'link'; label: string; href: string }
-  | { kind: 'url'; href: string }
-  | { kind: 'ref'; refId: string }
+  { kind: 'link'; label: string; href: string } | { kind: 'url'; href: string } | { kind: 'ref'; refId: string }
 );
 
 /** The Markdown link, bare URL or [[ref]] that the caret is in or touches. */

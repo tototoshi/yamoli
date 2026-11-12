@@ -42,7 +42,10 @@ async function type(root: HTMLElement, text: string) {
 const rowText = (root: HTMLElement, id: string) => root.querySelector(`li[data-id="${id}"] > .row`)!.textContent;
 
 test('typing in a row redraws the rows that link to it, and leaves the others alone', async () => {
-  let a = '', b = '', c = '', d = '';
+  let a = '',
+    b = '',
+    c = '',
+    d = '';
   const root = await mount((s) => {
     a = s.addChild(s.rootId, -1, 'Alpha').id;
     b = s.addChild(s.rootId, -1, `see [[${a}]]`).id;
@@ -60,7 +63,9 @@ test('typing in a row redraws the rows that link to it, and leaves the others al
 });
 
 test('changing a duration redraws the dates of the rows that wait for it', async () => {
-  let a = '', b = '', duration = '';
+  let a = '',
+    b = '',
+    duration = '';
   const root = await mount((s) => {
     a = s.addChild(s.rootId, -1, 'Alpha').id;
     s.addField(a, 'start', '2026-11-02');

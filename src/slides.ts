@@ -44,7 +44,12 @@ export interface Deck {
 export function buildDeck(store: OutlineStore, deckId: string): Deck {
   const value = (id: string, key: string) => {
     const f = store.field(id, key);
-    return f ? store.fieldTexts(f.id).filter((t) => t.trim()).join('\n') || undefined : undefined;
+    return f
+      ? store
+          .fieldTexts(f.id)
+          .filter((t) => t.trim())
+          .join('\n') || undefined
+      : undefined;
   };
   const bullets = (id: string): Bullet[] => store.items(id).map((c) => ({ id: c, children: bullets(c) }));
 

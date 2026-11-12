@@ -93,10 +93,7 @@ export function SlidesView() {
           ref={stageRef}
           onClick={(e) => !(e.target as Element).closest('a, button, .gantt-wrap') && go(index + 1)}
         >
-          <div
-            class={`slide layout-${slide.layout}`}
-            style={{ transform: `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` }}
-          >
+          <div class={`slide layout-${slide.layout}`} style={{ transform: `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` }}>
             <SlideBody slide={slide} />
             <div class="slide-number">
               {index + 1} / {count}
@@ -123,7 +120,11 @@ export function SlidesView() {
             {t('このスライドを編集', 'Edit this slide')}
           </a>
         </div>
-        {showNotes && <div class="slide-notes">{slide.notes || <span class="muted">{t('（notes: でノートを書けます）', '(write notes in a notes: field)')}</span>}</div>}
+        {showNotes && (
+          <div class="slide-notes">
+            {slide.notes || <span class="muted">{t('（notes: でノートを書けます）', '(write notes in a notes: field)')}</span>}
+          </div>
+        )}
       </div>
     </div>
   );

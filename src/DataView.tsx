@@ -49,7 +49,9 @@ export function DataView({ format }: { format: 'yaml' | 'json' | 'text' }) {
       <pre ref={pre} class={'serial-view-text fmt-' + format}>
         {format === 'text'
           ? text
-          : (format === 'yaml' ? yamlTokens : jsonTokens)(text).map((tok) => (tok.kind ? <span class={'j-' + tok.kind}>{tok.text}</span> : tok.text))}
+          : (format === 'yaml' ? yamlTokens : jsonTokens)(text).map((tok) =>
+              tok.kind ? <span class={'j-' + tok.kind}>{tok.text}</span> : tok.text
+            )}
       </pre>
     </section>
   );

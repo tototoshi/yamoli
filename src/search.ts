@@ -113,10 +113,7 @@ function matchTerm(n: OutlineNode, t: Term, ctx: MatchContext): boolean {
     const texts = ctx.field(t.key.split('.'));
     return !!texts && (!t.value || texts.some((x) => norm(x).includes(t.value)));
   }
-  return (
-    norm(n.text).includes(t.value) ||
-    (n.key !== null && norm(n.key).includes(t.value))
-  );
+  return norm(n.text).includes(t.value) || (n.key !== null && norm(n.key).includes(t.value));
 }
 
 export function matchNode(n: OutlineNode, terms: Term[], ctx: MatchContext = NO_CONTEXT): boolean {

@@ -143,7 +143,9 @@ test('the architecture sample draws as a flow, and the guide embeds it and the p
   }
 
   const deck = addGuideSlides(s, s.rootId);
-  const embeds = buildDeck(s, deck).slides.filter((x) => x.embed).map((x) => [x.embed, x.embedAs]);
+  const embeds = buildDeck(s, deck)
+    .slides.filter((x) => x.embed)
+    .map((x) => [x.embed, x.embedAs]);
   expect(embeds).toEqual([
     [proj, 'gantt'],
     [sys, 'diagram'],

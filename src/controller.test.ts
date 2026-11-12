@@ -40,7 +40,8 @@ function press(ctl: Ctl, ta: HTMLTextAreaElement, key: string, opts: KeyboardEve
 const texts = (ctl: Ctl, id: string) => ctl.store.node(id).children.map((c) => ctl.store.node(c).text);
 
 test('Backspace at the start of a row joins it to the row above', () => {
-  let a = '', b = '';
+  let a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'one');
     b = add(s.rootId, 'two');
@@ -51,7 +52,10 @@ test('Backspace at the start of a row joins it to the row above', () => {
 });
 
 test('Backspace never joins a row into a field', () => {
-  let item = '', tags = '', first = '', next = '';
+  let item = '',
+    tags = '',
+    first = '',
+    next = '';
   const ctl = setup((s, add) => {
     item = add(s.rootId, 'task');
     s.addField(item, 'duration', '3d');
@@ -70,7 +74,8 @@ test('Backspace never joins a row into a field', () => {
 });
 
 test('Tab does not put a row inside a block, even an empty one', () => {
-  let row = '', item = '';
+  let row = '',
+    item = '';
   const ctl = setup((s, add) => {
     item = add(s.rootId, 'item');
     s.addBlock(item, 'note', 'markdown', '');
@@ -105,7 +110,8 @@ test('completing records the day, reopening removes it', () => {
 });
 
 test('Shift+↓ at the end of a row starts selecting rows, and the same key goes no further', () => {
-  let a = '', b = '';
+  let a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'one');
     b = add(s.rootId, 'two');
@@ -119,7 +125,10 @@ test('Shift+↓ at the end of a row starts selecting rows, and the same key goes
 });
 
 test('selected rows indent and outdent together, keeping their order', () => {
-  let p = '', a = '', b = '', c = '';
+  let p = '',
+    a = '',
+    b = '',
+    c = '';
   const ctl = setup((s, add) => {
     p = add(s.rootId, 'parent');
     a = add(s.rootId, 'a');
@@ -135,7 +144,8 @@ test('selected rows indent and outdent together, keeping their order', () => {
 });
 
 test('⌘Shift+Enter on selected rows completes them all in one undo step', () => {
-  let a = '', b = '';
+  let a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'a');
     b = add(s.rootId, 'b');
@@ -149,7 +159,9 @@ test('⌘Shift+Enter on selected rows completes them all in one undo step', () =
 });
 
 test('dragging several rows moves them in order', () => {
-  let p = '', a = '', b = '';
+  let p = '',
+    a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'a');
     add(s.rootId, 'x');
@@ -163,7 +175,8 @@ test('dragging several rows moves them in order', () => {
 });
 
 test('a field or block cannot be zoomed into: its item opens instead', () => {
-  let item = '', note = '';
+  let item = '',
+    note = '';
   const ctl = setup((s, add) => {
     item = add(s.rootId, 'item');
     note = s.addBlock(item, 'note', 'markdown', 'text').id;
@@ -175,7 +188,8 @@ test('a field or block cannot be zoomed into: its item opens instead', () => {
 });
 
 test('a field name is completed only once a suggestion is picked, then its values are offered', () => {
-  let a = '', b = '';
+  let a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'a');
     s.addField(a, 'status', 'done');
@@ -202,7 +216,8 @@ test('a field name is completed only once a suggestion is picked, then its value
 });
 
 test('a row becomes a task and back; completing makes it one; ⌘L does it from the keyboard', () => {
-  let a = '', b = '';
+  let a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'note');
     b = add(s.rootId, 'chore');
@@ -221,7 +236,11 @@ test('a row becomes a task and back; completing makes it one; ⌘L does it from 
 });
 
 test('Tasks only shows tasks, the rows they are under (even collapsed) and their fields', () => {
-  let home = '', shop = '', milk = '', note = '', idea = '';
+  let home = '',
+    shop = '',
+    milk = '',
+    note = '',
+    idea = '';
   const ctl = setup((s, add) => {
     home = add(s.rootId, 'Home');
     shop = add(home, 'Shopping');
@@ -348,7 +367,8 @@ test('starting on #/docs shows the guide with home underneath', () => {
 });
 
 test('⌘Enter adds a row below, after the rows under it, wherever the caret is; ⌘Shift+Enter completes', () => {
-  let a = '', b = '';
+  let a = '',
+    b = '';
   const ctl = setup((s, add) => {
     a = add(s.rootId, 'parent');
     add(a, 'child');

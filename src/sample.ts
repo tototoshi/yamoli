@@ -161,7 +161,10 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
   s.addField(
     deck.id,
     'notes',
-    t('「スライド」表示で開くとプレゼンになります。← → でページ送り、F で全画面。', 'Open it in the “Slides” view to present. ← → to page through, F for full screen.')
+    t(
+      '「スライド」表示で開くとプレゼンになります。← → でページ送り、F で全画面。',
+      'Open it in the “Slides” view to present. ← → to page through, F for full screen.'
+    )
   );
 
   const slide = (title: string, fields: Record<string, string>, bullets: (string | [string, string[]])[]) => {
@@ -175,24 +178,40 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
     return n.id;
   };
 
-  slide(t('基本操作', 'The basics'), { notes: t('行の編集はふつうのテキストエディタと同じ感覚です。', 'Editing a row works like any text editor.') }, [
+  slide(
+    t('基本操作', 'The basics'),
+    { notes: t('行の編集はふつうのテキストエディタと同じ感覚です。', 'Editing a row works like any text editor.') },
     [
-      t('**Enter** で新しい行、**Tab / Shift+Tab** でインデント', '**Enter** for a new row, **Tab / Shift+Tab** to indent'),
-      [t('Alt+Shift+↑↓ で行を移動、● をドラッグしても OK', 'Alt+Shift+↑↓ moves a row, or drag its ●')],
-    ],
-    [
-      t('● をクリックすると、その項目に**ズームイン**', 'Click a ● to **zoom in** on that item'),
-      [t('パンくずやブラウザの「戻る」でズームアウト', 'The breadcrumbs or the browser’s Back zoom out')],
-    ],
-    [t('● を右クリックで項目メニュー', 'Right-click a ● for the item menu'), [t('複製・削除・リンクをコピー・完了など', 'Duplicate, delete, copy link, complete …')]],
-    t('⌘/Ctrl+F で検索、⌘/Ctrl+Z で元に戻す', '⌘/Ctrl+F to search, ⌘/Ctrl+Z to undo'),
-  ]);
+      [
+        t('**Enter** で新しい行、**Tab / Shift+Tab** でインデント', '**Enter** for a new row, **Tab / Shift+Tab** to indent'),
+        [t('Alt+Shift+↑↓ で行を移動、● をドラッグしても OK', 'Alt+Shift+↑↓ moves a row, or drag its ●')],
+      ],
+      [
+        t('● をクリックすると、その項目に**ズームイン**', 'Click a ● to **zoom in** on that item'),
+        [t('パンくずやブラウザの「戻る」でズームアウト', 'The breadcrumbs or the browser’s Back zoom out')],
+      ],
+      [
+        t('● を右クリックで項目メニュー', 'Right-click a ● for the item menu'),
+        [t('複製・削除・リンクをコピー・完了など', 'Duplicate, delete, copy link, complete …')],
+      ],
+      t('⌘/Ctrl+F で検索、⌘/Ctrl+Z で元に戻す', '⌘/Ctrl+F to search, ⌘/Ctrl+Z to undo'),
+    ]
+  );
 
   const yaml = slide(
     t('属性 = YAML', 'Fields = YAML'),
-    { layout: 'two-column', notes: t('左が書き方、右がアウトラインに書いた属性を YAML にしたものです。', 'On the left how to write fields; on the right the same fields as YAML.') },
+    {
+      layout: 'two-column',
+      notes: t(
+        '左が書き方、右がアウトラインに書いた属性を YAML にしたものです。',
+        'On the left how to write fields; on the right the same fields as YAML.'
+      ),
+    },
     [
-      [t('行頭で `name: ` と打つと**属性**の行に', 'Type `name: ` at the start of a row for a **field**'), [t('値の先頭で Backspace で戻る', 'Backspace at the value’s start undoes it')]],
+      [
+        t('行頭で `name: ` と打つと**属性**の行に', 'Type `name: ` at the start of a row for a **field**'),
+        [t('値の先頭で Backspace で戻る', 'Backspace at the value’s start undoes it')],
+      ],
       [
         t('値のない属性の下は入れ子に', 'A field without a value holds nested rows'),
         [t('子に属性 → オブジェクト', 'Fields below → an object'), t('子に普通の行 → リスト', 'Ordinary rows below → a list')],
@@ -201,10 +220,18 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
       t('属性で日程・スライドなどの振る舞いが変わる', 'Fields change what the app does: schedules, slides …'),
     ]
   );
-  s.addBlock(yaml, 'example', 'code', 'start: 2026-11-09\nduration: 3d\nbudget:\n  amount: 1200000\n  currency: JPY\nlinks:\n  - https://example.com');
+  s.addBlock(
+    yaml,
+    'example',
+    'code',
+    'start: 2026-11-09\nduration: 3d\nbudget:\n  amount: 1200000\n  currency: JPY\nlinks:\n  - https://example.com'
+  );
 
   slide(t('リンクと依存', 'Links and dependencies'), {}, [
-    [t('`[[` で他の項目へのリンク', '`[[` links to another item'), [t('リンク先には「被リンク」として表示される', 'The target lists it under “Linked from”')]],
+    [
+      t('`[[` で他の項目へのリンク', '`[[` links to another item'),
+      [t('リンク先には「被リンク」として表示される', 'The target lists it under “Linked from”')],
+    ],
     [
       t('`after: [[作業]]` で依存関係', '`after: [[task]]` for a dependency'),
       [
@@ -228,7 +255,12 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
         'This is the sample project’s Gantt chart, embedded. Edit the project and it changes here too.'
       ),
     },
-    [t('`start` / `duration` / `after` / `due` から日付を自動計算 — ★ はクリティカルパス', 'Dates come from `start` / `duration` / `after` / `due` — ★ is the critical path')]
+    [
+      t(
+        '`start` / `duration` / `after` / `due` から日付を自動計算 — ★ はクリティカルパス',
+        'Dates come from `start` / `duration` / `after` / `due` — ★ is the critical path'
+      ),
+    ]
   );
 
   slide(
@@ -240,16 +272,27 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
         'The sample architecture, embedded as a diagram. It is drawn from the outline’s rows and fields.'
       ),
     },
-    [t('行が箱、`shape: frame` の行が枠、`to: [[…]]` が矢印 — 「図」ビューで開く', 'Rows are boxes, rows with `shape: frame` frames, `to: [[…]]` arrows — open the Diagram view')]
+    [
+      t(
+        '行が箱、`shape: frame` の行が枠、`to: [[…]]` が矢印 — 「図」ビューで開く',
+        'Rows are boxes, rows with `shape: frame` frames, `to: [[…]]` arrows — open the Diagram view'
+      ),
+    ]
   );
 
   slide(t('ビュー', 'Views'), { layout: 'two-column' }, [
     [t('アウトライン', 'Outline'), [t('すべての編集はここで', 'Where all editing happens')]],
     [t('ガント', 'Gantt'), [t('日程を線表で', 'The schedule as a chart'), t('日付の列幅は切り替え可能', 'Adjustable day width')]],
     [t('図', 'Diagram'), [t('構成図・フロー図・マインドマップ', 'Architecture, flows, mind maps')]],
-    [t('スライド', 'Slides'), [t('項目 = デッキ、子 = 1 枚ずつ', 'An item is a deck, each row under it a slide'), '`layout` / `notes` / `image` / `theme`']],
+    [
+      t('スライド', 'Slides'),
+      [t('項目 = デッキ、子 = 1 枚ずつ', 'An item is a deck, each row under it a slide'), '`layout` / `notes` / `image` / `theme`'],
+    ],
     ['YAML / JSON', [t('ズームした項目をデータとして', 'The zoomed item as data')]],
-    [t('検索', 'Search'), [t('`status:進行中`、`budget.amount:1200000`', '`status:active`, `budget.amount:1200000`'), '`is:late` / `is:critical` / `is:done`']],
+    [
+      t('検索', 'Search'),
+      [t('`status:進行中`、`budget.amount:1200000`', '`status:active`, `budget.amount:1200000`'), '`is:late` / `is:critical` / `is:done`'],
+    ],
   ]);
 
   slide(t('保存', 'Saving'), {}, [
@@ -263,7 +306,10 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
 
   slide(
     t('このスライド自体がアウトライン', 'These slides are an outline too'),
-    { layout: 'center', notes: t('アウトラインに戻って、このデッキを自由に編集してみてください。', 'Go back to the outline and edit this deck as you like.') },
+    {
+      layout: 'center',
+      notes: t('アウトラインに戻って、このデッキを自由に編集してみてください。', 'Go back to the outline and edit this deck as you like.'),
+    },
     [t('「このスライドを編集」から中身を書き換えてみてください', 'Try “Edit this slide” and change it')]
   );
   return deck.id;

@@ -53,7 +53,10 @@ const LINE_KEYS: Record<string, string> = { to: '', async: 'dashed', both: 'both
 /** A line's look from words like `dotted both red`, on top of base. */
 export function lineStyle(words: string, base: LineStyle = { dash: 'solid', ends: 'arrow' }): LineStyle {
   const out = { ...base };
-  for (const w of words.toLowerCase().split(/[\s,]+/).filter(Boolean)) {
+  for (const w of words
+    .toLowerCase()
+    .split(/[\s,]+/)
+    .filter(Boolean)) {
     if (w === 'solid' || w === 'dashed' || w === 'dotted') out.dash = w;
     else if (w === 'arrow' || w === 'both' || w === 'none') out.ends = w;
     else if (colorOf(w)) out.color = colorOf(w);
@@ -108,7 +111,7 @@ const COLORS: Record<string, string> = {
   grey: '#7d848e',
 };
 
-const colorOf = (v: string | undefined) => (v ? COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined) : undefined);
+const colorOf = (v: string | undefined) => (v ? (COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined)) : undefined);
 
 /** Fields whose text describes the row, shown as text rather than `key: value`. */
 const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
@@ -321,7 +324,9 @@ const NO_END = /[（「『【〔(]$/;
  * by phrase. Spaces are pieces of their own.
  */
 function phrases(text: string): string[] {
-  const words = segmenter ? [...segmenter.segment(text)].map((s) => s.segment) : (text.match(/[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+/g) ?? []);
+  const words = segmenter
+    ? [...segmenter.segment(text)].map((s) => s.segment)
+    : (text.match(/[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+/g) ?? []);
   const out: string[] = [];
   for (const w of words) {
     const prev = out[out.length - 1];
@@ -433,7 +438,8 @@ function toXY(placed: Map<string, Placed>, frames: Set<string>, dir: Direction, 
 }
 
 /** Rank and order extents of a box for the direction. */
-const extents = (size: { w: number; h: number }, dir: Direction) => (dir === 'LR' ? { rs: size.w, os: size.h } : { rs: size.h, os: size.w });
+const extents = (size: { w: number; h: number }, dir: Direction) =>
+  dir === 'LR' ? { rs: size.w, os: size.h } : { rs: size.h, os: size.w };
 
 /**
  * Flow: inside each frame (and at the top), boxes go in ranks along the
@@ -572,7 +578,13 @@ function ranks(units: string[], succ: Map<string, string[]>, pred: Map<string, s
   const of = (u: string): number => {
     if (rank.has(u)) return rank.get(u)!;
     rank.set(u, 0); // guards against loops while working it out
-    const r = Math.max(0, ...pred.get(u)!.filter((p) => !back.has(`${p}>${u}`)).map((p) => of(p) + 1));
+    const r = Math.max(
+      0,
+      ...pred
+        .get(u)!
+        .filter((p) => !back.has(`${p}>${u}`))
+        .map((p) => of(p) + 1)
+    );
     rank.set(u, r);
     return r;
   };

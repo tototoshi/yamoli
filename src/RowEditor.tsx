@@ -143,7 +143,11 @@ function LinkBubble({ link, onEdit, replace }: { link: LinkAt; onEdit: () => voi
         <a href={ctl.hashFor(target.id)} title={t('この項目へ移動', 'Go to this item')}>
           {label}
         </a>
-        <button class="mini" onClick={() => replace(link.start, link.end, label)} title={t('リンクをやめて文字だけ残す', 'Keep the words, drop the link')}>
+        <button
+          class="mini"
+          onClick={() => replace(link.start, link.end, label)}
+          title={t('リンクをやめて文字だけ残す', 'Keep the words, drop the link')}
+        >
           {t('解除', 'Unlink')}
         </button>
       </div>
@@ -158,7 +162,11 @@ function LinkBubble({ link, onEdit, replace }: { link: LinkAt; onEdit: () => voi
         {t('編集', 'Edit')}
       </button>
       {link.kind === 'link' && (
-        <button class="mini" onClick={() => replace(link.start, link.end, link.label)} title={t('リンクをやめて文字だけ残す', 'Keep the words, drop the link')}>
+        <button
+          class="mini"
+          onClick={() => replace(link.start, link.end, link.label)}
+          title={t('リンクをやめて文字だけ残す', 'Keep the words, drop the link')}
+        >
           {t('解除', 'Unlink')}
         </button>
       )}
@@ -196,13 +204,7 @@ function LinkForm({ draft, onDone }: { draft: LinkDraft; onDone: (by: string | n
       </label>
       <label>
         URL
-        <input
-          ref={urlInput}
-          value={href}
-          placeholder="https://"
-          onInput={(e) => setHref(e.currentTarget.value)}
-          onKeyDown={onKeyDown}
-        />
+        <input ref={urlInput} value={href} placeholder="https://" onInput={(e) => setHref(e.currentTarget.value)} onKeyDown={onKeyDown} />
       </label>
       <button class="mini" onMouseDown={keepFocus} onClick={apply}>
         {t('適用', 'Apply')}

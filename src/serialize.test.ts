@@ -28,11 +28,7 @@ test('items become text or objects; fields become plain YAML values', () => {
     budget: { amount: 1200000, fixed: true },
     links: ['https://example.com'],
     owner: null,
-    children: [
-      { text: '要件定義', done: true },
-      'メモ: 未定',
-      { text: '説明', body: new Tagged('markdown', '# 見出し\n本文') },
-    ],
+    children: [{ text: '要件定義', done: true }, 'メモ: 未定', { text: '説明', body: new Tagged('markdown', '# 見出し\n本文') }],
   });
   expect(toValue(s, budget)).toEqual({ budget: { amount: 1200000, fixed: true } });
   expect(toValue(s, s.rootId)).toEqual([toValue(s, p)]);
@@ -97,9 +93,7 @@ test('toMarkdownList: a nested list with link labels, fields and tasks as checkl
   s.addChild(b, -1, 'step');
   s.setTask(s.addChild(p, -1, 'ship').id, true);
   const all = (id: string) => s.node(id).children;
-  expect(toMarkdownList(s, p, all)).toBe(
-    '- [x] **design**\n- build\n  second line\n  - after: design\n  - step\n- [ ] ship\n'
-  );
+  expect(toMarkdownList(s, p, all)).toBe('- [x] **design**\n- build\n  second line\n  - after: design\n  - step\n- [ ] ship\n');
   expect(toMarkdownList(s, s.rootId, all)).toMatch(/^- plan\n  - \[x\]/);
   expect(toMarkdownList(s, a, all)).toBe('');
 });

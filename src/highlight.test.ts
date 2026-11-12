@@ -21,6 +21,7 @@ test('YAML: keys, scalars by kind, tags and block lines; the text is kept whole'
   ].join('\n');
   const tokens = yamlTokens(yaml);
   expect(tokens.map((t) => t.text).join('')).toBe(yaml);
+  // prettier-ignore
   expect(kinds(tokens)).toEqual([
     'key:name', 'punct::', 'str:API',
     'key:replicas', 'punct::', 'num:3',
@@ -40,5 +41,16 @@ test('JSON: keys apart from string values', () => {
   const json = JSON.stringify({ a: 'x', n: -1.5, ok: false, z: null, list: ['y'] }, null, 2);
   const tokens = jsonTokens(json);
   expect(tokens.map((t) => t.text).join('')).toBe(json);
-  expect(kinds(tokens)).toEqual(['key:"a"', 'str:"x"', 'key:"n"', 'num:-1.5', 'key:"ok"', 'lit:false', 'key:"z"', 'lit:null', 'key:"list"', 'str:"y"']);
+  expect(kinds(tokens)).toEqual([
+    'key:"a"',
+    'str:"x"',
+    'key:"n"',
+    'num:-1.5',
+    'key:"ok"',
+    'lit:false',
+    'key:"z"',
+    'lit:null',
+    'key:"list"',
+    'str:"y"',
+  ]);
 });

@@ -43,11 +43,29 @@ export function shortDate(d: Day, now = today()): string {
 // ---------------------------------------------------------------- workdays
 
 const DAY_NAMES: Record<string, number> = {
-  sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
-  日: 0, 月: 1, 火: 2, 水: 3, 木: 4, 金: 5, 土: 6,
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
+  日: 0,
+  月: 1,
+  火: 2,
+  水: 3,
+  木: 4,
+  金: 5,
+  土: 6,
 };
 
-const dayIndex = (s: string) => DAY_NAMES[s.trim().toLowerCase().slice(0, /^[a-z]/i.test(s.trim()) ? 3 : 1)];
+const dayIndex = (s: string) =>
+  DAY_NAMES[
+    s
+      .trim()
+      .toLowerCase()
+      .slice(0, /^[a-z]/i.test(s.trim()) ? 3 : 1)
+  ];
 
 /** Weekday numbers from "mon-fri", "mon,wed,fri", "月-金"…; null if unparseable. */
 export function parseWorkdays(s: string): Set<number> | null {
@@ -118,7 +136,7 @@ export class WorkCalendar {
   /** The n-th working day counting `start` (a working day) as the first. */
   addWorkdays(start: Day, n: number): Day {
     let d = start;
-    for (let left = n - 1; left > 0; ) {
+    for (let left = n - 1; left > 0;) {
       d++;
       if (this.isWorkday(d)) left--;
       if (d - start > 36600) break;

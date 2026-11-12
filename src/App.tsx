@@ -117,7 +117,13 @@ export function App() {
   return (
     <Ctx.Provider value={ctl}>
       <TopBar />
-      <main class={'page' + (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
+      <main
+        class={
+          'page' +
+          (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') +
+          (ctl.view === 'slides' ? ' slides-page' : '')
+        }
+      >
         <ZoomHeader node={zoom} />
         <div class="view-bar">
           <ViewSwitch />
@@ -238,7 +244,10 @@ function MoreMenu() {
     if (!file) return;
     try {
       const next = OutlineStore.fromJSON(JSON.parse(await file.text()));
-      if (confirm(t('現在のアウトラインを置き換えますか？（元に戻すで取り消せます）', 'Replace the current outline? (Undo brings it back)'))) ctl.replaceStore(next);
+      if (
+        confirm(t('現在のアウトラインを置き換えますか？（元に戻すで取り消せます）', 'Replace the current outline? (Undo brings it back)'))
+      )
+        ctl.replaceStore(next);
     } catch (err) {
       alert(t('読み込みに失敗しました: ', 'Couldn’t load the file: ') + (err as Error).message);
     }
@@ -255,10 +264,12 @@ function MoreMenu() {
           return (
             <div class="menu-list" role="menu">
               <button role="menuitem" disabled={!ctl.history.canUndo} onClick={run(() => ctl.undo())}>
-                {t('元に戻す', 'Undo')}<kbd>⌘Z</kbd>
+                {t('元に戻す', 'Undo')}
+                <kbd>⌘Z</kbd>
               </button>
               <button role="menuitem" disabled={!ctl.history.canRedo} onClick={run(() => ctl.redo())}>
-                {t('やり直す', 'Redo')}<kbd>⇧⌘Z</kbd>
+                {t('やり直す', 'Redo')}
+                <kbd>⇧⌘Z</kbd>
               </button>
               <hr />
               <button
@@ -282,13 +293,25 @@ function MoreMenu() {
                 {t('バックアップから読み込む…', 'Restore from a backup…')}
               </button>
               <hr />
-              <button role="menuitem" title={t('依存関係・日程計算・ガントの例', 'Dependencies, scheduling and the Gantt chart')} onClick={run(() => ctl.addSample())}>
+              <button
+                role="menuitem"
+                title={t('依存関係・日程計算・ガントの例', 'Dependencies, scheduling and the Gantt chart')}
+                onClick={run(() => ctl.addSample())}
+              >
                 {t('サンプルプロジェクトを追加', 'Add the sample project')}
               </button>
-              <button role="menuitem" title={t('システム構成図の例（図ビュー）', 'A system architecture, in the Diagram view')} onClick={run(() => ctl.addDiagramSample())}>
+              <button
+                role="menuitem"
+                title={t('システム構成図の例（図ビュー）', 'A system architecture, in the Diagram view')}
+                onClick={run(() => ctl.addDiagramSample())}
+              >
                 {t('構成図のサンプルを追加', 'Add the architecture sample')}
               </button>
-              <button role="menuitem" title={t('このアプリの使い方（スライドの例）', 'How to use this app (as slides)')} onClick={run(() => ctl.addGuide())}>
+              <button
+                role="menuitem"
+                title={t('このアプリの使い方（スライドの例）', 'How to use this app (as slides)')}
+                onClick={run(() => ctl.addGuide())}
+              >
                 {t('使い方スライドを追加', 'Add the guide slides')}
               </button>
               <hr />
@@ -398,24 +421,56 @@ const shortcuts = (): [string, string][] => [
   ['Alt(⌘)+Shift+↑↓', t('行を移動', 'Move the row')],
   [
     t('Shift+↑↓（行の端で）/ Shift+クリック / 行をまたいでドラッグ', 'Shift+↑↓ (at a row’s ends) / Shift+click / drag across rows'),
-    t('複数行を選択：Tab・Shift+Tab・削除・⌘C・⌘X・⌘Shift+Enter、● のドラッグでまとめて移動', 'Select rows: Tab, Shift+Tab, delete, ⌘C, ⌘X, ⌘Shift+Enter; drag a ● to move them all'),
+    t(
+      '複数行を選択：Tab・Shift+Tab・削除・⌘C・⌘X・⌘Shift+Enter、● のドラッグでまとめて移動',
+      'Select rows: Tab, Shift+Tab, delete, ⌘C, ⌘X, ⌘Shift+Enter; drag a ● to move them all'
+    ),
   ],
   ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
-  ['⌘/Ctrl+Enter', t('下に新しい行（カーソルの位置によらず、子の行の後ろに）', 'A new row below (wherever the caret is, after the rows under it)')],
+  [
+    '⌘/Ctrl+Enter',
+    t('下に新しい行（カーソルの位置によらず、子の行の後ろに）', 'A new row below (wherever the caret is, after the rows under it)'),
+  ],
   ['⌘/Ctrl+Shift+Enter', t('完了 / 未完了', 'Complete / reopen')],
-  ['⌘/Ctrl+L', t('タスクにする / やめる（「タスクだけ」で絞り込み、検索 is:todo）', 'Mark as a task or not (filter with “Tasks only”, search is:todo)')],
+  [
+    '⌘/Ctrl+L',
+    t(
+      'タスクにする / やめる（「タスクだけ」で絞り込み、検索 is:todo）',
+      'Mark as a task or not (filter with “Tasks only”, search is:todo)'
+    ),
+  ],
   ['Alt+→ / ⌘+.', t('ズームイン（●クリックでも可）', 'Zoom in (or click the ●)')],
   ['Alt+← / ⌘+,', t('ズームアウト（ブラウザの戻るでも可）', 'Zoom out (or the browser’s Back)')],
-  [t('name: と入力', 'Type name: '), t('属性の行になる（値の先頭で Backspace で普通の行に戻す）', 'Makes a field (Backspace at the value’s start undoes it)')],
+  [
+    t('name: と入力', 'Type name: '),
+    t('属性の行になる（値の先頭で Backspace で普通の行に戻す）', 'Makes a field (Backspace at the value’s start undoes it)'),
+  ],
   ['Alt+A', t('属性を追加（属性の下に Tab で入れ子のオブジェクト・リスト）', 'Add a field (Tab under a field nests an object or list)')],
   ['Alt+D', t('ブロック（Markdown・CSV・コードなど複数行の値）を追加', 'Add a block: a multi-line value (Markdown, CSV, code …)')],
-  [t('属性の名前・値で ↓', '↓ in a field’s name or value'), t('使ったことのある名前・値から選ぶ（Enter で決定）', 'Pick a name or value already in use (Enter takes it)')],
+  [
+    t('属性の名前・値で ↓', '↓ in a field’s name or value'),
+    t('使ったことのある名前・値から選ぶ（Enter で決定）', 'Pick a name or value already in use (Enter takes it)'),
+  ],
   ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
-  [IS_MAC ? '⌘K' : 'Ctrl+K', t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)')],
+  [
+    IS_MAC ? '⌘K' : 'Ctrl+K',
+    t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)'),
+  ],
   ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
-  [t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'), t('次の行を結合（空の行なら行を削除）', 'Join the next row (removes an empty row)')],
+  [
+    t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'),
+    t('次の行を結合（空の行なら行を削除）', 'Join the next row (removes an empty row)'),
+  ],
   ...(IS_MAC
-    ? [['Ctrl+K', t('カーソルから行末まで削除（行末なら次の行を結合、Ctrl+Y で貼り戻す）', 'Delete to the end of the line (at the end, join the next row; Ctrl+Y puts it back)')] as [string, string]]
+    ? [
+        [
+          'Ctrl+K',
+          t(
+            'カーソルから行末まで削除（行末なら次の行を結合、Ctrl+Y で貼り戻す）',
+            'Delete to the end of the line (at the end, join the next row; Ctrl+Y puts it back)'
+          ),
+        ] as [string, string],
+      ]
     : []),
   ['⌘/Ctrl+Shift+Backspace', t('行を削除（子も含む）', 'Delete the row and what’s below it')],
   [t('● をドラッグ', 'Drag a ●'), t('行を移動（Esc でキャンセル）', 'Move the row (Esc cancels)')],
@@ -425,12 +480,27 @@ const shortcuts = (): [string, string][] => [
   ['⌘/Ctrl+F', t('検索（Esc でクリア、is:done で完了のみ）', 'Search (Esc clears; is:done for completed rows)')],
   ['is:ready / is:blocked', t('着手可 / 待ち の行を検索（after 属性の依存）', 'Rows ready to start / waiting (after dependencies)')],
   ['is:late / is:critical', t('期限超過 / クリティカルパス上の作業を検索', 'Late work / work on the critical path')],
-  ['duration: 3d / 2w / 10cd', t('作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）', 'Length in working days / weeks / calendar days (0d: milestone)')],
+  [
+    'duration: 3d / 2w / 10cd',
+    t('作業日数（稼働日 / 週 / 暦日、0d でマイルストーン）', 'Length in working days / weeks / calendar days (0d: milestone)'),
+  ],
   ['start / due', t('開始日（子にも継承）/ 期限 — 例 2026-11-10', 'Start (inherited by children) / deadline — e.g. 2026-11-10')],
   ['end', t('終了日（duration の代わりに start から end までのバー）', 'Last day (instead of a duration: a bar from start to end)')],
-  [t('スライド表示で ← →', '← → in slides'), t('ページ送り（F 全画面、N ノート、Home / End）', 'Page through (F full screen, N notes, Home / End)')],
-  ['layout / notes / theme', t('スライドの属性（center・two-column・title / ノート / dark）', 'Slide fields (center, two-column, title / speaker notes / dark)')],
-  ['workdays / holidays', t('稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）', 'Working days (default mon-fri) / days off (jp: Japanese holidays, a..b: a range)')],
+  [
+    t('スライド表示で ← →', '← → in slides'),
+    t('ページ送り（F 全画面、N ノート、Home / End）', 'Page through (F full screen, N notes, Home / End)'),
+  ],
+  [
+    'layout / notes / theme',
+    t('スライドの属性（center・two-column・title / ノート / dark）', 'Slide fields (center, two-column, title / speaker notes / dark)'),
+  ],
+  [
+    'workdays / holidays',
+    t(
+      '稼働曜日（既定 mon-fri）/ 休日（jp で日本の祝日、a..b で期間）',
+      'Working days (default mon-fri) / days off (jp: Japanese holidays, a..b: a range)'
+    ),
+  ],
 ];
 
 function HelpMenu() {
@@ -441,9 +511,7 @@ function HelpMenu() {
           <a class="docs-link" href="#/docs" onClick={close}>
             {t('使い方ガイドを開く', 'Open the guide')} →
           </a>
-          <dl class="shortcuts">
-            {shortcuts().map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}
-          </dl>
+          <dl class="shortcuts">{shortcuts().map(([k, v]) => [<dt key={k}>{k}</dt>, <dd key={k + ':d'}>{v}</dd>])}</dl>
         </>
       )}
     </Popup>
@@ -455,11 +523,7 @@ function HelpMenu() {
 function ViewSwitch() {
   const ctl = useCtl();
   const item = (view: View, label: string) => (
-    <button
-      class={ctl.view === view ? 'on' : ''}
-      onMouseDown={keepFocus}
-      onClick={() => ctl.view !== view && ctl.setView(view)}
-    >
+    <button class={ctl.view === view ? 'on' : ''} onMouseDown={keepFocus} onClick={() => ctl.view !== view && ctl.setView(view)}>
       {label}
     </button>
   );
@@ -563,7 +627,14 @@ function NodeRow({ id, changed }: RowProps) {
         >
           {canToggle && (
             <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path
+                d="M2.5 4.5 6 8l3.5-3.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           )}
         </button>
@@ -571,7 +642,10 @@ function NodeRow({ id, changed }: RowProps) {
           class="bullet"
           href={ctl.hashFor(id)}
           tabIndex={-1}
-          title={t('クリックでズームイン / ドラッグで移動 / 右クリックでメニュー', 'Click to zoom in / drag to move / right-click for the menu')}
+          title={t(
+            'クリックでズームイン / ドラッグで移動 / 右クリックでメニュー',
+            'Click to zoom in / drag to move / right-click for the menu'
+          )}
           draggable={false}
           onPointerDown={(e) => e.button === 0 && startBulletDrag(e, id, ctl)}
           onContextMenu={(e) => {
@@ -616,9 +690,7 @@ function FieldsSummary({ id }: { id: string }) {
   const fields = store.node(id).children.filter((c) => store.isField(c) && store.node(c).format === null);
   if (!fields.length) return null;
   const open = ctl.fieldsShown(id);
-  const summary = fields
-    .map((f) => (store.node(f).children.length ? `${store.node(f).key} …` : nodeLabel(store, f)))
-    .join(' · ');
+  const summary = fields.map((f) => (store.node(f).children.length ? `${store.node(f).key} …` : nodeLabel(store, f))).join(' · ');
   return (
     <button
       class={'fields-summary' + (open ? ' open' : '')}
@@ -628,7 +700,14 @@ function FieldsSummary({ id }: { id: string }) {
       onClick={() => ctl.toggleFieldsOpen(id)}
     >
       <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
-        <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        <path
+          d="M4.5 2.5 8 6l-3.5 3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
       {!open && <span>{summary}</span>}
     </button>
@@ -798,25 +877,42 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
       {/* A plain row can become a task; a task can be completed, and reopened. */}
       {id !== ctl.zoomId &&
         (!ctl.store.isTask(id) ? (
-          <button class="mini" title={t('やることとして登録 (⌘/Ctrl+L)', 'Mark as something to do (⌘/Ctrl+L)')} onMouseDown={keepFocus} onClick={() => ctl.toggleTask([id])}>
+          <button
+            class="mini"
+            title={t('やることとして登録 (⌘/Ctrl+L)', 'Mark as something to do (⌘/Ctrl+L)')}
+            onMouseDown={keepFocus}
+            onClick={() => ctl.toggleTask([id])}
+          >
             {t('タスク', 'Task')}
           </button>
         ) : (
           <button
             class="mini"
-            title={ctl.store.node(id).completed ? t('未完了に戻す (⌘/Ctrl+Shift+Enter)', 'Reopen (⌘/Ctrl+Shift+Enter)') : t('完了にする (⌘/Ctrl+Shift+Enter)', 'Complete (⌘/Ctrl+Shift+Enter)')}
+            title={
+              ctl.store.node(id).completed
+                ? t('未完了に戻す (⌘/Ctrl+Shift+Enter)', 'Reopen (⌘/Ctrl+Shift+Enter)')
+                : t('完了にする (⌘/Ctrl+Shift+Enter)', 'Complete (⌘/Ctrl+Shift+Enter)')
+            }
             onMouseDown={keepFocus}
             onClick={() => ctl.toggleComplete(id)}
           >
             {ctl.store.node(id).completed ? '↺' : '✓'}
           </button>
         ))}
-      <button class="mini" title={t('属性を追加 (Alt+A)', 'Add a field (Alt+A)')} onMouseDown={keepFocus} onClick={() => ctl.addAttribute(id)}>
+      <button
+        class="mini"
+        title={t('属性を追加 (Alt+A)', 'Add a field (Alt+A)')}
+        onMouseDown={keepFocus}
+        onClick={() => ctl.addAttribute(id)}
+      >
         {t('+ 属性', '+ Field')}
       </button>
       <button
         class="mini"
-        title={t('ブロック（Markdown・CSV・コードなど複数行の値）を追加 (Alt+D)', 'Add a block: a multi-line value such as Markdown, CSV or code (Alt+D)')}
+        title={t(
+          'ブロック（Markdown・CSV・コードなど複数行の値）を追加 (Alt+D)',
+          'Add a block: a multi-line value such as Markdown, CSV or code (Alt+D)'
+        )}
         onMouseDown={keepFocus}
         onClick={() => ctl.addBlock(id)}
       >
@@ -857,7 +953,11 @@ function BlockHead({ node }: { node: OutlineNode }) {
             {f.label}
           </option>
         ))}
-        {!hasFormat(node.format!) && <option value={node.format!}>{node.format} {t('(未定義)', '(unknown)')}</option>}
+        {!hasFormat(node.format!) && (
+          <option value={node.format!}>
+            {node.format} {t('(未定義)', '(unknown)')}
+          </option>
+        )}
       </select>
       {node.collapsed && <span class="block-preview">{node.text.split('\n')[0].slice(0, 80)}</span>}
     </span>
@@ -907,7 +1007,9 @@ function Backlinks({ id }: { id: string }) {
   if (!links.length) return null;
   return (
     <div class="backlinks">
-      <div class="backlinks-title">{t('被リンク', 'Linked from')} {links.length}</div>
+      <div class="backlinks-title">
+        {t('被リンク', 'Linked from')} {links.length}
+      </div>
       <ul>
         {links.map((b, i) => {
           const path = store
@@ -1222,7 +1324,10 @@ function DepBadge({ id }: { id: string }) {
   const broken = missing.length > 0 && !store.node(id).completed && (
     <span
       class="dep-badge cycle"
-      title={t('after のリンク先が見つかりません（削除された？）。この依存は日程に効いていません', 'An item in `after` is gone (deleted?), so it no longer holds this up')}
+      title={t(
+        'after のリンク先が見つかりません（削除された？）。この依存は日程に効いていません',
+        'An item in `after` is gone (deleted?), so it no longer holds this up'
+      )}
     >
       ⚠ {t('依存先なし', 'Missing')} {missing.length}
     </span>
@@ -1245,7 +1350,10 @@ function DepBadge({ id }: { id: string }) {
   }
   const waiting = blockers(store, id);
   return (
-    <span class="dep-badge blocked" title={t('待っている: ', 'Waiting for: ') + waiting.map((w) => nodeLabel(store, w)).join(t('、', ', '))}>
+    <span
+      class="dep-badge blocked"
+      title={t('待っている: ', 'Waiting for: ') + waiting.map((w) => nodeLabel(store, w)).join(t('、', ', '))}
+    >
       {t('待ち', 'Waiting')} {waiting.length}
     </span>
   );
@@ -1295,7 +1403,13 @@ function SchedLabel({ id, header }: { id: string; header?: boolean }) {
   if (schedule.unscheduled.has(id)) {
     return (
       <>
-        <span class="sched unscheduled" title={t('start がこの行にも親にもなく、日程を計算できる依存もありません', 'No start on this row or above it, and no scheduled dependency')}>
+        <span
+          class="sched unscheduled"
+          title={t(
+            'start がこの行にも親にもなく、日程を計算できる依存もありません',
+            'No start on this row or above it, and no scheduled dependency'
+          )}
+        >
           {t('開始日未設定', 'No start date')}
         </span>
         {bad}
@@ -1307,8 +1421,7 @@ function SchedLabel({ id, header }: { id: string; header?: boolean }) {
   const now = today();
   const done = store.node(id).completed;
   const span = s.end - s.start + 1;
-  const range =
-    s.kind === 'milestone' ? `◆ ${shortDate(s.start, now)}` : `${shortDate(s.start, now)} → ${shortDate(s.end, now)}`;
+  const range = s.kind === 'milestone' ? `◆ ${shortDate(s.start, now)}` : `${shortDate(s.start, now)} → ${shortDate(s.end, now)}`;
   const tip = schedTooltip(s);
   let cls = 'sched ' + s.kind;
   if (s.critical && s.kind !== 'summary') cls += ' critical';
@@ -1337,5 +1450,3 @@ function caretFromPoint(x: number, y: number): { node: Node; offset: number } | 
   const r = document.caretRangeFromPoint?.(x, y); // Safari < 18.4
   return r && { node: r.startContainer, offset: r.startOffset };
 }
-
-

@@ -32,7 +32,13 @@ test('YAML-ish text becomes a tree of rows and fields', () => {
     ['after: [[abc]]'],
     ['budget: ', [['amount: 1200000'], ['currency: JPY']]],
     ['links: ', [['https://example.com/spec'], ['https://example.com/figma']]],
-    ['members: ', [['', [['name: 田中'], ['role: PM']]], ['', [['name: 鈴木']]]]],
+    [
+      'members: ',
+      [
+        ['', [['name: 田中'], ['role: PM']]],
+        ['', [['name: 鈴木']]],
+      ],
+    ],
   ]);
 });
 

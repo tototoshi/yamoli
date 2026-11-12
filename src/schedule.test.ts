@@ -135,7 +135,17 @@ test('the sample WBS schedules through phases, holidays and a critical chain', a
   expect(dates(by('公開'))).toEqual(['2026-12-08', '2026-12-08']);
   expect(dates(by('監視・改善'))).toEqual(['2026-12-08', '2026-12-14']);
   expect(by('デザイン').kind).toBe('summary');
-  const critical = ['要件定義', '情報設計', 'ワイヤーフレーム', 'ビジュアルデザイン', '画面実装', 'API 連携', '総合テスト', '公開', '監視・改善'];
+  const critical = [
+    '要件定義',
+    '情報設計',
+    'ワイヤーフレーム',
+    'ビジュアルデザイン',
+    '画面実装',
+    'API 連携',
+    '総合テスト',
+    '公開',
+    '監視・改善',
+  ];
   for (const t of critical) expect([t, by(t).critical]).toEqual([t, true]);
   expect(by('API 実装').critical).toBe(false);
   expect(by('法務レビュー').critical).toBe(false);

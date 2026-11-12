@@ -81,7 +81,10 @@ function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): D
       return text as SVGTextElement;
     });
     const NAMES_MAX = 360;
-    const namesW = Math.max(140, Math.min(NAMES_MAX, Math.max(...texts.map((el) => el.x.baseVal[0].value + el.getComputedTextLength())) + 12));
+    const namesW = Math.max(
+      140,
+      Math.min(NAMES_MAX, Math.max(...texts.map((el) => el.x.baseVal[0].value + el.getComputedTextLength())) + 12)
+    );
     for (const el of texts) {
       const room = namesW - 8 - el.x.baseVal[0].value;
       while (el.textContent!.length > 1 && el.getComputedTextLength() > room) el.textContent = el.textContent!.slice(0, -2) + '…';
@@ -101,11 +104,16 @@ function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): D
       );
     }
     const left = namesW + datesW;
-    names.forEach((_, i) => add(stripes, 'rect', { x: 0, y: HEAD + i * ROW, width: left, height: ROW, class: 'row' + (i % 2 ? ' odd' : '') }));
+    names.forEach((_, i) =>
+      add(stripes, 'rect', { x: 0, y: HEAD + i * ROW, width: left, height: ROW, class: 'row' + (i % 2 ? ' odd' : '') })
+    );
 
     const width = left + chartW;
     const height = HEAD + Number(body.getAttribute('height'));
-    for (const [part, y] of [[head, 0], [body, HEAD]] as const) {
+    for (const [part, y] of [
+      [head, 0],
+      [body, HEAD],
+    ] as const) {
       const copy = part.cloneNode(true) as SVGSVGElement;
       copy.removeAttribute('style'); // the header's scroll offset
       copy.setAttribute('x', String(left));
@@ -115,7 +123,9 @@ function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): D
       copy.querySelectorAll('.dep').forEach((el) => el.classList.remove('near', 'far'));
       // Marker ids of their own, so the copy's arrows don't point at the page's.
       copy.querySelectorAll('marker').forEach((m) => (m.id = 'x-' + m.id));
-      copy.querySelectorAll('[marker-end]').forEach((el) => el.setAttribute('marker-end', el.getAttribute('marker-end')!.replace('#', '#x-')));
+      copy
+        .querySelectorAll('[marker-end]')
+        .forEach((el) => el.setAttribute('marker-end', el.getAttribute('marker-end')!.replace('#', '#x-')));
       svg.append(copy);
     }
     for (const lx of datesW ? [namesW, left] : [left]) add(svg, 'line', { x1: lx, x2: lx, y1: 0, y2: height, class: 'frame-line' });
@@ -196,8 +206,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
       <p class="gantt-empty">
         {lang() === 'en' ? (
           <>
-            Nothing is scheduled yet. Give tasks a <code>duration</code> (e.g. 3d) and the project a <code>start</code> (e.g.
-            2026-11-10).
+            Nothing is scheduled yet. Give tasks a <code>duration</code> (e.g. 3d) and the project a <code>start</code> (e.g. 2026-11-10).
           </>
         ) : (
           <>
@@ -235,8 +244,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
     return dateCells(s, work, now);
   };
   const dateRows = new Map(showDates ? rows.map((id) => [id, dates(id)]) : []);
-  const rowCls = (id: string) =>
-    (store.node(id).completed ? ' done' : '') + (schedule.byId.get(id)?.kind === 'summary' ? ' summary' : '');
+  const rowCls = (id: string) => (store.node(id).completed ? ' done' : '') + (schedule.byId.get(id)?.kind === 'summary' ? ' summary' : '');
 
   return (
     <div class={'gantt-wrap' + (embedded ? ' embedded' : '')}>
@@ -301,7 +309,9 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
       <div
         class={'gantt' + (showDates ? ' with-dates' : '')}
         ref={ganttRef}
-        style={showDates ? { gridTemplateColumns: `minmax(140px, 260px) ${DATE_COLS.map((w) => w + 'px').join(' ')} minmax(0, 1fr)` } : undefined}
+        style={
+          showDates ? { gridTemplateColumns: `minmax(140px, 260px) ${DATE_COLS.map((w) => w + 'px').join(' ')} minmax(0, 1fr)` } : undefined
+        }
         onMouseLeave={() => setHover(null)}
       >
         <div class="gantt-corner" style={{ height: `${HEAD}px` }} />
@@ -352,8 +362,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                   const date = new Date(d * 86_400_000);
                   const show = labelEvery === 1 || date.getUTCDay() === 1;
                   if (!show) return null;
-                  const label =
-                    labelEvery === 1 ? String(date.getUTCDate()) : `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+                  const label = labelEvery === 1 ? String(date.getUTCDate()) : `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
                   return (
                     <text
                       key={d}
@@ -426,37 +435,27 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
         <div class="gantt-chart" ref={chartRef} onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}>
           <svg width={width} height={height} class="gantt-svg">
             <defs>
-              <marker
-                id="gantt-arrow"
-                viewBox="0 0 8 8"
-                refX="7"
-                refY="4"
-                markerWidth="7"
-                markerHeight="7"
-                orient="auto"
-              >
+              <marker id="gantt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
                 <path d="M0,0 L8,4 L0,8 z" class="arrow-head" />
               </marker>
-              <marker
-                id="gantt-arrow-crit"
-                viewBox="0 0 8 8"
-                refX="7"
-                refY="4"
-                markerWidth="7"
-                markerHeight="7"
-                orient="auto"
-              >
+              <marker id="gantt-arrow-crit" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
                 <path d="M0,0 L8,4 L0,8 z" class="arrow-head critical" />
               </marker>
             </defs>
 
             {/* background: row stripes (which also catch the pointer), hovered row, days off, today, months */}
             {rows.map((id, i) => (
-              <rect key={id} x={0} y={rowY(i)} width={width} height={ROW} class={'row' + (i % 2 ? ' odd' : '')} onMouseEnter={() => setHover(id)} />
+              <rect
+                key={id}
+                x={0}
+                y={rowY(i)}
+                width={width}
+                height={ROW}
+                class={'row' + (i % 2 ? ' odd' : '')}
+                onMouseEnter={() => setHover(id)}
+              />
             ))}
-            {hover !== null && index.has(hover) && (
-              <rect x={0} y={rowY(index.get(hover)!)} width={width} height={ROW} class="row-hover" />
-            )}
+            {hover !== null && index.has(hover) && <rect x={0} y={rowY(index.get(hover)!)} width={width} height={ROW} class="row-hover" />}
             {offDays.map((d) => (
               <rect key={d} x={x(d)} y={0} width={dw} height={height} class="day-off" />
             ))}
@@ -470,25 +469,25 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
               .map((l) => ({ ...l, near: hover !== null && (l.from === hover || l.to === hover) }))
               .sort((a, b) => Number(a.near) - Number(b.near)) // the hovered row's on top
               .map((l) => {
-              const a = schedule.byId.get(l.from)!;
-              const b = schedule.byId.get(l.to)!;
-              const x1 = a.kind === 'milestone' ? x(a.start) + 6 : x(a.end + 1);
-              const x2 = b.kind === 'milestone' ? x(b.start) - 6 : x(b.start);
-              const y1 = rowY(index.get(l.from)!) + ROW / 2;
-              const y2 = rowY(index.get(l.to)!) + ROW / 2;
-              const d =
-                x2 - x1 >= 12
-                  ? `M${x1},${y1} H${x1 + 6} V${y2} H${x2}`
-                  : `M${x1},${y1} h6 V${y2 + (y2 > y1 ? -ROW / 2 : ROW / 2)} H${x2 - 8} V${y2} H${x2}`;
-              return (
-                <path
-                  key={l.from + '>' + l.to}
-                  d={d}
-                  class={'dep' + (l.critical ? ' critical' : '') + (l.near ? ' near' : hover !== null ? ' far' : '')}
-                  marker-end={`url(#${l.critical ? 'gantt-arrow-crit' : 'gantt-arrow'})`}
-                />
-              );
-            })}
+                const a = schedule.byId.get(l.from)!;
+                const b = schedule.byId.get(l.to)!;
+                const x1 = a.kind === 'milestone' ? x(a.start) + 6 : x(a.end + 1);
+                const x2 = b.kind === 'milestone' ? x(b.start) - 6 : x(b.start);
+                const y1 = rowY(index.get(l.from)!) + ROW / 2;
+                const y2 = rowY(index.get(l.to)!) + ROW / 2;
+                const d =
+                  x2 - x1 >= 12
+                    ? `M${x1},${y1} H${x1 + 6} V${y2} H${x2}`
+                    : `M${x1},${y1} h6 V${y2 + (y2 > y1 ? -ROW / 2 : ROW / 2)} H${x2 - 8} V${y2} H${x2}`;
+                return (
+                  <path
+                    key={l.from + '>' + l.to}
+                    d={d}
+                    class={'dep' + (l.critical ? ' critical' : '') + (l.near ? ' near' : hover !== null ? ' far' : '')}
+                    marker-end={`url(#${l.critical ? 'gantt-arrow-crit' : 'gantt-arrow'})`}
+                  />
+                );
+              })}
 
             {/* bars */}
             {rows.map((id, i) => {
@@ -498,12 +497,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                 // Explain the missing bar, at the visible left edge.
                 const issue = scheduleIssue(store, id, schedule, ctl.cycles);
                 return issue ? (
-                  <text
-                    key={id}
-                    x={scrollLeft + 6}
-                    y={y + ROW / 2 + 4}
-                    class={'unscheduled' + (issue.startsWith('⚠') ? ' invalid' : '')}
-                  >
+                  <text key={id} x={scrollLeft + 6} y={y + ROW / 2 + 4} class={'unscheduled' + (issue.startsWith('⚠') ? ' invalid' : '')}>
                     {issue}
                   </text>
                 ) : null;
@@ -512,9 +506,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                 <g key={id} class={store.node(id).completed ? 'done' : ''} onMouseEnter={() => setHover(id)}>
                   <title>{nodeLabel(store, id) + '\n' + schedTooltip(s)}</title>
                   <Bar s={s} x={x} y={y} />
-                  {s.due !== undefined && (
-                    <line x1={x(s.due + 1)} x2={x(s.due + 1)} y1={y + 3} y2={y + ROW - 3} class="due" />
-                  )}
+                  {s.due !== undefined && <line x1={x(s.due + 1)} x2={x(s.due + 1)} y1={y + 3} y2={y + ROW - 3} class="due" />}
                   {schedule.invalid.has(id) && (
                     <text x={x(s.end + 1) + 10} y={y + ROW / 2 + 4} class="unscheduled invalid">
                       ⚠ {schedule.invalid.get(id)}
@@ -550,27 +542,13 @@ function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
   const x1 = x(s.end + 1);
   if (s.kind === 'summary') {
     const top = mid - 5;
-    return (
-      <path
-        d={`M${x0},${top} H${x1} V${top + 10} L${x1 - 5},${top + 5} H${x0 + 5} L${x0},${top + 10} z`}
-        class="summary"
-      />
-    );
+    return <path d={`M${x0},${top} H${x1} V${top + 10} L${x1 - 5},${top + 5} H${x0 + 5} L${x0},${top + 10} z`} class="summary" />;
   }
   const lateFrom = s.due !== undefined && s.end > s.due ? x(s.due + 1) : null;
   return (
     <>
-      <rect
-        x={x0 + 0.5}
-        y={mid - 7}
-        width={Math.max(x1 - x0 - 1, 2)}
-        height={14}
-        rx={3}
-        class={'bar' + (s.critical ? ' critical' : '')}
-      />
-      {lateFrom !== null && (
-        <rect x={lateFrom} y={mid - 7} width={x1 - lateFrom - 0.5} height={14} rx={3} class="bar late" />
-      )}
+      <rect x={x0 + 0.5} y={mid - 7} width={Math.max(x1 - x0 - 1, 2)} height={14} rx={3} class={'bar' + (s.critical ? ' critical' : '')} />
+      {lateFrom !== null && <rect x={lateFrom} y={mid - 7} width={x1 - lateFrom - 0.5} height={14} rx={3} class="bar late" />}
     </>
   );
 }

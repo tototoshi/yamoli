@@ -80,7 +80,7 @@ export class OutlineStore {
     return new OutlineStore({ rootId: 'root', nodes: { root } });
   }
 
-    static fromJSON(json: any): OutlineStore {
+  static fromJSON(json: any): OutlineStore {
     if (!json || typeof json !== 'object' || !json.nodes || !json.rootId || !json.nodes[json.rootId]) {
       throw new Error('Invalid outline data');
     }

@@ -68,8 +68,24 @@ test('steps keep only the parts that changed, added and removed ones too', () =>
 
 test('a part added and then changed within one coalesced step is gone again on undo', () => {
   const h = new UndoHistory<null>(new Map([['a', '1']]));
-  h.record(new Map([['a', '1'], ['b', 'x']]), null, 'k', 0);
-  h.record(new Map([['a', '1'], ['b', 'xy']]), null, 'k', 100);
+  h.record(
+    new Map([
+      ['a', '1'],
+      ['b', 'x'],
+    ]),
+    null,
+    'k',
+    0
+  );
+  h.record(
+    new Map([
+      ['a', '1'],
+      ['b', 'xy'],
+    ]),
+    null,
+    'k',
+    100
+  );
   const back = h.undo(null)!.state;
   expect([...back.entries()]).toEqual([['a', '1']]);
 });

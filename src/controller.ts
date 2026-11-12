@@ -59,8 +59,7 @@ export const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** macOS's Emacs keys (Ctrl+P / N / B / F) as the arrow they stand for. */
 const EMACS: Record<string, string> = { KeyP: 'ArrowUp', KeyN: 'ArrowDown', KeyB: 'ArrowLeft', KeyF: 'ArrowRight' };
-export const arrowOf = (e: KeyboardEvent) =>
-  (IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && EMACS[e.code]) || e.key;
+export const arrowOf = (e: KeyboardEvent) => (IS_MAC && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && EMACS[e.code]) || e.key;
 
 /** State of the `[[` link picker attached to one editable field. */
 /** The menu opened by right-clicking an item's bullet. */
@@ -100,7 +99,6 @@ export interface Suggest {
 
 /** Fields whose values are not worth offering again: dates, and links (which have the `[[` picker). */
 const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'end', 'due', DONE_KEY]);
-
 
 /** A row as it was copied, with the rows under it. */
 interface Copied {
@@ -547,7 +545,7 @@ export class Controller {
       this.clearSelection(sel.head);
     } else if ((key === 'ArrowUp' || key === 'ArrowDown') && (key !== e.key || plain)) {
       e.preventDefault();
-      if (!e.shiftKey) return this.clearSelection(key === 'ArrowUp' ? rows[0] : rows[rows.length - 1]), true;
+      if (!e.shiftKey) return (this.clearSelection(key === 'ArrowUp' ? rows[0] : rows[rows.length - 1]), true);
       const head = vis[vis.indexOf(sel.head) + (key === 'ArrowDown' ? 1 : -1)];
       if (head) {
         this.selection = { ...sel, head };
@@ -770,7 +768,10 @@ export class Controller {
     this.copyRows([id], (c) => this.store.node(c).children).then(
       () =>
         this.showToast(
-          t(`${count} 行をコピーしました。行に貼り付けると、そのままの形で入ります`, `Copied ${count} rows. Paste into a row to put them back as they are`)
+          t(
+            `${count} 行をコピーしました。行に貼り付けると、そのままの形で入ります`,
+            `Copied ${count} rows. Paste into a row to put them back as they are`
+          )
         ),
       () => this.showToast(t('クリップボードにコピーできませんでした', 'Couldn’t copy to the clipboard'))
     );
@@ -780,7 +781,10 @@ export class Controller {
     navigator.clipboard.writeText(`[[${id}]]`).then(
       () =>
         this.showToast(
-          t('リンクをコピーしました。本文や属性の値に貼り付けると参照になります', 'Link copied. Paste it into a row or a field value to refer to this item')
+          t(
+            'リンクをコピーしました。本文や属性の値に貼り付けると参照になります',
+            'Link copied. Paste it into a row or a field value to refer to this item'
+          )
         ),
       () => this.showToast(t('クリップボードにコピーできませんでした', 'Couldn’t copy to the clipboard'))
     );
@@ -1200,9 +1204,7 @@ export class Controller {
       // The new row goes first among the sub-items, after the fields; with fields only, it's the next sibling.
       const firstItem = this.shownChildren(id).find((c) => !store.isField(c));
       const next =
-        firstItem && this.isExpanded(id)
-          ? store.addChild(id, store.indexOf(firstItem), after)
-          : store.addSiblingAfter(id, after);
+        firstItem && this.isExpanded(id) ? store.addChild(id, store.indexOf(firstItem), after) : store.addSiblingAfter(id, after);
       return this.commit(fText(next.id, 0));
     }
     if (e.key === 'Tab' && !isMod(e) && !e.altKey) {
@@ -1412,7 +1414,6 @@ export class Controller {
     }
     return false;
   }
-
 
   /**
    * Paste indented text (YAML, a nested list): the rows go after the current

@@ -70,7 +70,11 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   if (n.completed) own('done', true);
   if (todo) own('todo', true);
   Object.assign(out, fieldValues);
-  if (items.length) own('children', items.map((c) => itemValue(store, c, linked)));
+  if (items.length)
+    own(
+      'children',
+      items.map((c) => itemValue(store, c, linked))
+    );
   return out;
 }
 
@@ -138,8 +142,7 @@ export function toYaml(v: Value): string {
   return block(v, 0).replace(/^\n/, '') + '\n';
 }
 
-const isObj = (v: Value): v is Record<string, Value> =>
-  !!v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Tagged);
+const isObj = (v: Value): v is Record<string, Value> => !!v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Tagged);
 const isEmpty = (v: Value) => (Array.isArray(v) ? !v.length : isObj(v) && !Object.keys(v).length);
 
 /** A value placed after `key:` or `- `: inline for scalars, else on the following lines. */
@@ -173,7 +176,14 @@ function inline(v: Value, indent: number): string {
   if (typeof v === 'string' && v.includes('\n') && !/^\s/.test(v) && !/[ \t]$/m.test(v)) {
     const pad = ' '.repeat(indent);
     const chomp = v.endsWith('\n') ? '' : '-';
-    return ` |${chomp}\n` + v.replace(/\n$/, '').split('\n').map((l) => (l ? pad + l : '')).join('\n');
+    return (
+      ` |${chomp}\n` +
+      v
+        .replace(/\n$/, '')
+        .split('\n')
+        .map((l) => (l ? pad + l : ''))
+        .join('\n')
+    );
   }
   return ' ' + str(v);
 }
