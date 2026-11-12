@@ -86,6 +86,7 @@ export function App() {
 
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
+  ctl.keepViewShowable();
   ctl.taskRows = ctl.prefs.tasksOnly && (ctl.view === 'outline' || ctl.view === 'text') ? ctl.findTaskRows() : null;
   const changedRows = ctl.takeChangedRows();
   // Rows show their dates, search matches and the task filter: with any of those, every row is drawn again.

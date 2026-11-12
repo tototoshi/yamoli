@@ -2,7 +2,7 @@ import type { ComponentChildren, TargetedEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { fText } from './focus';
 import { IS_MAC } from './keys';
-import type { View } from './viewState';
+import { DRAWN_VIEWS, enabledViews, type DrawnView, type View } from './views';
 import { lang, t } from './i18n';
 import { keepFocus, useCtl } from './context';
 import { saveFile } from './exportImage';
@@ -364,21 +364,62 @@ function HelpMenu() {
 
 export function ViewSwitch() {
   const ctl = useCtl();
-  const item = (view: View, label: string) => (
-    <button class={ctl.view === view ? 'on' : ''} onMouseDown={keepFocus} onClick={() => ctl.view !== view && ctl.setView(view)}>
-      {label}
+  const label: Record<View, string> = {
+    outline: t('アウトライン', 'Outline'),
+    gantt: t('ガント', 'Gantt'),
+    diagram: t('図', 'Diagram'),
+    slides: t('スライド', 'Slides'),
+    text: t('テキスト', 'Text'),
+    yaml: 'YAML',
+    json: 'JSON',
+  };
+  const on = enabledViews(ctl.store, ctl.zoomId);
+  const item = (view: View) => (
+    <button key={view} class={ctl.view === view ? 'on' : ''} onMouseDown={keepFocus} onClick={() => ctl.view !== view && ctl.setView(view)}>
+      {label[view]}
     </button>
   );
+  const off = DRAWN_VIEWS.filter((v) => !on.has(v));
+  const hint: Record<DrawnView, string> = {
+    gantt: t('日程をチャートで', 'The schedule as a chart'),
+    diagram: t('行を箱と矢印で', 'The rows as boxes and arrows'),
+    slides: t('行をスライドに', 'The rows as slides'),
+  };
   return (
-    <div class="view-switch" role="group" aria-label={t('表示', 'View')}>
-      {item('outline', t('アウトライン', 'Outline'))}
-      {item('gantt', t('ガント', 'Gantt'))}
-      {item('diagram', t('図', 'Diagram'))}
-      {item('slides', t('スライド', 'Slides'))}
-      {item('text', t('テキスト', 'Text'))}
-      {item('yaml', 'YAML')}
-      {item('json', 'JSON')}
-    </div>
+    <>
+      <div class="view-switch" role="group" aria-label={t('表示', 'View')}>
+        {item('outline')}
+        {DRAWN_VIEWS.filter((v) => on.has(v)).map(item)}
+        {item('text')}
+        {item('yaml')}
+        {item('json')}
+      </div>
+      {off.length > 0 && (
+        <Popup label="+" title={t('この項目で使うビューを追加', 'Turn on a view for this item')}>
+          {(close) => (
+            <div class="menu-list view-add" role="menu">
+              {off.map((v) => (
+                <button
+                  key={v}
+                  role="menuitem"
+                  title={t(
+                    `この項目と下の行で使えるようにします（views: ${v}）`,
+                    `Turns it on for this item and the rows under it (views: ${v})`
+                  )}
+                  onClick={() => {
+                    close();
+                    ctl.enableView(v);
+                  }}
+                >
+                  {label[v]}
+                  <kbd>{hint[v]}</kbd>
+                </button>
+              ))}
+            </div>
+          )}
+        </Popup>
+      )}
+    </>
   );
 }
 

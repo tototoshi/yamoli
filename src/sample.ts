@@ -19,6 +19,7 @@ const findSample = (s: OutlineStore, parentId: string, field: string) =>
 export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = today()): string {
   const monday = now + ((8 - weekday(now)) % 7); // today if Monday, else the next one
   const proj = s.addChild(parentId, -1, t('サンプル: Web サイト リニューアル', 'Sample: Website redesign'));
+  s.addField(proj.id, 'views', 'gantt');
   s.addField(proj.id, 'start', formatDate(monday));
   if (lang() === 'ja') s.addField(proj.id, 'holidays', 'jp');
   // Notes go in a block, so every row stays a task.
@@ -80,6 +81,7 @@ export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = 
 /** Append a web service's architecture under parentId, to be seen in the Diagram view, and return its id. */
 export function addDiagramSample(s: OutlineStore, parentId: string): string {
   const sys = s.addChild(parentId, -1, t('サンプル: システム構成', 'Sample: System architecture'));
+  s.addField(sys.id, 'views', 'diagram');
   s.addField(sys.id, 'direction', 'LR');
   s.addBlock(
     sys.id,
@@ -157,6 +159,7 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
   const system = findSample(s, parentId, 'direction') ?? addDiagramSample(s, parentId);
 
   const deck = s.addChild(parentId, -1, t('Yamoli の使い方', 'Using Yamoli'));
+  s.addField(deck.id, 'views', 'slides');
   s.addField(deck.id, 'subtitle', t('アウトライン × YAML × プロジェクト管理', 'Outlines × YAML × project planning'));
   s.addField(
     deck.id,
@@ -289,6 +292,13 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
       [t('項目 = デッキ、子 = 1 枚ずつ', 'An item is a deck, each row under it a slide'), '`layout` / `notes` / `image` / `theme`'],
     ],
     ['YAML / JSON', [t('ズームした項目をデータとして', 'The zoomed item as data')]],
+    [
+      t('ビューを有効に', 'Turning views on'),
+      [
+        t('ガント・図・スライドは `views` 属性のある木だけ', 'Gantt, Diagram and Slides only where a `views` field is'),
+        t('表示バーの + から追加', 'Add one from the + in the view bar'),
+      ],
+    ],
     [
       t('検索', 'Search'),
       [t('`status:進行中`、`budget.amount:1200000`', '`status:active`, `budget.amount:1200000`'), '`is:late` / `is:critical` / `is:done`'],

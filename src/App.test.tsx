@@ -18,12 +18,17 @@ globalThis.ResizeObserver ??= class {
 } as unknown as typeof ResizeObserver;
 
 const { App } = await import('./App');
+const { setLang } = await import('./i18n');
+
+let mounted: HTMLElement | null = null;
 
 async function mount(build: (s: OutlineStore) => void) {
+  // The last test's app goes, or it would answer this one's hash changes too.
+  if (mounted) await act(() => render(null, mounted!));
   const s = OutlineStore.create();
   build(s);
   mocks.store = s;
-  const root = document.createElement('div');
+  const root = (mounted = document.createElement('div'));
   document.body.replaceChildren(root);
   await act(() => render(<App />, root));
   return root;
@@ -83,4 +88,42 @@ test('changing a duration redraws the dates of the rows that wait for it', async
     ta.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(dates()).not.toBe(before);
+});
+
+test('Gantt, Diagram and Slides show only where a views field turns them on', async () => {
+  setLang('en');
+  let item = '';
+  const root = await mount((s) => {
+    item = s.addChild(s.rootId, -1, 'Plan').id;
+    s.addChild(item, -1, 'Step');
+  });
+  const views = () => [...root.querySelectorAll('.view-switch button')].map((b) => b.textContent);
+  const on = () => root.querySelector('.view-switch button.on')?.textContent;
+  const settle = () => act(() => new Promise((r) => setTimeout(r, 0)));
+
+  // Asking for a view that isn't on (an old link, say) shows the outline.
+  await act(() => {
+    location.hash = `#/${item}?view=gantt`;
+  });
+  await settle();
+  expect(on()).toBe('Outline');
+  expect(views()).toEqual(['Outline', 'Text', 'YAML', 'JSON']);
+
+  // + turns one on: a views field on the item, and the view is shown.
+  await act(() => root.querySelector<HTMLElement>('.view-bar .popup summary')!.click());
+  await settle(); // the menu opens on the toggle event, which comes after the click
+  const gantt = [...root.querySelectorAll<HTMLElement>('.view-add button')].find((b) => b.textContent!.startsWith('Gantt'))!;
+  await act(() => gantt.click());
+  await settle();
+  expect(mocks.store.fieldValue(item, 'views')).toBe('gantt');
+  expect(views()).toEqual(['Outline', 'Gantt', 'Text', 'YAML', 'JSON']);
+  expect(on()).toBe('Gantt');
+
+  // Undoing it goes back to the outline.
+  await act(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', key: 'z', ctrlKey: true, bubbles: true }));
+  });
+  await settle();
+  expect(on()).toBe('Outline');
+  expect(views()).toEqual(['Outline', 'Text', 'YAML', 'JSON']);
 });

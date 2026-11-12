@@ -658,6 +658,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 }
 .view-switch button + button { border-left: 1px solid var(--faint); }
 .view-switch button.on { background: var(--attr-bg); color: var(--attr-fg); }
+/* The + after the view switch, for turning on another view. */
+.view-bar .popup-panel { left: 0; right: auto; }
+.view-add kbd { font-family: inherit; }
 
 /* ---------------------------------------------------------------- gantt */
 

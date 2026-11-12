@@ -13,9 +13,7 @@ import { OutlineStore } from './model';
 import { parseQuery, searchTree, wantsCompleted, type SearchResult, type Term } from './search';
 import { flush, load, loadPrefs, onExternalChange, onSaveState, resolveConflict, save, savePrefs, type FieldsMode } from './storage';
 import { captureFocus, fText, type Focus } from './focus';
-
-export type View = 'outline' | 'gantt' | 'diagram' | 'slides' | 'text' | 'yaml' | 'json';
-const VIEWS: View[] = ['outline', 'gantt', 'diagram', 'slides', 'text', 'yaml', 'json'];
+import { enabledViews, isDrawn, VIEWS, type View } from './views';
 
 /** The menu opened by right-clicking an item's bullet. */
 export interface ItemMenu {
@@ -445,14 +443,27 @@ export class ViewState {
     // A field or block can't be zoomed into: its item is shown instead.
     this.zoomId = this.store.get(raw) ? this.store.owner(raw) : this.store.rootId;
     const asked = new URLSearchParams(m?.[2] ?? '').get('view') as View | null;
-    if (asked && VIEWS.includes(asked)) {
+    if (asked && VIEWS.includes(asked) && this.canShow(asked)) {
       this.view = asked;
       this.rememberView();
     } else {
       const remembered = this.prefs.views[this.zoomId];
-      this.view = remembered ?? 'outline';
-      if (remembered) window.history.replaceState(null, '', this.hashFor(this.zoomId, remembered));
+      this.view = remembered && this.canShow(remembered) ? remembered : 'outline';
+      if (this.view !== 'outline' || asked)
+        window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view === 'outline' ? undefined : this.view));
     }
+  }
+
+  /** Whether the zoomed item can be shown as view: the Gantt chart, diagram and slides only where a `views` field turns them on. */
+  canShow(view: View): boolean {
+    return !isDrawn(view) || enabledViews(this.store, this.zoomId).has(view);
+  }
+
+  /** Back to the outline when the view on screen is no longer turned on (its `views` field changed, or was undone). */
+  keepViewShowable() {
+    if (this.docs || this.canShow(this.view)) return;
+    this.view = 'outline';
+    window.history.replaceState(null, '', this.hashFor(this.zoomId));
   }
 
   private rememberView() {

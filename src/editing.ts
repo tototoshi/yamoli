@@ -12,6 +12,7 @@ import { FIELD_TYPED } from './fields';
 import { fKey, fText, type Focus } from './focus';
 import { arrowOf } from './keys';
 import { ViewState } from './viewState';
+import { VIEWS_KEY, type DrawnView } from './views';
 
 /** The field that records when an item was completed. */
 const DONE_KEY = 'completed';
@@ -372,6 +373,16 @@ export class Editing extends ViewState {
     this.store.setFormat(id, null);
     this.store.setText(id, prefix + n.text);
     this.commit(fText(id, caret ?? prefix.length));
+  }
+
+  /** Turn a view on for the zoomed item and everything under it (in its `views` field), and show it. */
+  enableView(view: DrawnView) {
+    const f = this.store.field(this.zoomId, VIEWS_KEY);
+    const v = f?.text.trim();
+    if (f) this.store.setText(f.id, v ? `${v}, ${view}` : view);
+    else this.store.addField(this.zoomId, VIEWS_KEY, view);
+    this.commit(null);
+    this.setView(view);
   }
 
   /** Add a block (multi-line field, Markdown by default) and start writing in it. */

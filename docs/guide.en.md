@@ -68,10 +68,11 @@ Because of `after`, Design is scheduled to start on the working day after Requir
 
 ## Scheduling
 
-These fields are read for the Gantt chart.
+The Gantt chart is there for items with `views: gantt` (see Views). It reads these fields.
 
 | Field | Example | Meaning |
 | --- | --- | --- |
+| `views` | `gantt` | Turns the Gantt chart on (see Views) |
 | `duration` | `3d` / `2w` / `10cd` / `0d` | Length in working days / weeks / calendar days. `0d` is a milestone |
 | `start` | `2026-11-10` | Don't start before this date. Inherited by children |
 | `end` | `2026-11-14` | Instead of `duration`: the last day, the bar running from `start` to here (calendar days, so weekends count). Dependencies that end later move it whole |
@@ -86,10 +87,11 @@ An item with children spans the dates of its children. ★ marks the critical pa
 
 ## Diagrams
 
-The Diagram view draws the zoomed item from its rows, for example a system's architecture:
+For items with `views: diagram`, the Diagram view draws the zoomed item from its rows, for example a system's architecture:
 
 ```
 ・Production
+  ・views: diagram
   ・User
     ・shape: actor
     ・to: [[Web]] HTTPS
@@ -134,7 +136,7 @@ An arrow to or from a row listed in a box is drawn to the box; a mind map (`diag
 
 ## Slides
 
-The zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content. ← → page through, F goes full screen, N shows the speaker notes.
+For items with `views: slides`: the zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content. ← → page through, F goes full screen, N shows the speaker notes.
 
 | Field | On | Meaning |
 | --- | --- | --- |
@@ -168,10 +170,12 @@ Search (⌘F) finds the rows matching all the terms you write; Esc clears it.
 
 Switch with the view bar; each item remembers the view last used for it.
 
+Outline, Text, YAML and JSON work for any item. Gantt, Diagram and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `slides`, or `ガント` / `図` / `スライド`).
+
 - **Outline**: where all editing happens.
-- **Gantt**: the schedule as a chart (see Scheduling).
-- **Diagram**: the rows drawn as boxes and arrows (see Diagrams).
-- **Slides**: the rows as a slide deck (see Slides).
+- **Gantt**: the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
+- **Diagram**: the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
+- **Slides**: the rows as a slide deck (see Slides). Turned on with `views: slides`.
 - **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
 - **YAML / JSON**: the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
 

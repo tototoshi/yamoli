@@ -30,13 +30,14 @@ import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
 import { nodeLabel, refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
+import { VIEWS_KEY } from './views';
 
 export type Shape = 'box' | 'actor' | 'db' | 'queue' | 'external';
 const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
-const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'diagram', 'lines', 'completed', DEP_KEY, 'sequential']);
+const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'diagram', 'lines', 'completed', DEP_KEY, 'sequential', VIEWS_KEY]);
 
 export type FrameStyle = 'dashed' | 'solid' | 'none';
 const FRAME_STYLES: FrameStyle[] = ['dashed', 'solid', 'none'];
