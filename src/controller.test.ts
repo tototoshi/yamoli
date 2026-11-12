@@ -363,3 +363,39 @@ test('⌘Enter adds a row below, after the rows under it, wherever the caret is;
   press(ctl, editor(ctl, b), 'Enter', { metaKey: true, shiftKey: true });
   expect(store.node(b).completed).toBe(true);
 });
+
+test('the schedule is worked out again only when what it reads changes', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'A');
+    s.addField(a, 'start', '2026-11-10');
+    s.addField(a, 'duration', '2d');
+  });
+  ctl.refreshSchedule();
+  const first = ctl.schedule;
+  ctl.store.setText(a, 'A renamed');
+  ctl.refreshSchedule();
+  expect(ctl.schedule).toBe(first);
+  ctl.store.setText(ctl.store.field(a, 'duration')!.id, '3d');
+  ctl.refreshSchedule();
+  expect(ctl.schedule).not.toBe(first);
+});
+
+test('undo puts back the whole outline from the steps', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'A');
+    add(a, 'child');
+  });
+  const ta = editor(ctl, a, 1);
+  press(ctl, ta, 'Enter', { metaKey: true }); // a new row below
+  ctl.store.setText(a, 'A2');
+  ctl.commit(null);
+  ctl.undo();
+  ctl.undo();
+  const top = () => ctl.store.node(ctl.store.rootId).children.map((c) => ctl.store.node(c).text);
+  expect(top()).toEqual(['A']);
+  expect(texts(ctl, a)).toEqual(['child']);
+  ctl.redo();
+  expect(top()).toEqual(['A', '']);
+});

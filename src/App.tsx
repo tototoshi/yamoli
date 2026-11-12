@@ -5,7 +5,7 @@ import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from '
 import { lang, t } from './i18n';
 import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
-import { blockers, DEP_KEY, dependencies, dependents, depStatus, findCycles, missingDependencies } from './deps';
+import { blockers, DEP_KEY, dependencies, dependents, depStatus, missingDependencies } from './deps';
 import { startBulletDrag, startRowSelect } from './drag';
 import { Ctx, useCtl } from './context';
 import { DiagramView } from './DiagramView';
@@ -18,7 +18,6 @@ import { SegView } from './InlineText';
 import { formatDate, parseDate, shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
 import { toValue, toYaml } from './serialize';
-import { computeSchedule } from './schedule';
 import type { OutlineNode } from './model';
 import { OutlineStore } from './model';
 import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
@@ -91,10 +90,9 @@ export function App() {
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
   ctl.taskRows = ctl.prefs.tasksOnly && (ctl.view === 'outline' || ctl.view === 'text') ? ctl.findTaskRows() : null;
-  ctl.cycles = findCycles(store);
+  ctl.refreshSchedule();
   ctl.selected = new Set(ctl.selectedRows());
   if (ctl.selection && !ctl.selected.size) ctl.selection = null;
-  ctl.schedule = computeSchedule(store, ctl.cycles, ctl.jpDays);
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
   document.title = (zoomId === store.rootId ? 'Home' : zoom.text || t('無題', 'Untitled')) + ' – Yamoli';

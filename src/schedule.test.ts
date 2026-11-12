@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { formatDate, parseDate, parseDuration, parseHolidays, parseWorkdays, WorkCalendar } from './calendar';
 import { findCycles } from './deps';
 import { OutlineStore } from './model';
-import { computeSchedule, type Sched } from './schedule';
+import { computeSchedule, scheduleInputs, type Sched } from './schedule';
 
 const D = (s: string) => parseDate(s)!;
 
@@ -178,4 +178,16 @@ test('an end instead of a duration: a bar from the start to it, moved whole by l
   expect(r.invalid.get(backwards)).toBe('end: 2026-11-19');
   expect(r.unscheduled.has(loose)).toBe(true);
   expect(s.isTask(own)).toBe(true);
+});
+
+test('typing in an ordinary row leaves the schedule inputs alone; fields and moves change them', () => {
+  const { s, design, api } = project();
+  const before = scheduleInputs(s);
+  s.setText(design, '設計（詳細）');
+  expect(scheduleInputs(s)).toBe(before);
+  s.setText(s.field(api, 'duration')!.id, '6d');
+  const afterField = scheduleInputs(s);
+  expect(afterField).not.toBe(before);
+  s.indent(api);
+  expect(scheduleInputs(s)).not.toBe(afterField);
 });

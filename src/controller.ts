@@ -3,10 +3,10 @@
  * commit() saves and asks the App to re-render, optionally moving focus.
  */
 import { formatDate, today } from './calendar';
-import { DEP_KEY } from './deps';
-import type { ScheduleResult } from './schedule';
+import { DEP_KEY, findCycles } from './deps';
+import { computeSchedule, scheduleInputs, type ScheduleResult } from './schedule';
 import { addDiagramSample, addGuideSlides, addScheduleSample } from './sample';
-import { UndoHistory } from './history';
+import { UndoHistory, type Entry } from './history';
 import { browserLang, setLang, t, type Lang } from './i18n';
 import { keyCandidates, linkCandidates, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED, parseOutlineText, type TextRow } from './fields';
@@ -156,12 +156,14 @@ export class Controller {
   view: View = 'outline';
   /** The slide on screen in the slides view (clamped by the view). */
   slide = 0;
-  /** Items on a dependency cycle; recomputed by the App on every render. */
+  /** Items on a dependency cycle (refreshSchedule). */
   cycles = new Set<string>();
-  /** Computed dates; recomputed by the App on every render. */
+  /** Computed dates (refreshSchedule). */
   schedule: ScheduleResult = { byId: new Map(), unscheduled: new Set(), invalid: new Map(), needsJp: false };
   /** Japanese public holidays (ISO date -> name), loaded on first use. */
   jpDays: ReadonlyMap<string, string> | null = null;
+  /** What the schedule and cycles were last worked out from. */
+  private scheduledFrom: { inputs: string; jpDays: ReadonlyMap<string, string> | null } | null = null;
   private jpLoading = false;
   private rerender: () => void = () => {};
 
@@ -350,8 +352,11 @@ export class Controller {
     this.rerender();
   }
 
-  private snapshot() {
-    return JSON.stringify(this.store.toJSON());
+  /** The outline for the undo history: each node serialized on its own (under its id), the root under ''. */
+  private snapshot(): Map<string, string> {
+    const state = new Map([['', this.store.rootId]]);
+    for (const [id, n] of Object.entries(this.store.nodes)) state.set(id, JSON.stringify(n));
+    return state;
   }
 
   undo() {
@@ -362,9 +367,11 @@ export class Controller {
     this.restore(this.history.redo(captureFocus()));
   }
 
-  private restore(entry: { state: string; meta: Focus | null } | null) {
+  private restore(entry: Entry<Focus | null> | null) {
     if (!entry) return;
-    this.store = OutlineStore.fromJSON(JSON.parse(entry.state));
+    const nodes: Record<string, unknown> = {};
+    for (const [id, json] of entry.state) if (id) nodes[id] = JSON.parse(json);
+    this.store = OutlineStore.fromJSON({ version: 1, rootId: entry.state.get(''), nodes });
     if (!this.store.get(this.zoomId)) {
       this.zoomId = this.store.rootId;
       window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view));
@@ -545,6 +552,19 @@ export class Controller {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Work out dependency cycles and the schedule again, if anything they read
+   * has changed since last time (typing in an ordinary row doesn't).
+   */
+  refreshSchedule() {
+    const inputs = scheduleInputs(this.store);
+    const last = this.scheduledFrom;
+    if (last && last.inputs === inputs && last.jpDays === this.jpDays) return;
+    this.cycles = findCycles(this.store);
+    this.schedule = computeSchedule(this.store, this.cycles, this.jpDays);
+    this.scheduledFrom = { inputs, jpDays: this.jpDays };
   }
 
   /** Switch the UI language (null: follow the browser). */

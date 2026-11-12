@@ -43,6 +43,24 @@ export interface ScheduleResult {
 }
 
 
+/**
+ * Everything scheduling and dependencies read, as one string: the tree's
+ * shape, which rows are fields, and the text of fields and what is inside
+ * them — not the text of ordinary rows. While it stays the same, so does the
+ * schedule, so typing in a row needn't work it out again.
+ */
+export function scheduleInputs(store: OutlineStore): string {
+  const parts: string[] = [];
+  const walk = (id: string, inField: boolean) => {
+    const n = store.node(id);
+    const data = inField || n.key !== null;
+    parts.push(id, n.key ?? '\u0000', data ? n.text : '', n.children.join(','));
+    for (const c of n.children) walk(c, data);
+  };
+  walk(store.rootId, false);
+  return parts.join('\u0001');
+}
+
 export function computeSchedule(
   store: OutlineStore,
   cycles: Set<string>,
