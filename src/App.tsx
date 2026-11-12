@@ -1,4 +1,5 @@
 import type { ComponentChildren, TargetedEvent } from 'preact';
+import { memo } from 'preact/compat';
 import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { applyFocus, arrowOf, captureFocus, Controller, IS_MAC, fKey, fText, type View } from './controller';
 import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
@@ -90,7 +91,9 @@ export function App() {
   const { store, zoomId, search } = ctl;
   const zoom = store.node(zoomId);
   ctl.taskRows = ctl.prefs.tasksOnly && (ctl.view === 'outline' || ctl.view === 'text') ? ctl.findTaskRows() : null;
-  ctl.refreshSchedule();
+  const changedRows = ctl.takeChangedRows();
+  // Rows show their dates, search matches and the task filter: with any of those, every row is drawn again.
+  const changed = ctl.refreshSchedule() || search || ctl.taskRows ? null : changedRows;
   ctl.selected = new Set(ctl.selectedRows());
   if (ctl.selection && !ctl.selected.size) ctl.selection = null;
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
@@ -140,7 +143,7 @@ export function App() {
           <section class="outline">
             <ul class="children top">
               {rows.map((id) => (
-                <NodeItem key={id} id={id} />
+                <NodeItem key={id} id={id} changed={changed} />
               ))}
             </ul>
             {!search && !zoom.children.length && (
@@ -518,7 +521,12 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
   );
 }
 
-function NodeItem({ id }: { id: string }) {
+type RowProps = { id: string; changed: ReadonlySet<string> | null };
+
+/** A row and the rows under it, skipped when nothing in them has changed (Controller.takeChangedRows). */
+const NodeItem = memo(NodeRow, (_: RowProps, next: RowProps) => next.changed !== null && !next.changed.has(next.id));
+
+function NodeRow({ id, changed }: RowProps) {
   const ctl = useCtl();
   const { search } = ctl;
   const n = ctl.store.node(id);
@@ -589,7 +597,7 @@ function NodeItem({ id }: { id: string }) {
       {expanded && kids.length > 0 && (
         <ul class="children">
           {kids.map((c) => (
-            <NodeItem key={c} id={c} />
+            <NodeItem key={c} id={c} changed={changed} />
           ))}
         </ul>
       )}

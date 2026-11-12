@@ -165,28 +165,71 @@ export class Controller {
   /** What the schedule and cycles were last worked out from. */
   private scheduledFrom: { inputs: string; jpDays: ReadonlyMap<string, string> | null } | null = null;
   private jpLoading = false;
-  private rerender: () => void = () => {};
+  private renderApp: () => void = () => {};
+  /**
+   * Rows that may look different since the last render (with the rows above
+   * them); null: any row may. Typing in a row only redraws the rows that show it.
+   */
+  private changedRows: Set<string> | null = null;
 
   constructor() {
     this.readHash();
-    onSaveState(() => this.rerender());
+    onSaveState(() => this.rerenderRows([]));
     onExternalChange((next) => this.applyExternal(next));
   }
 
-  bind(rerender: () => void) {
-    this.rerender = rerender;
+  bind(render: () => void) {
+    this.renderApp = render;
+  }
+
+  /** Render again, every row included. */
+  private rerender() {
+    this.changedRows = null;
+    this.renderApp();
+  }
+
+  /** Render again, redrawing only these rows (and those above them) of the outline. */
+  private rerenderRows(ids: Iterable<string>) {
+    if (this.changedRows) for (const id of ids) for (let n: string | undefined = id; n; n = this.store.parentOf(n)) this.changedRows.add(n);
+    this.renderApp();
+  }
+
+  /** For the render under way: the rows to draw again (null: all). */
+  takeChangedRows(): ReadonlySet<string> | null {
+    const rows = this.changedRows;
+    this.changedRows = new Set();
+    return rows;
+  }
+
+  /**
+   * The rows that show id's text: id itself, and rows linking to it ([[id]]),
+   * whose labels include its text, up to the depth nodeLabel follows links.
+   */
+  private rowsShowing(id: string): string[] {
+    const out = [id];
+    const nodes = Object.values(this.store.toJSON().nodes);
+    for (let i = 0, depth = 0; depth < 3 && i < out.length; depth++) {
+      const end = out.length;
+      for (; i < end; i++) {
+        const ref = '[[' + out[i] + ']]';
+        for (const n of nodes) if (n.text.includes(ref) && !out.includes(n.id)) out.push(n.id);
+      }
+    }
+    return out;
   }
 
   /**
    * Record an undo step, save and re-render. focus=undefined leaves focus where it is.
    * Commits sharing a `coalesce` key (e.g. typing in one field) merge into one undo step.
+   * `rows`: the only rows the change shows in, when known (else all are redrawn).
    */
-  commit(focus?: Focus | null, coalesce?: string) {
+  commit(focus?: Focus | null, coalesce?: string, rows?: Iterable<string>) {
     this.history.record(this.snapshot(), captureFocus(), coalesce ?? null);
     save(this.store);
     if (focus !== undefined) this.setPendingFocus(focus);
     if (this.search) this.extendSearch(focus);
-    this.rerender();
+    if (rows && !this.search) this.rerenderRows(rows);
+    else this.rerender();
   }
 
   /** Move focus (switching a row into edit mode if needed) and re-render. */
@@ -555,16 +598,17 @@ export class Controller {
   }
 
   /**
-   * Work out dependency cycles and the schedule again, if anything they read
+   * Work out dependency cycles and the schedule again (returning true), if anything they read
    * has changed since last time (typing in an ordinary row doesn't).
    */
-  refreshSchedule() {
+  refreshSchedule(): boolean {
     const inputs = scheduleInputs(this.store);
     const last = this.scheduledFrom;
-    if (last && last.inputs === inputs && last.jpDays === this.jpDays) return;
+    if (last && last.inputs === inputs && last.jpDays === this.jpDays) return false;
     this.cycles = findCycles(this.store);
     this.schedule = computeSchedule(this.store, this.cycles, this.jpDays);
     this.scheduledFrom = { inputs, jpDays: this.jpDays };
+    return true;
   }
 
   /** Switch the UI language (null: follow the browser). */
@@ -929,7 +973,7 @@ export class Controller {
     store.setText(id, value);
     this.updatePicker(ta, id);
     if (n.key !== null) this.suggestValues(id);
-    this.commit(undefined, 'text:' + id);
+    this.commit(undefined, 'text:' + id, this.rowsShowing(id));
   }
 
   onKeyInput(id: string, input: HTMLInputElement) {
