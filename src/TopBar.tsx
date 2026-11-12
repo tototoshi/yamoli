@@ -1,6 +1,8 @@
 import type { ComponentChildren, TargetedEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { IS_MAC, fText, type View } from './controller';
+import { fText } from './focus';
+import { IS_MAC } from './keys';
+import type { View } from './viewState';
 import { lang, t } from './i18n';
 import { keepFocus, useCtl } from './context';
 import { saveFile } from './exportImage';

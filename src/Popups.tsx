@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { arrowOf, captureFocus } from './controller';
+import { captureFocus } from './focus';
+import { arrowOf } from './keys';
 import { t } from './i18n';
 import { nodeLabel } from './links';
 import { useCtl } from './context';

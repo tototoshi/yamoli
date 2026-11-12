@@ -1,5 +1,5 @@
 import { OutlineStore } from './model';
-import type { View } from './controller';
+import type { View } from './viewState';
 import { lang, t, type Lang } from './i18n';
 import { addDiagramSample, addGuideSlides, addScheduleSample } from './sample';
 

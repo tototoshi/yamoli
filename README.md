@@ -45,7 +45,10 @@ The usage guide is in [docs/guide.en.md](docs/guide.en.md) (日本語: [docs/gui
 ```
 src/
   model.ts        Outline data (a flat table of nodes), fields and blocks
-  controller.ts   Editing operations, keys, undo, view state
+  viewState.ts    What is edited and shown: zoom, view, undo, search, rows on screen, rendering
+  editing.ts      Editing operations (extends ViewState): typing, fields, link picker, tasks, menus
+  controller.ts   The Controller the UI uses (extends Editing): keys, copying and pasting rows
+  focus.ts / keys.ts  Focus by key (fText …), shortcut helpers (IS_MAC, arrowOf)
   App.tsx         The UI (Preact): the outline and its rows
   TopBar.tsx      The top bar, its menus and the view bar
   Popups.tsx      Link picker, completions, ⌘P jump, item menu, toasts

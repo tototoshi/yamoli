@@ -1,6 +1,8 @@
 import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { applyFocus, Controller, IS_MAC, fKey, fText } from './controller';
+import { Controller } from './controller';
+import { applyFocus, fKey, fText } from './focus';
+import { IS_MAC } from './keys';
 import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
 import { t } from './i18n';
 import { parseInline } from './inline';

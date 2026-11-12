@@ -11,7 +11,7 @@
 import type { TextareaHTMLAttributes } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
-import { IS_MAC } from './controller';
+import { IS_MAC } from './keys';
 import { t } from './i18n';
 import { linkAt, markupSpans, type LinkAt } from './inline';
 import { nodeLabel } from './links';
