@@ -127,6 +127,15 @@ export async function init(): Promise<void> {
   const file = res.headers.get('X-Yamoli-File');
   if (!file || (res.status !== 200 && res.status !== 204)) {
     initial = loadLocal();
+    if (res.status === 403) {
+      setState({
+        kind: 'error',
+        message: t(
+          'このサーバーのファイルはサーバーのコンピュータからだけ使えます。このブラウザに保存しています',
+          'The server’s file is only for the computer it runs on. Saving in this browser instead'
+        ),
+      });
+    }
     return;
   }
   dataFile = decodeURIComponent(file);

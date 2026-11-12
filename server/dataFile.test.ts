@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { migrateDataFile, readData, writeData } from './dataFile';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { dataMiddleware, migrateDataFile, readData, writeData } from './dataFile';
 
 const outline = (text: string) => JSON.stringify({ rootId: 'r', nodes: { r: { id: 'r', text, children: [] } } });
 
@@ -93,4 +94,22 @@ test('moves data from the legacy folder, backups and all, unless the new file ex
   await writeFile(legacy, outline('stale'));
   expect(await migrateDataFile(path, legacy)).toBe(false);
   expect(JSON.parse(await readFile(path, 'utf8')).nodes.r.text).toBe('old');
+});
+
+test('serves the file only to this computer, unless told to share it', async () => {
+  const path = join(await mkdtemp(join(tmpdir(), 'yamoli-')), 'data.json');
+  await writeData(path, outline('a'), '*');
+  const get = async (remoteAddress: string, allowRemote = false) => {
+    let status = 0;
+    const res = { setHeader() {}, writeHead: (s: number) => ((status = s), res), end: () => res } as unknown as ServerResponse;
+    const req = { url: '/api/data', method: 'GET', headers: {}, socket: { remoteAddress } } as unknown as IncomingMessage;
+    await dataMiddleware(path, allowRemote)(req, res, () => {});
+    return status;
+  };
+  expect(await get('127.0.0.1')).toBe(200);
+  expect(await get('::1')).toBe(200);
+  expect(await get('::ffff:127.0.0.1')).toBe(200);
+  expect(await get('192.168.1.20')).toBe(403);
+  expect(await get('::ffff:192.168.1.20')).toBe(403);
+  expect(await get('192.168.1.20', true)).toBe(200);
 });

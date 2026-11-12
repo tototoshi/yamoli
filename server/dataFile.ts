@@ -6,6 +6,9 @@
  *   PUT /api/data   If-Match: <etag> (or If-None-Match: * to create);
  *                   409 + the current ETag when someone else saved first
  *
+ * Only this computer may use it, unless YAMOLI_ALLOW_REMOTE=1: started with
+ * `--host`, the server is on the network, but the outline isn't (403).
+ *
  * Writes go through a temporary file and a rename, and the first write of
  * each day keeps a copy of the previous contents in backups/, as does any
  * write that removes many rows at once.
@@ -151,10 +154,18 @@ const readBody = (req: IncomingMessage) =>
     req.on('error', reject);
   });
 
+/** Whether a request comes from this computer. */
+export const isLocal = (req: IncomingMessage) => /^(127\.|::1$|::ffff:127\.)/.test(req.socket.remoteAddress ?? '');
+
 /** Connect-style middleware for Vite's dev and preview servers. */
-export function dataMiddleware(path: string) {
+export function dataMiddleware(path: string, allowRemote = !!process.env.YAMOLI_ALLOW_REMOTE) {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     if (req.url?.split('?')[0] !== API_PATH) return next();
+    if (!allowRemote && !isLocal(req)) {
+      return void res
+        .writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+        .end('The outline file is only served to this computer (set YAMOLI_ALLOW_REMOTE=1 to share it)');
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Yamoli-File', encodeURIComponent(path));
     try {
