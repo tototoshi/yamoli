@@ -30,6 +30,15 @@ test('create, update with the current ETag, and reject stale writes', async () =
   expect(JSON.parse(await readFile(join(dir, 'sub', 'backups', backups[0]), 'utf8')).nodes.r.text).toBe('a');
 });
 
+test('of two writes based on the same version at once, only one wins', async () => {
+  const path = join(await mkdtemp(join(tmpdir(), 'yamoli-')), 'data.json');
+  const { etag } = (await writeData(path, outline('a'), '*')) as { etag: string };
+  const results = await Promise.all([writeData(path, outline('b'), etag), writeData(path, outline('c'), etag)]);
+  expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+  const winner = results.findIndex((r) => r.status === 200) === 0 ? 'b' : 'c';
+  expect(JSON.parse(await readFile(path, 'utf8')).nodes.r.text).toBe(winner);
+});
+
 test('rejects bodies that are not outlines', async () => {
   const path = join(await mkdtemp(join(tmpdir(), 'yamoli-')), 'data.json');
   expect((await writeData(path, 'nope', '*')).status).toBe(400);

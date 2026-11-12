@@ -62,11 +62,26 @@ export async function readData(path: string): Promise<{ text: string; etag: stri
 
 export type WriteResult = { status: 200; etag: string } | { status: 409; etag: string | null } | { status: 400; error: string };
 
+/** The last write queued for each file, so the next one waits for it. */
+const queues = new Map<string, Promise<unknown>>();
+let tmpSeq = 0;
+
 /**
  * Replace the file with `body` if it still matches `ifMatch` (an ETag, or
  * '*' / null meaning "only if there is no file yet").
+ *
+ * Writes to one file run one at a time, so two based on the same version
+ * can't both pass the check: the second sees the first's ETag and gets 409.
  */
-export async function writeData(path: string, body: string, ifMatch: string | null): Promise<WriteResult> {
+export function writeData(path: string, body: string, ifMatch: string | null): Promise<WriteResult> {
+  const run = (queues.get(path) ?? Promise.resolve()).then(() => writeNow(path, body, ifMatch));
+  const done = run.catch(() => {});
+  queues.set(path, done);
+  done.then(() => queues.get(path) === done && queues.delete(path));
+  return run;
+}
+
+async function writeNow(path: string, body: string, ifMatch: string | null): Promise<WriteResult> {
   let json: any;
   try {
     json = JSON.parse(body);
@@ -83,7 +98,7 @@ export async function writeData(path: string, body: string, ifMatch: string | nu
   const text = JSON.stringify(json, null, 2) + '\n';
   await mkdir(dirname(path), { recursive: true });
   if (current !== null) await backup(path);
-  const tmp = `${path}.${process.pid}.tmp`;
+  const tmp = `${path}.${process.pid}-${++tmpSeq}.tmp`;
   await writeFile(tmp, text, 'utf8');
   await rename(tmp, path);
   return { status: 200, etag: etagOf(text) };
