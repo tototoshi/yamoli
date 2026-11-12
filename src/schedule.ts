@@ -69,8 +69,11 @@ export function computeSchedule(
   const res: ScheduleResult = { byId: new Map(), unscheduled: new Set(), invalid: new Map(), needsJp: false };
   const memo = new Map<string, Sched | null>();
   const visiting = new Set<string>();
-  /** What determined each item's dates (dependency, child, …) for the critical chain. */
-  const driver = new Map<string, string | null>();
+  /**
+   * What determined each item's dates (dependencies, children, …) for the
+   * critical chain: all of them when several finish on the same day.
+   */
+  const driver = new Map<string, string[]>();
 
   const ancestry = (id: string) => store.path(id).reverse(); // self first, root last
 
@@ -138,29 +141,29 @@ export function computeSchedule(
     if (seen.has(id)) return undefined;
     seen.add(id);
     let best: Day | undefined;
+    let by: string[] = [];
     for (const d of dependencies(store, id)) {
       const e = endOf(d, seen);
-      if (e !== undefined && (best === undefined || e > best)) {
-        best = e;
-        driver.set(id, d);
-      }
+      if (e === undefined || (best !== undefined && e < best)) continue;
+      if (best === undefined || e > best) [best, by] = [e, []];
+      by.push(d);
     }
+    driver.set(id, by);
     return best;
   };
 
-  /** Latest end among id's and its ancestors' dependencies, and which one it was. */
+  /** Latest end among id's and its ancestors' dependencies, and which ones end then. */
   const afterDeps = (id: string) => {
     let latest: Day | undefined;
-    let by: string | null = null;
+    let by: string[] = [];
     for (const holder of ancestry(id)) {
       for (const d of dependencies(store, holder)) {
         // An ancestor depending on something inside itself would be circular.
         if (d === id || store.isAncestor(d, id) || (holder !== id && store.isAncestor(holder, d))) continue;
         const e = endOf(d);
-        if (e !== undefined && (latest === undefined || e > latest)) {
-          latest = e;
-          by = d;
-        }
+        if (e === undefined || (latest !== undefined && e < latest)) continue;
+        if (latest === undefined || e > latest) [latest, by] = [e, []];
+        if (!by.includes(d)) by.push(d);
       }
     }
     return { after: latest === undefined ? undefined : latest + 1, by };
@@ -179,14 +182,16 @@ export function computeSchedule(
       res.unscheduled.add(id);
       return null;
     }
-    let start = Math.max(after ?? -Infinity, base ?? -Infinity);
-    driver.set(id, after !== undefined && after >= (base ?? -Infinity) ? by : null);
     const cal = calendarFor(id);
+    // Work in working days starts on the next one: a dependency ending on a
+    // Friday holds back a Monday start as much as one ending on Sunday would.
+    const begin = (d: Day) => (dur.unit === 'cd' ? d : cal.nextWorkday(d));
+    const start = begin(Math.max(after ?? -Infinity, base ?? -Infinity));
+    driver.set(id, after !== undefined && begin(after) === start ? by : []);
     let end: Day;
     if (dur.unit === 'cd') {
       end = start + Math.max(Math.ceil(dur.amount) - 1, 0);
     } else {
-      start = cal.nextWorkday(start);
       const days = Math.ceil(dur.unit === 'w' ? dur.amount * cal.workdaysPerWeek : dur.amount);
       end = days === 0 ? start : cal.addWorkdays(start, days);
     }
@@ -217,7 +222,7 @@ export function computeSchedule(
       return null;
     }
     const start = Math.max(after ?? -Infinity, base ?? -Infinity);
-    driver.set(id, after !== undefined && after >= (base ?? -Infinity) ? by : null);
+    driver.set(id, after !== undefined && after >= (base ?? -Infinity) ? by : []);
     return finish(id, {
       start,
       end: start + (last - from),
@@ -229,15 +234,16 @@ export function computeSchedule(
   const summary = (id: string): Sched | null => {
     let start: Day | undefined;
     let end: Day | undefined;
+    let by: string[] = [];
     for (const c of store.items(id)) {
       const s = schedOf(c);
       if (!s) continue;
       if (start === undefined || s.start < start) start = s.start;
-      if (end === undefined || s.end > end) {
-        end = s.end;
-        driver.set(id, c);
-      }
+      if (end !== undefined && s.end < end) continue;
+      if (end === undefined || s.end > end) [end, by] = [s.end, []];
+      by.push(c);
     }
+    driver.set(id, by);
     if (start === undefined || end === undefined) return null;
     return finish(id, { start, end, kind: 'summary', delayed: false });
   };
@@ -266,7 +272,7 @@ export function computeSchedule(
 
   // Critical chain: per project (nearest item above with a start; a task's own
   // start doesn't make it a project of its own), walk back from the
-  // latest-finishing task through whatever determined each item's dates.
+  // latest-finishing tasks through whatever determined each item's dates.
   const projectOf = (id: string) =>
     ancestry(id)
       .slice(store.items(id).length ? 0 : 1)
@@ -279,14 +285,14 @@ export function computeSchedule(
     if (!cur || s.end > cur.end) latest.set(p, { end: s.end, ids: [id] });
     else if (s.end === cur.end) cur.ids.push(id);
   }
-  for (const { ids } of latest.values()) {
-    for (const start of ids) {
-      for (let cur: string | null | undefined = start, guard = 0; cur && guard < 10000; guard++) {
-        const s = res.byId.get(cur);
-        if (s) s.critical = true;
-        cur = driver.get(cur);
-      }
-    }
+  const seen = new Set<string>();
+  const stack = [...latest.values()].flatMap(({ ids }) => ids);
+  for (let cur = stack.pop(); cur !== undefined; cur = stack.pop()) {
+    if (seen.has(cur)) continue;
+    seen.add(cur);
+    const s = res.byId.get(cur);
+    if (s) s.critical = true;
+    stack.push(...(driver.get(cur) ?? []));
   }
   return res;
 }
