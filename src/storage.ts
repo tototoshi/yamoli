@@ -32,12 +32,14 @@ export interface Prefs {
   views: Record<string, Exclude<View, 'outline'>>;
   /** Index into the Gantt chart's day widths (GANTT_SCALES). */
   ganttZoom: number;
+  /** Start, end and working days in columns beside the Gantt chart's names. */
+  ganttDates: boolean;
   /** The UI language the user picked; the browser's when unset. */
   lang?: Lang;
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true, tasksOnly: false, fields: 'show', views: {}, ganttZoom: 5 };
+  const defaults: Prefs = { showCompleted: true, tasksOnly: false, fields: 'show', views: {}, ganttZoom: 5, ganttDates: true };
   try {
     const { ganttItems, showFields, ganttScale, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
     const prefs: Prefs = { ...defaults, ...saved };

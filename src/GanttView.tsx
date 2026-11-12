@@ -7,10 +7,11 @@
  * except the critical ones and those of the row under the pointer.
  * Zoomed far out (a project of a year or more), the dates above are years
  * and months instead of months and days, and days off are left unshaded.
+ * Beside the names, columns give each row's start, end and working days.
  * The whole chart, names and all, saves as an SVG or PNG image.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { today, type Day } from './calendar';
+import { shortDate, today, type Day } from './calendar';
 import { useCtl } from './context';
 import { lang, t } from './i18n';
 import { standaloneSvg } from './exportImage';
@@ -27,15 +28,36 @@ const MONTH_H = 20;
 export const GANTT_SCALES = [1, 2, 4, 6, 12, 22, 34];
 /** Below this many pixels a day, the header shows years and months. */
 const MONTHS_BELOW = 5;
+/** The date columns' widths: start, end, working days. */
+const DATE_COLS = [76, 76, 48];
+
+/** A row's start, end and working days as shown in the date columns. */
+export function dateCells(s: Sched | undefined, workdays: number, now: Day): [string, string, string] {
+  if (!s) return ['', '', ''];
+  if (s.kind === 'milestone') return [shortDate(s.start, now), '', '◆'];
+  return [shortDate(s.start, now), shortDate(s.end, now), t(`${workdays}日`, `${workdays}d`)];
+}
+
+interface ExportRow {
+  label: string;
+  depth: number;
+  cls: string;
+  dates?: [string, string, string];
+  /** Finishes past its due date (its end shown in red). */
+  late?: boolean;
+}
 
 const NS = 'http://www.w3.org/2000/svg';
+/** The legend's strip under a saved image. */
+const LEGEND_H = 32;
 
 /**
  * The chart in gantt as one image: its names drawn beside the dates and bars,
  * chartW of the timeline (the schedule, not the days filling the screen beyond
- * it) rather than what is scrolled into view, without the pointer's highlights.
+ * it) rather than what is scrolled into view, without the pointer's highlights,
+ * and the legend under it.
  */
-function ganttDrawing(gantt: HTMLElement, names: { label: string; depth: number; cls: string }[], chartW: number): Drawing {
+function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): Drawing {
   const head = gantt.querySelector<SVGSVGElement>('.gantt-head svg')!;
   const body = gantt.querySelector<SVGSVGElement>('.gantt-chart svg')!;
   const svg = document.createElementNS(NS, 'svg');
@@ -64,14 +86,29 @@ function ganttDrawing(gantt: HTMLElement, names: { label: string; depth: number;
       const room = namesW - 8 - el.x.baseVal[0].value;
       while (el.textContent!.length > 1 && el.getComputedTextLength() > room) el.textContent = el.textContent!.slice(0, -2) + '…';
     }
-    names.forEach((_, i) => add(stripes, 'rect', { x: 0, y: HEAD + i * ROW, width: namesW, height: ROW, class: 'row' + (i % 2 ? ' odd' : '') }));
+    // The date columns, right-aligned in each.
+    const datesW = names.some((n) => n.dates) ? DATE_COLS.reduce((a, b) => a + b, 0) : 0;
+    if (datesW) {
+      const right = DATE_COLS.map((_, c) => namesW + DATE_COLS.slice(0, c + 1).reduce((a, b) => a + b, 0) - 8);
+      [t('開始', 'Start'), t('終了', 'End'), t('日数', 'Days')].forEach((label, c) => {
+        add(svg, 'text', { x: right[c], y: HEAD - 10, class: 'date-head' }).textContent = label;
+      });
+      names.forEach(({ dates, cls, late }, i) =>
+        dates?.forEach((v, c) => {
+          const at = { x: right[c], y: HEAD + i * ROW + ROW / 2 + 4, class: 'date-cell' + cls + (late && c === 1 ? ' late' : '') };
+          add(svg, 'text', at).textContent = v;
+        })
+      );
+    }
+    const left = namesW + datesW;
+    names.forEach((_, i) => add(stripes, 'rect', { x: 0, y: HEAD + i * ROW, width: left, height: ROW, class: 'row' + (i % 2 ? ' odd' : '') }));
 
-    const width = namesW + chartW;
+    const width = left + chartW;
     const height = HEAD + Number(body.getAttribute('height'));
     for (const [part, y] of [[head, 0], [body, HEAD]] as const) {
       const copy = part.cloneNode(true) as SVGSVGElement;
       copy.removeAttribute('style'); // the header's scroll offset
-      copy.setAttribute('x', String(namesW));
+      copy.setAttribute('x', String(left));
       copy.setAttribute('y', String(y));
       copy.setAttribute('width', String(chartW));
       copy.querySelectorAll('.row-hover').forEach((el) => el.remove());
@@ -81,10 +118,27 @@ function ganttDrawing(gantt: HTMLElement, names: { label: string; depth: number;
       copy.querySelectorAll('[marker-end]').forEach((el) => el.setAttribute('marker-end', el.getAttribute('marker-end')!.replace('#', '#x-')));
       svg.append(copy);
     }
-    add(svg, 'line', { x1: namesW, x2: namesW, y1: 0, y2: height, class: 'frame-line' });
+    for (const lx of datesW ? [namesW, left] : [left]) add(svg, 'line', { x1: lx, x2: lx, y1: 0, y2: height, class: 'frame-line' });
     add(svg, 'line', { x1: 0, x2: width, y1: HEAD, y2: HEAD, class: 'frame-line' });
-    for (const [k, v] of Object.entries({ viewBox: `0 0 ${width} ${height}`, width, height })) svg.setAttribute(k, String(v));
-    return { svg: standaloneSvg(svg), width, height };
+    // The legend, under the chart.
+    add(svg, 'line', { x1: 0, x2: width, y1: height, y2: height, class: 'frame-line' });
+    let lx = 8;
+    const ly = height + LEGEND_H / 2;
+    for (const [mark, label] of [
+      ['bar', t('作業', 'Task')],
+      ['bar critical', t('クリティカルパス', 'Critical path')],
+      ['bar late', t('期限超過', 'Late')],
+      ['due', t('期限', 'Due')],
+    ]) {
+      if (mark === 'due') add(svg, 'line', { x1: lx + 6, x2: lx + 6, y1: ly - 6, y2: ly + 6, class: mark });
+      else add(svg, 'rect', { x: lx, y: ly - 4, width: 14, height: 8, rx: 2, class: mark });
+      const text = add(svg, 'text', { x: lx + 20, y: ly + 4, class: 'legend' }) as SVGTextElement;
+      text.textContent = label;
+      lx += 20 + text.getComputedTextLength() + 16;
+    }
+    const [fullW, fullH] = [Math.max(width, lx), height + LEGEND_H];
+    for (const [k, v] of Object.entries({ viewBox: `0 0 ${fullW} ${fullH}`, width: fullW, height: fullH })) svg.setAttribute(k, String(v));
+    return { svg: standaloneSvg(svg), width: fullW, height: fullH };
   } finally {
     holder.remove();
   }
@@ -170,6 +224,19 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   const labelEvery = dw >= 16 ? 1 : 7;
   const months = monthBands(range);
   const todayW = Math.max(dw, 2);
+  const showDates = !embedded && ctl.prefs.ganttDates;
+  const dates = (id: string) => {
+    const s = schedule.byId.get(id);
+    let work = 0;
+    if (s && s.kind !== 'milestone') {
+      const c = calendarAt(store, id, ctl.jpDays);
+      for (let d = s.start; d <= s.end; d++) if (c.isWorkday(d)) work++;
+    }
+    return dateCells(s, work, now);
+  };
+  const dateRows = new Map(showDates ? rows.map((id) => [id, dates(id)]) : []);
+  const rowCls = (id: string) =>
+    (store.node(id).completed ? ' done' : '') + (schedule.byId.get(id)?.kind === 'summary' ? ' summary' : '');
 
   return (
     <div class={'gantt-wrap' + (embedded ? ' embedded' : '')}>
@@ -197,6 +264,14 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
           <button class="mini" disabled={now < range.from || now > range.to} onClick={scrollToToday}>
             {t('今日', 'Today')}
           </button>
+          <button
+            class={'mini' + (showDates ? ' on' : '')}
+            aria-pressed={showDates}
+            title={t('開始・終了・日数（稼働日）の列', 'Start, end and working-days columns')}
+            onClick={() => ctl.setGanttDates(!showDates)}
+          >
+            {t('日付', 'Dates')}
+          </button>
           <span class="gantt-legend">
             <i class="lg task" />
             {t('作業', 'Task')} <i class="lg critical" />
@@ -213,7 +288,9 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                 rows.map((id) => ({
                   label: nodeLabel(store, id),
                   depth: store.path(id).length - baseDepth,
-                  cls: (store.node(id).completed ? ' done' : '') + (schedule.byId.get(id)?.kind === 'summary' ? ' summary' : ''),
+                  cls: rowCls(id),
+                  dates: dateRows.get(id),
+                  late: (schedule.byId.get(id)?.late ?? 0) > 0,
                 })),
                 span ? Math.min(width, x(span.to + 1)) : width
               )
@@ -221,8 +298,19 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
           />
         </div>
       )}
-      <div class="gantt" ref={ganttRef} onMouseLeave={() => setHover(null)}>
+      <div
+        class={'gantt' + (showDates ? ' with-dates' : '')}
+        ref={ganttRef}
+        style={showDates ? { gridTemplateColumns: `minmax(140px, 260px) ${DATE_COLS.map((w) => w + 'px').join(' ')} minmax(0, 1fr)` } : undefined}
+        onMouseLeave={() => setHover(null)}
+      >
         <div class="gantt-corner" style={{ height: `${HEAD}px` }} />
+        {showDates &&
+          [t('開始', 'Start'), t('終了', 'End'), t('日数', 'Days')].map((label, c) => (
+            <div key={c} class={'gantt-corner date-head' + (c === 2 ? ' last' : '')} style={{ height: `${HEAD}px` }}>
+              {label}
+            </div>
+          ))}
         <div class="gantt-head">
           <svg width={width} height={HEAD} class="gantt-svg" style={{ transform: `translateX(${-scrollLeft}px)` }}>
             {offDays.map((d) => (
@@ -316,6 +404,25 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
             );
           })}
         </div>
+        {showDates &&
+          [0, 1, 2].map((c) => (
+            <div key={c} class={'gantt-dates' + (c === 2 ? ' last' : '')}>
+              {rows.map((id, i) => {
+                const s = schedule.byId.get(id);
+                const late = c === 1 && !!s && s.late > 0;
+                return (
+                  <div
+                    key={id}
+                    class={'gantt-date' + (i % 2 ? ' odd' : '') + (hover === id ? ' hover' : '') + rowCls(id) + (late ? ' late' : '')}
+                    style={{ height: `${ROW}px` }}
+                    onMouseEnter={() => setHover(id)}
+                  >
+                    {dateRows.get(id)![c]}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         <div class="gantt-chart" ref={chartRef} onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}>
           <svg width={width} height={height} class="gantt-svg">
             <defs>

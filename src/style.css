@@ -705,6 +705,32 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-name.odd { background: var(--stripe); }
 .gantt-name.hover { background: var(--hover); }
 .gantt-chart { overflow-x: auto; }
+/* Start, end and working days beside the names. */
+.gantt-corner.date-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 8px 6px 0;
+  border-right: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+.gantt-corner.date-head.last, .gantt-dates.last { border-right: 1px solid var(--faint); }
+.gantt-date {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.gantt-date.odd { background: var(--stripe); }
+.gantt-date.hover { background: var(--hover); }
+.gantt-date.summary { color: var(--fg); font-weight: 600; }
+.gantt-date.done { text-decoration: line-through; }
+.gantt-date.late { color: var(--danger); }
 .gantt-svg { display: block; font-family: var(--font); }
 
 .gantt-svg .row { fill: transparent; }
@@ -722,6 +748,11 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-svg .name.summary { font-weight: 600; }
 .gantt-svg .name.done { fill: var(--muted); text-decoration: line-through; }
 .gantt-svg .frame-line { stroke: var(--faint); }
+.gantt-svg .date-head { fill: var(--muted); font-size: 11px; text-anchor: end; }
+.gantt-svg .date-cell { fill: var(--muted); font-size: 12px; text-anchor: end; }
+.gantt-svg .date-cell.summary { fill: var(--fg); font-weight: 600; }
+.gantt-svg .date-cell.late { fill: var(--danger); }
+.gantt-svg .legend { fill: var(--muted); font-size: 12px; }
 .gantt-svg .day-label { fill: var(--muted); font-size: 11px; }
 .gantt-svg .day-label.center { text-anchor: middle; }
 .gantt-svg .day-label.now { fill: var(--accent); font-weight: 700; }

@@ -832,6 +832,12 @@ export class Controller {
     this.rerender();
   }
 
+  setGanttDates(show: boolean) {
+    this.prefs = { ...this.prefs, ganttDates: show };
+    savePrefs(this.prefs);
+    this.rerender();
+  }
+
   setGanttZoom(zoom: number) {
     this.prefs = { ...this.prefs, ganttZoom: zoom };
     savePrefs(this.prefs);
