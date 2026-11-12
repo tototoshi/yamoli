@@ -46,7 +46,10 @@ The usage guide is in [docs/guide.en.md](docs/guide.en.md) (日本語: [docs/gui
 src/
   model.ts        Outline data (a flat table of nodes), fields and blocks
   controller.ts   Editing operations, keys, undo, view state
-  App.tsx         The UI (Preact)
+  App.tsx         The UI (Preact): the outline and its rows
+  TopBar.tsx      The top bar, its menus and the view bar
+  Popups.tsx      Link picker, completions, ⌘P jump, item menu, toasts
+  Badges.tsx      Dependency and schedule marks beside rows
   storage.ts      Saving (file / localStorage), initial data
   fields.ts       Reading YAML-like text (paste)
   serialize.ts    Writing YAML / JSON / Markdown lists
