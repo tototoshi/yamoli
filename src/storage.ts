@@ -30,21 +30,23 @@ export interface Prefs {
   fields: FieldsMode;
   /** How items were last viewed, when not as an outline. */
   views: Record<string, Exclude<View, 'outline'>>;
-  /** Index into the Gantt chart's day widths. */
-  ganttScale: number;
+  /** Index into the Gantt chart's day widths (GANTT_SCALES). */
+  ganttZoom: number;
   /** The UI language the user picked; the browser's when unset. */
   lang?: Lang;
 }
 
 export function loadPrefs(): Prefs {
-  const defaults: Prefs = { showCompleted: true, tasksOnly: false, fields: 'show', views: {}, ganttScale: 2 };
+  const defaults: Prefs = { showCompleted: true, tasksOnly: false, fields: 'show', views: {}, ganttZoom: 5 };
   try {
-    const { ganttItems, showFields, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    const { ganttItems, showFields, ganttScale, ...saved } = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
     const prefs: Prefs = { ...defaults, ...saved };
     // Earlier versions could only show or hide fields.
     if (showFields === false && !saved.fields) prefs.fields = 'hide';
     // Earlier versions only remembered Gantt charts.
     if (Array.isArray(ganttItems)) for (const id of ganttItems) prefs.views[id] ??= 'gantt';
+    // Earlier versions had three fewer, narrower, day widths.
+    if (typeof ganttScale === 'number' && saved.ganttZoom === undefined) prefs.ganttZoom = ganttScale + 3;
     return prefs;
   } catch {
     return defaults;

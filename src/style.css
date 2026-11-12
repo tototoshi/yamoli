@@ -30,6 +30,8 @@
   --bar-done: #d3d7dd;
   --summary: #4a4f57;
   --day-off: #f3f4f6;
+  --stripe: #f8f9fb;
+  --topbar-h: 44px; /* kept to the top bar's height by the app */
   --today-bg: rgba(59, 111, 216, 0.1);
   --crit: #d08a10;
   --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
@@ -167,6 +169,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 
 .page { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40vh; }
 .page.wide { max-width: 1400px; }
+.page.full { max-width: none; }
 .page.slides-page { padding-bottom: 24px; }
 
 .zoom-header { margin: 0 0 12px 28px; }
@@ -660,6 +663,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 .gantt-empty { margin-left: 28px; color: var(--muted); font-size: 14px; }
 .gantt-tools { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.export-tools { display: flex; gap: 6px; margin-left: 12px; }
 .gantt-legend { margin-left: auto; color: var(--muted); font-size: 12px; }
 .gantt-legend .lg { display: inline-block; width: 14px; height: 8px; margin: 0 4px 0 10px; border-radius: 2px; vertical-align: middle; }
 .lg.task { background: var(--bar); }
@@ -672,8 +676,19 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   grid-template-columns: minmax(140px, 260px) minmax(0, 1fr);
   border: 1px solid var(--faint);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: clip; /* not hidden: the header sticks to the page */
 }
+/* The dates stay under the top bar while the page scrolls. */
+.gantt-corner, .gantt-head {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 3;
+  background: var(--bg);
+  border-bottom: 1px solid var(--faint);
+}
+.gantt-corner { border-right: 1px solid var(--faint); }
+.gantt-head { overflow: hidden; }
+.gantt-wrap.embedded .gantt-corner, .gantt-wrap.embedded .gantt-head { position: static; }
 .gantt-names { border-right: 1px solid var(--faint); min-width: 0; }
 .gantt-name {
   display: flex;
@@ -687,16 +702,26 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-name a:hover { color: var(--accent); }
 .gantt-name.summary a { font-weight: 600; }
 .gantt-name.done a { color: var(--muted); text-decoration: line-through; }
+.gantt-name.odd { background: var(--stripe); }
 .gantt-name.hover { background: var(--hover); }
 .gantt-chart { overflow-x: auto; }
 .gantt-svg { display: block; font-family: var(--font); }
 
+.gantt-svg .row { fill: transparent; }
+.gantt-svg .row.odd { fill: var(--stripe); }
 .gantt-svg .row-hover { fill: var(--hover); }
 .gantt-svg .day-off { fill: var(--day-off); }
 .gantt-svg .today { fill: var(--today-bg); }
 .gantt-svg .month-line { stroke: var(--faint); }
-.gantt-svg .head-line { stroke: var(--faint); }
+/* Only the rows and bars take the pointer; what lies over them lets it through. */
+.gantt-svg .row-hover, .gantt-svg .day-off, .gantt-svg .today, .gantt-svg .month-line, .gantt-svg .dep { pointer-events: none; }
 .gantt-svg .month-label { fill: var(--fg); font-size: 12px; font-weight: 600; }
+.gantt-svg .month-short { fill: var(--muted); font-size: 11px; }
+/* In a saved image: the names beside the chart, and the lines between the parts. */
+.gantt-svg .name { fill: var(--fg); font-size: 13px; }
+.gantt-svg .name.summary { font-weight: 600; }
+.gantt-svg .name.done { fill: var(--muted); text-decoration: line-through; }
+.gantt-svg .frame-line { stroke: var(--faint); }
 .gantt-svg .day-label { fill: var(--muted); font-size: 11px; }
 .gantt-svg .day-label.center { text-anchor: middle; }
 .gantt-svg .day-label.now { fill: var(--accent); font-weight: 700; }
@@ -709,8 +734,11 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-svg .done .bar, .gantt-svg .done .milestone { fill: var(--bar-done); stroke: none; }
 .gantt-svg .done .summary { fill: var(--bar-done); }
 .gantt-svg .due { stroke: var(--danger); stroke-width: 2; stroke-dasharray: 3 2; }
-.gantt-svg .dep { fill: none; stroke: var(--muted); stroke-width: 1.2; }
-.gantt-svg .dep.critical { stroke: var(--crit); stroke-width: 1.6; }
+.gantt-svg .dep { fill: none; stroke: var(--muted); stroke-width: 1.2; opacity: 0.35; }
+.gantt-svg .dep.critical { stroke: var(--crit); stroke-width: 1.6; opacity: 0.85; }
+/* With a row under the pointer: its lines stand out, the rest step back. */
+.gantt-svg .dep.far { opacity: 0.12; }
+.gantt-svg .dep.near { opacity: 1; stroke-width: 2; }
 .gantt-svg .arrow-head { fill: var(--muted); }
 .gantt-svg .arrow-head.critical { fill: var(--crit); }
 .gantt-svg .unscheduled { fill: var(--muted); font-size: 12px; font-style: italic; }

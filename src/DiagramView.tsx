@@ -6,7 +6,8 @@
 import { useId, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { buildDiagram, descLines, estimate, frameDesc, frameHead, ICON_SPACE, layout, LABEL_SIZE, PAD, PROP_SIZE, type Box, type DiagramNode, type Direction, type Measure } from './diagram';
-import { fileName, saveFile, standaloneSvg, svgToPng } from './exportImage';
+import { standaloneSvg } from './exportImage';
+import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
 
@@ -165,7 +166,13 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
 
   return (
     <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
-      {!embedded && <ExportTools svg={svgRef} name={store.get(id) && id !== store.rootId ? store.node(id).text : 'Home'} size={[W, H]} />}
+      {!embedded && (
+        <ExportTools
+          class="diagram-tools"
+          drawing={() => ({ svg: standaloneSvg(svgRef.current!), width: W, height: H })}
+          name={store.get(id) && id !== store.rootId ? store.node(id).text : 'Home'}
+        />
+      )}
       <svg ref={svgRef} class="diagram" viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`} width={W} height={H} onMouseLeave={() => setHover(null)}>
         <defs>
           <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -231,41 +238,6 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           )}
         </p>
       )}
-    </div>
-  );
-}
-
-/** Save the drawing as SVG or PNG, or copy it as an image. */
-function ExportTools({ svg, name, size: [w, h] }: { svg: { current: SVGSVGElement | null }; name: string; size: [number, number] }) {
-  const ctl = useCtl();
-  const source = () => standaloneSvg(svg.current!);
-  const fail = () => ctl.showToast(t('画像を作れませんでした', 'Couldn’t make the image'));
-  const copy = () => {
-    try {
-      // The PNG goes in as a promise so the copy stays within the click (Safari asks for that).
-      const png = svgToPng(source(), w, h);
-      navigator.clipboard
-        .write([new ClipboardItem({ 'image/png': png })])
-        .then(() => ctl.showToast(t('図を画像としてコピーしました', 'Copied the diagram as an image')), fail);
-    } catch {
-      fail();
-    }
-  };
-  return (
-    <div class="diagram-tools">
-      <button class="mini" title={t('SVG ファイルとして保存', 'Save as an SVG file')} onClick={() => saveFile(fileName(name, 'svg'), new Blob([source()], { type: 'image/svg+xml' }))}>
-        SVG
-      </button>
-      <button
-        class="mini"
-        title={t('PNG 画像として保存（2 倍の解像度）', 'Save as a PNG image (at twice the size)')}
-        onClick={() => svgToPng(source(), w, h).then((b) => saveFile(fileName(name, 'png'), b), fail)}
-      >
-        PNG
-      </button>
-      <button class="mini" title={t('PNG 画像をクリップボードへ（資料に貼り付け）', 'PNG image to the clipboard, to paste into documents')} onClick={copy}>
-        {t('画像をコピー', 'Copy image')}
-      </button>
     </div>
   );
 }

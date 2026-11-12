@@ -114,7 +114,7 @@ export function App() {
   return (
     <Ctx.Provider value={ctl}>
       <TopBar />
-      <main class={'page' + (ctl.view === 'gantt' || ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
+      <main class={'page' + (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') + (ctl.view === 'slides' ? ' slides-page' : '')}>
         <ZoomHeader node={zoom} />
         <div class="view-bar">
           <ViewSwitch />
@@ -167,8 +167,16 @@ function TopBar() {
   const { store, zoomId } = ctl;
   // The brand is the way home, so the crumbs start below it.
   const ancestors = zoomId === store.rootId ? [] : store.path(zoomId).slice(1, -1);
+  // Its height, for what sticks under it (the Gantt chart's dates); the crumbs can wrap.
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    const ro = new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <header class="topbar">
+    <header class="topbar" ref={ref}>
       <a class="brand" href="#/" title="Home">
         Yamoli
       </a>

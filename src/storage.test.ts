@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, test, vi } from 'vitest';
 import { OutlineStore } from './model';
-import { flush, save, saveState } from './storage';
+import { flush, loadPrefs, save, saveState } from './storage';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -18,4 +18,9 @@ test('a failed save to the browser shows, with no file to fall back on, and clea
   save(OutlineStore.create());
   flush();
   expect(saveState().kind).toBe('local');
+});
+
+test('a Gantt day width saved before the narrower ones were added stays the same width', () => {
+  localStorage.setItem('yamoli:prefs', JSON.stringify({ ganttScale: 1 }));
+  expect(loadPrefs().ganttZoom).toBe(4); // 12px a day, then and now
 });

@@ -53,6 +53,9 @@ export interface MonthBand {
   /** Inclusive. */
   end: Day;
   label: string;
+  /** The month alone ("11月", "Nov"), for narrow scales. */
+  short: string;
+  year: number;
 }
 
 /** Month bands within the range, labelled "2026年11月" (or "Nov 2026"). */
@@ -62,7 +65,7 @@ export function monthBands({ from, to }: DayRange): MonthBand[] {
     const [y, m] = formatDate(d).split('-').map(Number);
     const nextMonth = Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 1) / 86_400_000;
     const end = Math.min(nextMonth - 1, to);
-    bands.push({ start: d, end, label: t(`${y}年${m}月`, `${MONTHS[m - 1]} ${y}`) });
+    bands.push({ start: d, end, label: t(`${y}年${m}月`, `${MONTHS[m - 1]} ${y}`), short: t(`${m}月`, MONTHS[m - 1]), year: y });
     d = end + 1;
   }
   return bands;

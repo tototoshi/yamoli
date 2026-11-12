@@ -832,8 +832,8 @@ export class Controller {
     this.rerender();
   }
 
-  setGanttScale(scale: number) {
-    this.prefs = { ...this.prefs, ganttScale: scale };
+  setGanttZoom(zoom: number) {
+    this.prefs = { ...this.prefs, ganttZoom: zoom };
     savePrefs(this.prefs);
     this.rerender();
   }

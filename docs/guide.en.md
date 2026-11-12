@@ -82,7 +82,7 @@ These fields are read for the Gantt chart.
 | `workdays` | `mon-fri` | Working days of the week (default `mon-fri`). Inherited by children |
 | `holidays` | `jp`, `2026-12-29..2027-01-03` | Days off. `jp` adds Japanese public holidays |
 
-An item with children spans the dates of its children. ★ marks the critical path (work whose delay delays the whole project). The Gantt chart draws dependency arrows and due-date lines; − / + change the width of a day.
+An item with children spans the dates of its children. ★ marks the critical path (work whose delay delays the whole project). The Gantt chart draws dependency arrows and due-date lines; − / + change the width of a day, down to years and months for a long project, and **Fit** picks the widest that shows the whole schedule. The buttons above the chart save it, names and all, as an SVG or PNG file, or copy it as an image.
 
 ## Diagrams
 
