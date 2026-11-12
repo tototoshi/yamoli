@@ -25,7 +25,7 @@ On first launch the outline comes with a usage-guide slide deck, a sample projec
 ## Where data is saved
 
 - Under `npm run dev` or `npm run preview`, the outline is saved to **`~/yamoli/data.json`**. Set `YAMOLI_DATA` to use another path.
-- Before the first write of each day, the previous contents are kept in `backups/` (30 days).
+- Before the first write of each day, the previous contents are kept in `backups/` (30 days). So are the contents before any write that removes 10 or more rows at once (the last 20 such copies, named with the time).
 - If the file changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 - When `dist/` is served statically with no server, the outline is saved in the browser (localStorage).
 - The ⋯ menu exports the outline:

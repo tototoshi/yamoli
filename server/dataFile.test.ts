@@ -39,6 +39,34 @@ test('of two writes based on the same version at once, only one wins', async () 
   expect(JSON.parse(await readFile(path, 'utf8')).nodes.r.text).toBe(winner);
 });
 
+test('keeps a copy before a write that removes many rows', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'yamoli-'));
+  const path = join(dir, 'data.json');
+  const withRows = (n: number) => {
+    const nodes: Record<string, object> = { r: { id: 'r', text: '', children: [] as string[] } };
+    for (let i = 0; i < n; i++) {
+      nodes['n' + i] = { id: 'n' + i, text: 'row ' + i, children: [] };
+      (nodes.r as { children: string[] }).children.push('n' + i);
+    }
+    return JSON.stringify({ rootId: 'r', nodes });
+  };
+  const snapshots = async () => (await readdir(join(dir, 'backups'))).filter((f) => /-\d{6}\.json$/.test(f));
+
+  let { etag } = (await writeData(path, withRows(20), '*')) as { etag: string };
+  // Removing a few rows only keeps the day's backup.
+  ({ etag } = (await writeData(path, withRows(15), etag)) as { etag: string });
+  expect(await snapshots()).toHaveLength(0);
+  // Removing ten or more keeps what was there just before.
+  await writeData(path, withRows(5), etag);
+  const kept = await snapshots();
+  expect(kept).toHaveLength(1);
+  expect(Object.keys(JSON.parse(await readFile(join(dir, 'backups', kept[0]), 'utf8')).nodes)).toHaveLength(16);
+  // The day's backup is still the version from before the first write.
+  const daily = (await readdir(join(dir, 'backups'))).filter((f) => !kept.includes(f));
+  expect(daily).toHaveLength(1);
+  expect(Object.keys(JSON.parse(await readFile(join(dir, 'backups', daily[0]), 'utf8')).nodes)).toHaveLength(21);
+});
+
 test('rejects bodies that are not outlines', async () => {
   const path = join(await mkdtemp(join(tmpdir(), 'yamoli-')), 'data.json');
   expect((await writeData(path, 'nope', '*')).status).toBe(400);

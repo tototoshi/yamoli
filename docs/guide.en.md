@@ -179,4 +179,6 @@ Switch with the view bar; each item remembers the view last used for it.
 
 The outline saves itself as you type (the top bar shows when it has). If it changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 
+When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time).
+
 The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it. It also adds the usage-guide slides and the samples (a scheduled project, a system architecture) again.

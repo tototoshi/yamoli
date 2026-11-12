@@ -7,7 +7,8 @@
  *                   409 + the current ETag when someone else saved first
  *
  * Writes go through a temporary file and a rename, and the first write of
- * each day keeps a copy of the previous contents in backups/.
+ * each day keeps a copy of the previous contents in backups/, as does any
+ * write that removes many rows at once.
  */
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
@@ -17,6 +18,9 @@ import { basename, dirname, join } from 'node:path';
 
 export const API_PATH = '/api/data';
 const KEEP_BACKUPS = 30;
+/** A write that removes at least this many rows keeps a copy of what was there. */
+const BIG_DELETE = 10;
+const KEEP_SNAPSHOTS = 20;
 
 export const defaultDataPath = () => process.env.YAMOLI_DATA || join(homedir(), 'yamoli', 'data.json');
 /** Where the file lived before the app was renamed to Yamoli. */
@@ -97,24 +101,46 @@ async function writeNow(path: string, body: string, ifMatch: string | null): Pro
 
   const text = JSON.stringify(json, null, 2) + '\n';
   await mkdir(dirname(path), { recursive: true });
-  if (current !== null) await backup(path);
+  if (current !== null) await backup(path, countNodes(current) - countNodes(json));
   const tmp = `${path}.${process.pid}-${++tmpSeq}.tmp`;
   await writeFile(tmp, text, 'utf8');
   await rename(tmp, path);
   return { status: 200, etag: etagOf(text) };
 }
 
-/** Keep the file as it was before today's first write; prune old copies. */
-async function backup(path: string) {
+function countNodes(outline: string | { nodes: object }): number {
+  try {
+    const { nodes } = typeof outline === 'string' ? JSON.parse(outline) : outline;
+    return Object.keys(nodes ?? {}).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Keep the file as it was before today's first write (`data-YYYY-MM-DD.json`)
+ * and before a write that removes `removed` >= BIG_DELETE rows
+ * (`data-YYYY-MM-DD-HHMMSS.json`); prune old copies of each kind.
+ */
+async function backup(path: string, removed: number) {
   const dir = join(dirname(path), 'backups');
   const stem = basename(path, '.json');
-  const day = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD, local time
-  const target = join(dir, `${stem}-${day}.json`);
+  const now = new Date();
+  const day = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD, local time
   await mkdir(dir, { recursive: true });
-  const existing = (await readdir(dir)).filter((f) => f.startsWith(stem + '-') && f.endsWith('.json')).sort();
-  if (existing.includes(basename(target))) return;
-  await copyFile(path, target);
-  for (const old of [...existing, basename(target)].slice(0, -KEEP_BACKUPS)) await rm(join(dir, old), { force: true });
+  const files = await readdir(dir);
+  const keep = async (name: string, pattern: RegExp, limit: number) => {
+    const existing = files.filter((f) => pattern.test(f)).sort();
+    if (existing.includes(name)) return;
+    await copyFile(path, join(dir, name));
+    for (const old of [...existing, name].slice(0, -limit)) await rm(join(dir, old), { force: true });
+  };
+  const esc = stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await keep(`${stem}-${day}.json`, new RegExp(`^${esc}-\\d{4}-\\d{2}-\\d{2}\\.json$`), KEEP_BACKUPS);
+  if (removed >= BIG_DELETE) {
+    const time = now.toLocaleTimeString('sv-SE').replaceAll(':', ''); // HHMMSS
+    await keep(`${stem}-${day}-${time}.json`, new RegExp(`^${esc}-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.json$`), KEEP_SNAPSHOTS);
+  }
 }
 
 const readBody = (req: IncomingMessage) =>
