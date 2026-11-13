@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { expect, test } from 'vitest';
-import { filesMiddleware, imageType, saveFile } from './files';
+import { attachment, extensionFor, filesMiddleware, imageType, saveFile } from './files';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
@@ -25,7 +25,23 @@ test('an image is kept under the name of its contents, once', async () => {
   expect(a).toMatchObject({ status: 200, ref: expect.stringMatching(/^files\/[0-9a-f]{64}\.png$/) });
   expect(await saveFile(dir, PNG)).toEqual(a);
   expect(await readdir(dir)).toEqual([(a as { ref: string }).ref.slice('files/'.length)]);
-  expect(await saveFile(dir, SVG)).toMatchObject({ status: 415 });
+});
+
+test('other files keep the extension of their name, but never pass for an image', () => {
+  expect(extensionFor(PNG, 'shot.bin')).toBe('png');
+  expect(extensionFor(Buffer.from('%PDF-1.7'), '報告書.PDF')).toBe('pdf');
+  expect(extensionFor(SVG, 'logo.svg')).toBe('svg');
+  expect(extensionFor(Buffer.from('<html>'), 'fake.png')).toBe('bin');
+  expect(extensionFor(Buffer.from('x'), 'README')).toBe('bin');
+  expect(extensionFor(Buffer.from('x'), 'a.tar.gz')).toBe('gz');
+});
+
+test('a download keeps the name the file came with, safely', () => {
+  expect(attachment('報告書.pdf', 'x.pdf')).toBe(`attachment; filename="___.pdf"; filename*=UTF-8''${encodeURIComponent('報告書.pdf')}`);
+  expect(attachment('a"b;\r\n/c.txt', 'x.txt')).toBe(
+    `attachment; filename="a_b_c.txt"; filename*=UTF-8''${encodeURIComponent('a"b;c.txt')}`
+  );
+  expect(attachment(null, 'abc.pdf')).toContain('filename="abc.pdf"');
 });
 
 /** Run the middleware on a request; the response's status, headers and body. */
@@ -41,7 +57,7 @@ async function call(dir: string, method: string, url: string, body?: Buffer, rem
   return { ...out, passed };
 }
 
-test('serves kept images so that nothing in them runs, and only to this computer', async () => {
+test('serves kept files so that nothing in them runs, and only to this computer', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'yamoli-')), 'files');
   const up = await call(dir, 'POST', '/api/files', PNG);
   expect(up.status).toBe(200);
@@ -54,7 +70,13 @@ test('serves kept images so that nothing in them runs, and only to this computer
   expect(got.headers).toMatchObject({ 'Content-Type': 'image/png', 'X-Content-Type-Options': 'nosniff' });
   expect(got.headers['Content-Security-Policy']).toContain('sandbox');
 
-  expect((await call(dir, 'POST', '/api/files', SVG)).status).toBe(415);
+  // Anything else is only ever downloaded, under the name it came with.
+  const svg = JSON.parse((await call(dir, 'POST', '/api/files?name=logo.svg', SVG)).body.toString());
+  expect(svg).toMatchObject({ ref: expect.stringMatching(/\.svg$/), size: SVG.length });
+  const down = await call(dir, 'GET', `/api/${svg.ref}?name=logo.svg`);
+  expect(down.headers).toMatchObject({ 'Content-Type': 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
+  expect(down.headers['Content-Disposition']).toMatch(/^attachment; filename="logo.svg"/);
+  expect(down.body).toEqual(SVG);
   expect((await call(dir, 'GET', '/api/files/../data.json')).status).toBe(404);
   expect((await call(dir, 'GET', '/api/files/' + 'a'.repeat(64) + '.png')).status).toBe(404);
   expect((await call(dir, 'GET', '/api/' + ref, undefined, '192.168.1.20')).status).toBe(403);

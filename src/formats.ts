@@ -16,7 +16,7 @@ import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
 import { jsonTokens, tokensHtml } from './highlight';
 import { t } from './i18n';
-import { fileUrl } from './files';
+import { downloadUrl, fileUrl, sizeLabel } from './files';
 
 export interface Format {
   name: string;
@@ -40,13 +40,14 @@ export const getFormat = (name: string): Format => registry.get(name) ?? registr
 export const listFormats = () => [...registry.values()];
 export const placeholderOf = (f: Format) => (typeof f.placeholder === 'function' ? f.placeholder() : f.placeholder);
 
-// Links open in a new tab; images kept with the outline (`files/…`) load from the server.
+// Links open in a new tab; files kept with the outline (`files/…`) load from the server.
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A' && node.getAttribute('href')) {
     node.setAttribute('target', '_blank');
     node.setAttribute('rel', 'noopener noreferrer');
   }
   if (node.tagName === 'IMG' && node.getAttribute('src')) node.setAttribute('src', fileUrl(node.getAttribute('src')!));
+  if (node.tagName === 'A' && node.getAttribute('href')) node.setAttribute('href', fileUrl(node.getAttribute('href')!));
 });
 
 export function renderFormat(name: string, content: string): string {
@@ -91,6 +92,25 @@ registerFormat('image', {
     const text = caption.join('\n').trim();
     const alt = escapeHtml(text);
     return `<figure class="fmt-image"><img src="${escapeHtml(src.trim())}" alt="${alt}">${text ? `<figcaption>${alt}</figcaption>` : ''}</figure>`;
+  },
+});
+
+// ---------------------------------------------------------------- file
+
+/** A file to download: its reference (`files/….pdf`), the name it came with and its size in bytes, then an optional note. */
+registerFormat('file', {
+  label: 'File',
+  placeholder: 'files/….pdf\nreport.pdf\n12345',
+  render: (c) => {
+    const [ref, name = '', size = '', ...note] = c.split('\n').map((l) => l.trim());
+    const bytes = Number(size);
+    const label = name || ref.split('/').pop()!;
+    return (
+      `<div class="fmt-file"><a href="${escapeHtml(downloadUrl(ref, name))}" download="${escapeHtml(label)}">` +
+      `<span class="file-name">${escapeHtml(label)}</span>` +
+      (size && Number.isFinite(bytes) ? `<span class="file-size">${sizeLabel(bytes)}</span>` : '') +
+      `</a>${note.join(' ').trim() ? `<div class="file-note">${escapeHtml(note.join('\n').trim())}</div>` : ''}</div>`
+    );
   },
 });
 

@@ -27,7 +27,7 @@ On first launch the outline comes with a usage-guide slide deck, a sample projec
 
 - Under `npm run dev` or `npm run preview`, the outline is saved to **`~/yamoli/data.json`**. Set `YAMOLI_DATA` to use another path.
 - Before the first write of each day, the previous contents are kept in `backups/` (30 days). So are the contents before any write that removes 10 or more rows at once (the last 20 such copies, named with the time).
-- Images pasted or dropped into rows are kept in `files/` next to it, named by their contents (PNG, JPEG, GIF and WebP, up to 20 MB), and never changed or removed once kept.
+- Images and files pasted or dropped into rows are kept in `files/` next to it, named by their contents (up to 50 MB each), and never changed or removed once kept. Images (PNG, JPEG, GIF, WebP, told by their bytes) are shown; anything else is only ever downloaded.
 - If the file changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 - Only the computer running the server can read or write the file. With `--host` (to open the app from a phone, say) other devices save in their own browser instead; set `YAMOLI_ALLOW_REMOTE=1` to let them use the file too, on a network you trust, since anyone who can reach the server can then read and overwrite the outline.
 - When `dist/` is served statically with no server, the outline is saved in the browser (localStorage).
@@ -62,13 +62,13 @@ src/
   slides.ts / SlidesView.tsx          search.ts    links.ts
   diagram.ts / DiagramView.tsx        Diagrams
   i18n.ts         The interface language: t('日本語', 'English')
-  formats.ts      Showing blocks (Markdown, CSV, code, text, images)
-  files.ts        Adding images (upload) and their URLs
+  formats.ts      Showing blocks (Markdown, CSV, code, text, images, files)
+  files.ts        Adding images and files (upload) and their URLs
   views.ts        Which views an item can be shown in (`views` field)
   DocsView.tsx    The usage guide (docs/guide.*.md) at #/docs
 server/
   dataFile.ts     /api/data (reading and writing the data file), used by a Vite plugin
-  files.ts        /api/files (images kept next to it)
+  files.ts        /api/files (images and files kept next to it)
 ```
 
 Built with Vite 8, TypeScript and Preact. Markdown is rendered with marked and sanitized with DOMPurify before display.

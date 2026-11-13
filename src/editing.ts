@@ -13,7 +13,7 @@ import { fKey, fText, type Focus } from './focus';
 import { arrowOf } from './keys';
 import { ViewState } from './viewState';
 import { VIEWS_KEY, type DrawnView } from './views';
-import { uploadImage } from './files';
+import { isImageRef, uploadFile } from './files';
 import { canAddFiles } from './storage';
 
 /** The field that records when an item was completed. */
@@ -388,30 +388,34 @@ export class Editing extends ViewState {
   }
 
   /**
-   * Keep images (pasted or dropped on row id) beside the outline file, and add
-   * each to the row's item as an image block.
+   * Keep files (pasted or dropped on row id) beside the outline file, and add
+   * each to the row's item as a block: an image shown, anything else a file to
+   * download (its reference, name and size, one per line).
    */
-  addImages(id: string, images: File[]) {
+  addFiles(id: string, files: File[]) {
     if (!canAddFiles()) {
       return this.showToast(
         t(
-          '画像は、ファイルに保存しているとき（npm run dev / preview）だけ追加できます',
-          'Images can only be added when the outline is saved to a file (npm run dev / preview)'
+          '画像やファイルは、ファイルに保存しているとき（npm run dev / preview）だけ追加できます',
+          'Images and files can only be added when the outline is saved to a file (npm run dev / preview)'
         )
       );
     }
     const owner = this.store.owner(id);
-    this.showToast(t('画像を保存しています…', 'Saving the image…'));
-    Promise.all(images.map(uploadImage)).then(
-      (refs) => {
+    this.showToast(t('ファイルを保存しています…', 'Saving…'));
+    Promise.all(files.map(uploadFile)).then(
+      (kept) => {
         const { store } = this; // the outline may have been replaced (undo) while uploading
         if (!store.get(owner)) return this.hideToast();
-        for (const ref of refs) store.addBlock(owner, store.freeKey(owner, 'image'), 'image', ref);
+        kept.forEach(({ ref, size }, i) => {
+          if (isImageRef(ref)) store.addBlock(owner, store.freeKey(owner, 'image'), 'image', ref);
+          else store.addBlock(owner, store.freeKey(owner, 'file'), 'file', `${ref}\n${files[i].name}\n${size}`);
+        });
         store.setCollapsed(owner, false);
         this.hideToast();
         this.commit();
       },
-      (e: Error) => this.showToast(t('画像を保存できませんでした: ', 'Couldn’t save the image: ') + e.message)
+      (e: Error) => this.showToast(t('保存できませんでした: ', 'Couldn’t save it: ') + e.message)
     );
   }
 

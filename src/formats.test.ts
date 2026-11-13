@@ -42,3 +42,15 @@ test('an image block shows its picture and caption; kept images load from the se
   box.innerHTML = renderFormat('image', '" onerror="alert(1)');
   expect(box.querySelector('img')!.getAttributeNames()).toEqual(['src', 'alt']);
 });
+
+test('a file block links to the file, downloaded under its own name, with its size', () => {
+  const box = document.createElement('div');
+  box.innerHTML = renderFormat('file', `files/${'b'.repeat(64)}.pdf\n報告書 Q3.pdf\n1536000\nfrom the board`);
+  const a = box.querySelector('a')!;
+  expect(a.getAttribute('href')).toBe(`./api/files/${'b'.repeat(64)}.pdf?name=${encodeURIComponent('報告書 Q3.pdf')}`);
+  expect(a.getAttribute('download')).toBe('報告書 Q3.pdf');
+  expect(a.textContent).toBe('報告書 Q3.pdf1.5 MB');
+  expect(box.querySelector('.file-note')!.textContent).toBe('from the board');
+  // Markdown links to kept files work too.
+  expect(renderFormat('markdown', '[minutes](files/x.pdf)')).toContain('href="./api/files/x.pdf"');
+});

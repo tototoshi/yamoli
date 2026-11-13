@@ -22,7 +22,7 @@ import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
 import { TopBar, ViewSwitch, ViewToggles } from './TopBar';
 import { ItemMenuView, JumpBox, LinkPickerMenu, SuggestMenu, ToastView } from './Popups';
 import { DependencyPanel, DepBadge, SchedLabel } from './Badges';
-import { imageFiles } from './files';
+import { filesIn } from './files';
 
 // ================================================================ app
 
@@ -223,10 +223,10 @@ function NodeRow({ id, changed }: RowProps) {
         }
         onDragOver={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()}
         onDrop={(e) => {
-          const images = imageFiles(e.dataTransfer);
-          if (!images.length) return;
+          const files = filesIn(e.dataTransfer);
+          if (!files.length) return;
           e.preventDefault();
-          ctl.addImages(id, images);
+          ctl.addFiles(id, files);
         }}
       >
         <button

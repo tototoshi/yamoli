@@ -2,7 +2,7 @@
 import { expect, test, vi } from 'vitest';
 import { OutlineStore } from './model';
 
-// A store per test, saved nowhere, with a server to keep images (whose upload is faked).
+// A store per test, saved nowhere, with a server to keep files (whose upload is faked).
 const mocks = vi.hoisted(() => ({ store: null as unknown as import('./model').OutlineStore, server: true }));
 vi.mock('./storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./storage')>()),
@@ -12,7 +12,7 @@ vi.mock('./storage', async (importOriginal) => ({
 }));
 vi.mock('./files', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./files')>()),
-  uploadImage: async (f: File) => `files/${f.name}`,
+  uploadFile: async (f: File) => ({ ref: `files/${f.name}`, size: f.size }),
 }));
 
 const { Controller } = await import('./controller');
@@ -62,11 +62,18 @@ test('with text on the clipboard too, the text is pasted, not the image', () => 
   expect(blocks(ctl, item)).toHaveLength(0);
 });
 
-test('without a file to keep images beside, pasting one says so', () => {
+test('without an outline file to keep them beside, pasting a file says so', () => {
   mocks.server = false;
   const { ctl, item } = setup();
   paste(ctl, item, [png('a.png')]);
   expect(ctl.toast?.message).toMatch(/file|ファイル/);
   expect(blocks(ctl, item)).toHaveLength(0);
   mocks.server = true;
+});
+
+test('any other file is added as a file to download, with its name and size', async () => {
+  const { ctl, item } = setup();
+  paste(ctl, item, [new File(['%PDF-1.7 ...'], 'deadbeef.pdf', { type: 'application/pdf' })]);
+  await vi.waitFor(() => expect(blocks(ctl, item)).toHaveLength(1));
+  expect(blocks(ctl, item).map((b) => [b.key, b.format, b.text])).toEqual([['file', 'file', 'files/deadbeef.pdf\ndeadbeef.pdf\n12']]);
 });
