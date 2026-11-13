@@ -11,6 +11,7 @@ import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
 import { nodeLabel } from './links';
 import { buildDeck, splitColumns, type Bullet, type Slide } from './slides';
+import { fileUrl } from './files';
 
 const W = 1280;
 const H = 720;
@@ -191,7 +192,7 @@ function SlideBody({ slide }: { slide: Slide }) {
             </div>
           )}
         </div>
-        {slide.image && <img class="slide-image" src={slide.image} alt="" />}
+        {slide.image && <img class="slide-image" src={fileUrl(slide.image)} alt="" />}
       </div>
     </>
   );

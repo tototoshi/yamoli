@@ -13,6 +13,8 @@ import { fKey, fText, type Focus } from './focus';
 import { arrowOf } from './keys';
 import { ViewState } from './viewState';
 import { VIEWS_KEY, type DrawnView } from './views';
+import { uploadImage } from './files';
+import { canAddFiles } from './storage';
 
 /** The field that records when an item was completed. */
 const DONE_KEY = 'completed';
@@ -383,6 +385,34 @@ export class Editing extends ViewState {
     else this.store.addField(this.zoomId, VIEWS_KEY, view);
     this.commit(null);
     this.setView(view);
+  }
+
+  /**
+   * Keep images (pasted or dropped on row id) beside the outline file, and add
+   * each to the row's item as an image block.
+   */
+  addImages(id: string, images: File[]) {
+    if (!canAddFiles()) {
+      return this.showToast(
+        t(
+          '画像は、ファイルに保存しているとき（npm run dev / preview）だけ追加できます',
+          'Images can only be added when the outline is saved to a file (npm run dev / preview)'
+        )
+      );
+    }
+    const owner = this.store.owner(id);
+    this.showToast(t('画像を保存しています…', 'Saving the image…'));
+    Promise.all(images.map(uploadImage)).then(
+      (refs) => {
+        const { store } = this; // the outline may have been replaced (undo) while uploading
+        if (!store.get(owner)) return this.hideToast();
+        for (const ref of refs) store.addBlock(owner, store.freeKey(owner, 'image'), 'image', ref);
+        store.setCollapsed(owner, false);
+        this.hideToast();
+        this.commit();
+      },
+      (e: Error) => this.showToast(t('画像を保存できませんでした: ', 'Couldn’t save the image: ') + e.message)
+    );
   }
 
   /** Add a block (multi-line field, Markdown by default) and start writing in it. */

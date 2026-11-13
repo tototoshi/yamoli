@@ -30,7 +30,8 @@ The interface is in English or Japanese, following the browser's language; switc
 
 - Typing `name: ` at the start of a row makes it a **field**. Backspace at the start of the value turns it back into an ordinary row.
 - A field without a value can hold nested rows: fields below it make an object, ordinary rows a list.
-- A **block** (Alt+D) is a field with a multi-line value: Markdown, CSV, code or plain text. In YAML it is written as `note: !markdown |`.
+- A **block** (Alt+D) is a field with a multi-line value: Markdown, CSV, code, plain text or an image. In YAML it is written as `note: !markdown |`.
+- **Paste** or **drop an image** on a row and its item gets an image block (`image: !image files/….png`); lines after the first are its caption. Images are kept in the `files/` folder next to the data file, and Markdown can show them too: `![caption](files/….png)`. This works when saving to a file (`npm run dev` / `preview`).
 - While typing a field's name or value, the names and values already in use are offered below it: **↓** picks one, **Enter** takes it.
 - The **Fields** setting in the view bar shows field rows, folds each row's fields into a one-line summary (click it to open them), or hides them.
 
@@ -144,7 +145,7 @@ For items with `views: slides`: the zoomed item is the deck, and each row under 
 | `theme` | deck | `dark` for a dark theme |
 | `layout` | slide | `center` / `two-column` / `title` |
 | `notes` | slide | Speaker notes |
-| `image` | slide | Image URL |
+| `image` | slide | Image: a URL, or a pasted image's `files/….png` |
 | `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram) |
 
 ## Search
@@ -183,6 +184,6 @@ Outline, Text, YAML and JSON work for any item. Gantt, Diagram and Slides only m
 
 The outline saves itself as you type (the top bar shows when it has). If it changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 
-When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time).
+When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time). Pasted images are in the `files/` folder; once kept, an image is never changed or removed.
 
-The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it. It also adds the usage-guide slides and the samples (a scheduled project, a system architecture) again.
+The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it (without the images: keep the `files/` folder with it). It also adds the usage-guide slides and the samples (a scheduled project, a system architecture) again.

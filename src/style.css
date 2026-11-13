@@ -629,6 +629,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .fmt-markdown pre code { padding: 0; background: none; }
 .fmt-markdown hr { border: 0; border-top: 1px solid var(--faint); }
 .fmt-markdown img { max-width: 100%; }
+.fmt-image { margin: 0; }
+.fmt-image img { display: block; max-width: 100%; max-height: 480px; border-radius: 4px; }
+.fmt-image figcaption { margin-top: 4px; font-size: 12px; color: var(--muted); }
 .data-view a { color: var(--accent); }
 
 .data-view table { border-collapse: collapse; font-size: 13px; }

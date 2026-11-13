@@ -28,3 +28,17 @@ test('json / csv / fallback formats', () => {
   ]);
   expect(getFormat('nope').name).toBe('text');
 });
+
+test('an image block shows its picture and caption; kept images load from the server', () => {
+  const ref = 'files/' + 'a'.repeat(64) + '.png';
+  const html = renderFormat('image', `${ref}\nThe login screen <b>`);
+  expect(html).toContain(`<img src="./api/${ref}" alt="The login screen &lt;b&gt;">`);
+  expect(html).toContain('<figcaption>The login screen &lt;b&gt;</figcaption>');
+  expect(renderFormat('image', 'https://example.com/a.png')).toContain('src="https://example.com/a.png"');
+  // In Markdown too.
+  expect(renderFormat('markdown', `![shot](${ref})`)).toContain(`src="./api/${ref}"`);
+  // A quote in the reference stays inside src.
+  const box = document.createElement('div');
+  box.innerHTML = renderFormat('image', '" onerror="alert(1)');
+  expect(box.querySelector('img')!.getAttributeNames()).toEqual(['src', 'alt']);
+});

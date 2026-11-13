@@ -287,6 +287,11 @@ export async function resolveConflict(keep: 'file' | 'mine', mine: OutlineStore)
   }
 }
 
+// ================================================================ images
+
+/** Whether images can be added: only with a file on disk to keep them beside (server/files.ts). */
+export const canAddFiles = () => dataFile !== null;
+
 window.addEventListener('focus', checkExternal);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && checkExternal());
 

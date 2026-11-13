@@ -10,6 +10,7 @@ import { toMarkdownRows } from './serialize';
 import { fKey, fText } from './focus';
 import { arrowOf, IS_MAC, isMod } from './keys';
 import { Editing } from './editing';
+import { imageFiles } from './files';
 
 /** A row as it was copied, with the rows under it. */
 interface Copied {
@@ -468,6 +469,12 @@ export class Controller extends Editing {
   /** Pasting multiple lines into a row creates one sibling per line (or rows, for indented text). */
   onTextPaste(e: ClipboardEvent, ta: HTMLTextAreaElement) {
     const text = e.clipboardData?.getData('text') ?? '';
+    // An image alone (a screenshot) is kept as an image; with text too (cells from a spreadsheet), the text is what's meant.
+    const images = text ? [] : imageFiles(e.clipboardData);
+    if (images.length) {
+      e.preventDefault();
+      return this.addImages(ta.dataset.id!, images);
+    }
     const lf = (t: string) => t.replace(/\r\n?/g, '\n').trimEnd();
     if (this.copied && lf(text) === lf(this.copied.text)) return this.pasteCopied(e, ta, this.copied.rows);
     if (!text.includes('\n')) return;

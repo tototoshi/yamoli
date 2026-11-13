@@ -22,6 +22,7 @@ import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
 import { TopBar, ViewSwitch, ViewToggles } from './TopBar';
 import { ItemMenuView, JumpBox, LinkPickerMenu, SuggestMenu, ToastView } from './Popups';
 import { DependencyPanel, DepBadge, SchedLabel } from './Badges';
+import { imageFiles } from './files';
 
 // ================================================================ app
 
@@ -62,11 +63,15 @@ export function App() {
         ctl.zoomOut();
       }
     };
+    // A file dropped beside the rows would replace the app with it.
+    const noFileDrop = (e: DragEvent) => e.dataTransfer?.types.includes('Files') && e.preventDefault();
     // A press outside the rows ends a selection of rows (a press on a row handles it itself).
     const onPress = (e: PointerEvent) => ctl.selection && !(e.target as Element).closest('.outline .row') && ctl.clearSelection();
     window.addEventListener('hashchange', onHash);
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', onPress);
+    window.addEventListener('dragover', noFileDrop);
+    window.addEventListener('drop', noFileDrop);
     const first = ctl.store.node(ctl.zoomId).children[0];
     if (first) ctl.focus(fText(first));
     else rerender();
@@ -74,6 +79,8 @@ export function App() {
       window.removeEventListener('hashchange', onHash);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPress);
+      window.removeEventListener('dragover', noFileDrop);
+      window.removeEventListener('drop', noFileDrop);
     };
   }, []);
 
@@ -214,6 +221,13 @@ function NodeRow({ id, changed }: RowProps) {
         onPointerDown={(e) =>
           !(e.target as Element).closest('.bullet, .toggle, button, input, select, .link-bubble') && startRowSelect(e, id, ctl)
         }
+        onDragOver={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()}
+        onDrop={(e) => {
+          const images = imageFiles(e.dataTransfer);
+          if (!images.length) return;
+          e.preventDefault();
+          ctl.addImages(id, images);
+        }}
       >
         <button
           class={'toggle' + (canToggle ? '' : ' empty')}

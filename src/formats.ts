@@ -16,6 +16,7 @@ import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
 import { jsonTokens, tokensHtml } from './highlight';
 import { t } from './i18n';
+import { fileUrl } from './files';
 
 export interface Format {
   name: string;
@@ -39,12 +40,13 @@ export const getFormat = (name: string): Format => registry.get(name) ?? registr
 export const listFormats = () => [...registry.values()];
 export const placeholderOf = (f: Format) => (typeof f.placeholder === 'function' ? f.placeholder() : f.placeholder);
 
-// Links open in a new tab.
+// Links open in a new tab; images kept with the outline (`files/…`) load from the server.
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A' && node.getAttribute('href')) {
     node.setAttribute('target', '_blank');
     node.setAttribute('rel', 'noopener noreferrer');
   }
+  if (node.tagName === 'IMG' && node.getAttribute('src')) node.setAttribute('src', fileUrl(node.getAttribute('src')!));
 });
 
 export function renderFormat(name: string, content: string): string {
@@ -76,6 +78,20 @@ registerFormat('markdown', {
   label: 'Markdown',
   placeholder: () => t('# 見出し\n\n- **太字** や `code` が使えます', '# Heading\n\n- **bold** and `code` work'),
   render: (c) => `<div class="fmt-markdown">${markdown(c)}</div>`,
+});
+
+// ---------------------------------------------------------------- image
+
+/** A picture: its reference (`files/….png`, or a web address) on the first line, an optional caption below. */
+registerFormat('image', {
+  label: 'Image',
+  placeholder: 'files/….png',
+  render: (c) => {
+    const [src, ...caption] = c.split('\n');
+    const text = caption.join('\n').trim();
+    const alt = escapeHtml(text);
+    return `<figure class="fmt-image"><img src="${escapeHtml(src.trim())}" alt="${alt}">${text ? `<figcaption>${alt}</figcaption>` : ''}</figure>`;
+  },
 });
 
 // ---------------------------------------------------------------- json
