@@ -68,7 +68,8 @@ export function savePrefs(prefs: Prefs) {
 /*
  * When the app is served by our dev / preview server the outline is kept in a
  * file on disk (server/dataFile.ts); otherwise in this browser's localStorage.
- * A copy always goes to localStorage too, as a fallback.
+ * A copy always goes to localStorage too, as a fallback: one per file (under
+ * its path), so a new or unreadable file is never filled with another one's.
  *
  * Every write names the version it was based on (ETag), so a stale tab can't
  * overwrite newer data: it gets a conflict and the user picks a side.
@@ -98,6 +99,8 @@ function setState(next: SaveState) {
 }
 
 let initial: OutlineStore;
+/** Where this browser keeps its copy: of the outline file, by its path, or the only outline when there is none. */
+let localKey = STORAGE_KEY;
 let etag: string | null = null; // null: no file yet
 /** Called with the file's contents when it changed elsewhere and we had nothing unsaved. */
 let onExternal: (store: OutlineStore) => void = () => {};
@@ -108,7 +111,7 @@ export function onExternalChange(fn: (store: OutlineStore) => void) {
 
 function loadLocal(): OutlineStore {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(localKey);
     if (raw) return OutlineStore.fromJSON(JSON.parse(raw));
   } catch (e) {
     console.warn('Failed to load outline, starting fresh', e);
@@ -139,8 +142,9 @@ export async function init(): Promise<void> {
     return;
   }
   dataFile = decodeURIComponent(file);
+  localKey = `${STORAGE_KEY}:${dataFile}`;
   if (res.status === 204) {
-    // No file yet: start it from what this browser had (or the sample).
+    // No file yet: start it from this browser's copy of it (it was deleted?), or the sample.
     initial = loadLocal();
     setState({ kind: 'saved' });
     save(initial);
@@ -188,7 +192,7 @@ export function flush() {
   const json = JSON.stringify(pending.toJSON());
   pending = null;
   try {
-    localStorage.setItem(STORAGE_KEY, json);
+    localStorage.setItem(localKey, json);
     if (browserFull) {
       browserFull = false;
       setState({ kind: 'local' });

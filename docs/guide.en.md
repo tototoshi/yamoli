@@ -195,7 +195,7 @@ Outline, Text, YAML and JSON work for any item. Table, Gantt, Diagram and Slides
 
 The outline saves itself as you type (the top bar shows when it has). If it changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 
-When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time). Pasted images and files are in the `files/` folder; once kept, one is never changed.
+When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time). Pasted images and files are in the `files/` folder; once kept, one is never changed. The browser keeps a copy of each data file too: if the file goes missing, it is made again from that file's copy (or the sample, without one; never from another data file).
 
 The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it (without the images and files). When saving to a file it also exports a **backup (ZIP)** of the outline with the images and files it uses; **Restore from a backup** takes either (a ZIP's images and files go back into `files/`).
 
