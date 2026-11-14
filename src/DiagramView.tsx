@@ -1031,11 +1031,11 @@ function Shape({ node, box, on, onHover }: Drawn) {
       outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} style={style} />;
       break;
     case 'store':
-      // Lines along the top and bottom, closed at the start only.
+      // Two lines, along the top and bottom (as in Yourdon / DeMarco, beside a process's ellipse).
       outline = (
         <>
           <rect class="dg-store-bg" width={w} height={h} style={style && { fill: style.fill }} />
-          <path d={`M${w},0 H0 V${h} H${w}`} style={{ fill: 'none', ...(style && { stroke: style.stroke }) }} />
+          <path d={`M0,0 H${w} M0,${h} H${w}`} style={{ fill: 'none', ...(style && { stroke: style.stroke }) }} />
         </>
       );
       break;

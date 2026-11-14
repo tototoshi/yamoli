@@ -8,7 +8,7 @@
  *                        (`to: [[API]] gRPC`); `after` arrows run from the
  *                        dependency to the item waiting for it
  *   shape                box / actor / db / queue / external / process
- *                        (an ellipse) / store (a data store, open at its end)
+ *                        (an ellipse) / store (a data store: two lines)
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   icon                 server, database, cloud … (icons.ts) or an emoji
  *   note / description   wrapped text under the name, in a box or a frame
