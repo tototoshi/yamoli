@@ -1138,6 +1138,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   text-align: center;
   outline: none;
 }
+/* Unseen until typed into, and clicks pass through to the box under it. */
+.dg-type-at { pointer-events: none; }
+.dg-type-at .dg-rename { pointer-events: auto; }
+.dg-type-at .dg-rename.dg-type-idle { opacity: 0; pointer-events: none; }
 .dg-label-input { font-size: 12px; font-weight: 400; }
 .dg-describe { height: 80px; padding: 4px 6px; resize: none; font: inherit; font-size: 12px; font-weight: 400; line-height: 1.4; text-align: left; }
 .dg-menu { min-width: 240px; }

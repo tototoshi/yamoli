@@ -5,7 +5,7 @@
  * or grid, and arrows drawn and removed (diagramEdit.ts writes the outline).
  */
 import type { ComponentChildren } from 'preact';
-import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { CellInput } from './CellInput';
 import { useCtl } from './context';
 import {
@@ -57,6 +57,7 @@ import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
 import { nodeLabel } from './links';
+import { imeActive } from './RowEditor';
 
 const M = 16; // margin around the drawing
 
@@ -150,6 +151,39 @@ function branch(a: Box, b: Box, dir: Direction): string {
   return `M${p0} C${p0[0]},${my} ${p3[0]},${my} ${p3}`;
 }
 
+/** Where an arrow's label is typed: across the middle of the line. */
+const labelAt = ([x, y]: Pt) => ({ x: x - 90, y: y - 14, width: 180, height: 28 });
+
+/**
+ * A box over the selection, unseen until typed into: then it shows, and Enter
+ * or leaving it keeps what was typed (Escape empties it). Keys while it is
+ * empty are the diagram's (onKey), so it only waits for text, IME too.
+ */
+function TypeIn({ class: cls, onKey, onDone }: { class: string; onKey: (e: KeyboardEvent) => boolean; onDone: (text: string) => void }) {
+  const [text, setText] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => input.current?.focus({ preventScroll: true }), []);
+  const typing = text !== '';
+  return (
+    <input
+      ref={input}
+      class={cls + (typing ? '' : ' dg-type-idle')}
+      value={text}
+      onInput={(e) => setText(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (imeActive(e)) return;
+        if (!typing) {
+          if (onKey(e)) e.preventDefault();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          onDone(text);
+        } else if (e.key === 'Escape') setText('');
+      }}
+      onBlur={() => typing && onDone(text)}
+    />
+  );
+}
+
 /** How much larger than its own size an embedded diagram may be drawn. */
 const EMBED_GROW = 2;
 
@@ -185,6 +219,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   const [renaming, setRenaming] = useState<string | null>(null);
   /** The arrow whose label is being written (its key). */
   const [labeling, setLabeling] = useState<string | null>(null);
+  /** Counts what was typed straight onto the selection, so the box waiting for it starts empty again. */
+  const [typedIn, setTypedIn] = useState(0);
   /** The box whose description is being written. */
   const [describing, setDescribing] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -460,6 +496,25 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       }
     : undefined;
   const sb = selectedBox ? L.boxes.get(selectedBox) : undefined;
+  /** Where a box's name is typed: over the box (a frame: over its title). */
+  const nameAt = (b: Box) => {
+    const width = Math.max(b.frame ? 200 : b.w, 140);
+    return { x: b.frame ? b.x + 6 : b.x + b.w / 2 - width / 2, y: b.frame ? b.y + 3 : b.y + b.h / 2 - 14, width, height: 28 };
+  };
+  // Typing on the selection writes its name (an arrow's label) at once: an unseen box waits there for it.
+  const idle = editable && !renaming && !describing && !labeling && !menu && !edgeMenu && !moving && !link && !bend;
+  const typeAt = !idle
+    ? undefined
+    : sb
+      ? nameAt(sb)
+      : selectedEdge && canLabel(selectedEdge)
+        ? labelAt(routes.get(selectedEdge)!.mid)
+        : undefined;
+  const typed = (text: string) => {
+    if (selectedBox) rename(selectedBox, text);
+    else if (selectedEdge) label(selectedEdge, text);
+    setTypedIn((n) => n + 1);
+  };
   const renamed = renaming ? L.boxes.get(renaming) : undefined;
   const described = describing ? L.boxes.get(describing) : undefined;
 
@@ -648,13 +703,18 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             />
           </>
         )}
+        {typeAt && (
+          <foreignObject class="dg-type-at" {...typeAt}>
+            <TypeIn
+              key={`${selectedBox ?? (sel && 'edge' in sel && sel.edge)}#${typedIn}`}
+              class={selectedBox ? 'dg-rename' : 'dg-rename dg-label-input'}
+              onKey={(e) => onKey.current(e)}
+              onDone={typed}
+            />
+          </foreignObject>
+        )}
         {renaming && renamed && (
-          <foreignObject
-            x={renamed.frame ? renamed.x + 6 : renamed.x + renamed.w / 2 - Math.max(renamed.w, 140) / 2}
-            y={renamed.frame ? renamed.y + 3 : renamed.y + renamed.h / 2 - 14}
-            width={Math.max(renamed.frame ? 200 : renamed.w, 140)}
-            height={28}
-          >
+          <foreignObject {...nameAt(renamed)}>
             <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
           </foreignObject>
         )}
@@ -662,9 +722,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           (() => {
             const e = d.edges.find((x) => edgeKey(x) === labeling);
             if (!e) return null;
-            const [mx, my] = routes.get(e)!.mid;
             return (
-              <foreignObject x={mx - 90} y={my - 14} width={180} height={28}>
+              <foreignObject {...labelAt(routes.get(e)!.mid)}>
                 <CellInput
                   key={labeling}
                   class="dg-rename dg-label-input"
@@ -730,8 +789,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                 'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · Delete removes · direction: TB on this item to grow down'
               )
             : t(
-                'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
-                'Click to select · Double-click or Enter to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
+                'クリックで選択 ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
+                'Click to select · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
               )}
         </p>
       )}

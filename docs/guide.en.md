@@ -148,7 +148,7 @@ An arrow to or from a row listed in a box is drawn to the box. Lines that would 
 
 You can edit the diagram where it is drawn. Each edit changes the outline's rows and fields, so the diagram and the outline always match.
 
-- **Names**: double-click a box (or select it and press Enter) to rename it.
+- **Names**: select a box and just type to rename it; double-click it (or press Enter) to edit the name it has. Typing on a selected arrow writes its label.
 - **Description**: "Edit the description" in the right-click menu (Shift+Enter for a new line). It is written to `note`, as a text block when it has several lines, or to the `description` (or other) field the box already has.
 - **Shape and colour**: right-click a box and pick them from the menu (they become the `shape` and `color` fields). The same menu adds a box inside (a plain box becomes a container) or after the box, opens the row in the outline, or deletes it.
 - **New boxes**: **+ Add a box** at the top left of the diagram.
