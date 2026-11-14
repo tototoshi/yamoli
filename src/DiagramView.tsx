@@ -125,7 +125,8 @@ function route(
   others: Box[],
   labelWidth = 0,
   sides: [Side, Side] = facing(a, b, dir),
-  along: [number, number] = [0.5, 0.5]
+  along: [number, number] = [0.5, 0.5],
+  taken = new Taken()
 ): { d: string; mid: Pt; pts: Pt[]; ends: [Pt, Pt] } {
   const natural = facing(a, b, dir);
   if (sides[0] !== natural[0] || sides[1] !== natural[1]) {
@@ -144,8 +145,8 @@ function route(
     const crosses = samples.some(
       (t) => solid.some((r) => near(r, curve(t))) || (t > 0.15 && t < 0.85 && [a, b].some((r) => near(r, curve(t))))
     );
-    const around = crosses && aroundBoxes(s, e, [...solid, a, b]);
-    if (around) return around;
+    const around = crosses && aroundBoxes(s, e, [...solid, a, b], taken);
+    if (around) return (taken.add(around.pts), around);
     return { d: `M${s.p} C${c1} ${c2} ${e.p}`, mid: curve(0.5), pts: [], ends: [s.p, e.p] };
   }
   const apartX = b.x >= a.x + a.w ? 1 : b.x + b.w <= a.x ? -1 : 0;
@@ -180,11 +181,49 @@ function route(
   // Far enough out for the label too, which sits across a lane that runs down the page.
   const gap = horizontal ? 14 : Math.max(14, labelWidth / 2 + 6);
   const lanes = [...between.map((r) => r.y - gap), ...between.map((r) => r.y + r.h + gap)].filter(clear);
-  const lane = lanes.sort((m, n) => Math.abs(m - wanted) - Math.abs(n - wanted))[0] ?? wanted;
-  const x1 = p0[0] + s * 16;
-  const x2 = p3[0] - s * 16;
+  const nearest = lanes.sort((m, n) => Math.abs(m - wanted) - Math.abs(n - wanted));
+  // Off the lines already drawn: a lane, and the stretches down to it, a little aside when another runs there.
+  const free = (p: Pt, q: Pt) => taken.free(sw(p), sw(q));
+  const aside = [0, 1, -1, 2, -2, 3, -3].map((k) => k * SPACING);
+  const [x1s, x2s] = [p0[0] + s * 16, p3[0] - s * 16];
+  const lane = nearest.flatMap((y) => aside.map((d) => y + d)).find((y) => clear(y) && free([x1s, y], [x2s, y])) ?? nearest[0] ?? wanted;
+  // Shifted toward the middle, short of where the other end turns.
+  const stub = (from: number, sign: number, y: number, short: (x: number) => boolean) =>
+    [0, 1, 2, 3].map((k) => from + sign * k * SPACING).find((x) => short(x) && free([x, y], [x, lane])) ?? from;
+  const x1 = stub(x1s, s, p0[1], (x) => s * (x2s - x) > SPACING);
+  const x2 = stub(x2s, -s, p3[1], (x) => s * (x - x1) > SPACING);
   const pts: Pt[] = [p0, [x1, p0[1]], [x1, lane], [x2, lane], [x2, p3[1]], p3];
+  taken.add(pts.map(sw));
   return { d: rounded(pts.map(sw)), mid: sw([(x1 + x2) / 2, lane]), pts: pts.map(sw), ends: [sw(p0), sw(p3)] };
+}
+
+/** How far apart lines running side by side are kept. */
+const SPACING = 8;
+
+/** The straight stretches of the lines drawn so far, for the next ones to keep off. */
+export class Taken {
+  /** Across the page: [y, from x, to x]. */
+  private across: [number, number, number][] = [];
+  /** Down the page: [x, from y, to y]. */
+  private down: [number, number, number][] = [];
+
+  /** Whether a straight stretch from p to q keeps clear of every one running the same way. */
+  free([x1, y1]: Pt, [x2, y2]: Pt): boolean {
+    const runs = (list: [number, number, number][], at: number, a: number, b: number) =>
+      list.every(([c, lo, hi]) => Math.abs(c - at) >= SPACING - 1 || Math.min(hi, Math.max(a, b)) - Math.max(lo, Math.min(a, b)) <= 2);
+    if (y1 === y2) return runs(this.across, y1, x1, x2);
+    if (x1 === x2) return runs(this.down, x1, y1, y2);
+    return true;
+  }
+
+  /** Note the straight stretches of a line through pts. */
+  add(pts: Pt[]) {
+    for (let i = 1; i < pts.length; i++) {
+      const [[x1, y1], [x2, y2]] = [pts[i - 1], pts[i]];
+      if (y1 === y2) this.across.push([y1, Math.min(x1, x2), Math.max(x1, x2)]);
+      else if (x1 === x2) this.down.push([x1, Math.min(y1, y2), Math.max(y1, y2)]);
+    }
+  }
 }
 
 /** Room kept between a line going around boxes and the boxes. */
@@ -196,7 +235,7 @@ const CLEAR = 12;
  * side, then the shortest way between on lines clear of every box, with as
  * few turns as it can. Null when no way is found.
  */
-export function aroundBoxes(s: { p: Pt; out: Pt }, e: { p: Pt; out: Pt }, boxes: Box[]) {
+export function aroundBoxes(s: { p: Pt; out: Pt }, e: { p: Pt; out: Pt }, boxes: Box[], taken = new Taken()) {
   const stub = CLEAR + 8;
   const q0: Pt = [s.p[0] + s.out[0] * stub, s.p[1] + s.out[1] * stub];
   const q3: Pt = [e.p[0] + e.out[0] * stub, e.p[1] + e.out[1] * stub];
@@ -209,9 +248,15 @@ export function aroundBoxes(s: { p: Pt; out: Pt }, e: { p: Pt; out: Pt }, boxes:
         Math.max(y1, y2) > r.y - CLEAR &&
         Math.min(y1, y2) < r.y + r.h + CLEAR
     );
-  // Lines to run on: through both ends, and just clear of each box's sides.
+  // Lines to run on: through both ends, and just clear of each box's sides (and a little further, beside lines already there).
   const lines = (pick: (p: Pt) => number, lo: (r: Box) => number, size: (r: Box) => number) =>
-    [...new Set([pick(q0), pick(q3), ...boxes.flatMap((r) => [lo(r) - CLEAR - 4, lo(r) + size(r) + CLEAR + 4])])].sort((m, n) => m - n);
+    [
+      ...new Set([
+        pick(q0),
+        pick(q3),
+        ...boxes.flatMap((r) => [0, 1, 2].flatMap((k) => [lo(r) - CLEAR - 4 - k * SPACING, lo(r) + size(r) + CLEAR + 4 + k * SPACING])),
+      ]),
+    ].sort((m, n) => m - n);
   const xs = lines(
     (p) => p[0],
     (r) => r.x,
@@ -284,7 +329,9 @@ export function aroundBoxes(s: { p: Pt; out: Pt }, e: { p: Pt; out: Pt }, boxes:
       const m = i2 + j2 * W;
       const [p, q] = [at(n), at(m)];
       if ((m !== goal && inside(q)) || blocked(p, q)) return;
-      push(m * 4 + nd, c + Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) + (nd === dir ? 0 : TURN), state);
+      // Running along a line already drawn costs more than going round.
+      const along = taken.free(p, q) ? 0 : 4 * TURN;
+      push(m * 4 + nd, c + Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) + (nd === dir ? 0 : TURN) + along, state);
     });
   }
   if (end < 0) return null;
@@ -587,11 +634,12 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     ends.sort((p, q) => centre(p.other) - centre(q.other));
     ends.forEach(({ e, end }, i) => (at.get(e)![end] = 0.5 + (i - (ends.length - 1) / 2) * step));
   }
+  const taken = new Taken();
   const routes = new Map(
     d.edges.map((e) => {
       const others = [...all, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
       const labelWidth = e.label ? measure(e.label, PROP_SIZE) + 8 : 0;
-      return [e, route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, labelWidth, sidesOf.get(e), at.get(e))];
+      return [e, route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, labelWidth, sidesOf.get(e), at.get(e), taken)];
     })
   );
   // The drawing's bounds: the boxes, and lines going around them with their labels.
