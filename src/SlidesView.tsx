@@ -1,7 +1,9 @@
 /*
  * Slides view: the zoomed item as a deck (see slides.ts). Slides are laid out
- * at 1280×720 and scaled to fit, in the page or full screen.
+ * at 1280×720 and scaled to fit, in the page or full screen, and printed one
+ * to a page of that size (to save as a PDF).
  */
+import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { t } from './i18n';
@@ -26,6 +28,33 @@ export function SlidesView() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState({ scale: 1, x: 0, y: 0 });
   const [showNotes, setShowNotes] = useState(false);
+  /** Every slide is laid out for printing, and the print dialog opened. */
+  const [printing, setPrinting] = useState(false);
+
+  // Print once the slides are laid out (and their pictures loaded), then put them away.
+  useEffect(() => {
+    if (!printing) return;
+    let gone = false;
+    const done = () => {
+      document.body.classList.remove('printing-slides');
+      setPrinting(false);
+    };
+    const pictures = [...document.querySelectorAll<HTMLImageElement>('.slides-print img')].filter((img) => !img.complete);
+    const loaded = Promise.all(pictures.map((img) => new Promise((r) => (img.onload = img.onerror = r))));
+    void loaded.then(() =>
+      requestAnimationFrame(() => {
+        if (gone) return;
+        document.body.classList.add('printing-slides');
+        window.addEventListener('afterprint', done, { once: true });
+        window.print();
+      })
+    );
+    return () => {
+      gone = true;
+      window.removeEventListener('afterprint', done);
+      document.body.classList.remove('printing-slides');
+    };
+  }, [printing]);
 
   const go = (i: number) => ctl.setSlide(Math.min(Math.max(i, 0), count - 1));
   const fullscreen = () => {
@@ -117,10 +146,34 @@ export function SlidesView() {
           <button class="mini" onClick={fullscreen} title={t('全画面 (F、Esc で戻る)', 'Full screen (F, Esc to leave)')}>
             {t('全画面', 'Full screen')}
           </button>
+          <button
+            class="mini"
+            disabled={printing}
+            onClick={() => setPrinting(true)}
+            title={t('すべてのスライドを印刷（「PDF に保存」で PDF に）', 'Print every slide (choose "Save as PDF" for a PDF)')}
+          >
+            PDF
+          </button>
           <a class="slide-edit" href={ctl.hashFor(slide.id, 'outline')}>
             {t('このスライドを編集', 'Edit this slide')}
           </a>
         </div>
+        {printing &&
+          createPortal(
+            <div class="slides-print">
+              {deck.slides.map((s, i) => (
+                <div key={s.id} class={'slide-stage slide-page theme-' + deck.theme}>
+                  <div class={`slide layout-${s.layout}`}>
+                    <SlideBody slide={s} />
+                    <div class="slide-number">
+                      {i + 1} / {count}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>,
+            document.body
+          )}
         {showNotes && (
           <div class="slide-notes">
             {slide.notes || <span class="muted">{t('（notes: でノートを書けます）', '(write notes in a notes: field)')}</span>}

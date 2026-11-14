@@ -892,6 +892,24 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   --s-accent: #7fa6ff;
   --s-code: #2a2e37;
 }
+/* Every slide, a page each, only while printing them (the PDF button): laid out off screen, so what measures itself (a Gantt chart) can. */
+.slides-print { position: fixed; top: 0; left: -100000px; }
+@media print {
+  @page { size: 1280px 720px; margin: 0; }
+  body.printing-slides > :not(.slides-print) { display: none !important; }
+  body.printing-slides { margin: 0; background: none; }
+  .slides-print { position: static; }
+}
+.slide-page {
+  width: 1280px;
+  height: 720px;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  break-after: page;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
 .slide-stage:fullscreen { width: auto; border: none; border-radius: 0; aspect-ratio: auto; cursor: default; }
 .slide {
   position: absolute;

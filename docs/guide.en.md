@@ -158,7 +158,7 @@ You can edit the diagram where it is drawn. Each edit changes the outline's rows
 
 ## Slides
 
-For items with `views: slides`: the zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content. ← → page through, F goes full screen, N shows the speaker notes.
+For items with `views: slides`: the zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content. ← → page through, F goes full screen, N shows the speaker notes. The **PDF** button below opens the print dialog with every slide on a 16:9 page of its own: choose Save as PDF for a PDF (without the notes).
 
 | Field | On | Meaning |
 | --- | --- | --- |
