@@ -9,6 +9,26 @@ import { DEP_KEY, wouldCycle } from './deps';
 import { addPart, addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
 
+/**
+ * In a mind map, the row an arrow key leads to from id: back to the row it
+ * grows from, out to its first row, or to the row before or after it. Null
+ * when there is none.
+ */
+export function neighbour(d: Diagram, id: string, key: string): string | null {
+  const parent = new Map<string, string>();
+  for (const n of d.nodes.values()) for (const c of n.children) parent.set(c, n.id);
+  const [back, out, prev, next] =
+    d.direction === 'TB' ? ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'] : ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  const p = parent.get(id);
+  const kids = p ? d.nodes.get(p)!.children : [];
+  const i = kids.indexOf(id);
+  if (key === back) return p ?? null;
+  if (key === out) return d.nodes.get(id)?.children[0] ?? null;
+  if (key === prev) return kids[i - 1] ?? null;
+  if (key === next) return kids[i + 1] ?? null;
+  return null;
+}
+
 /** Make id a box of a shape (`box` takes the field away), a frame or a container. */
 export function setShape(store: OutlineStore, id: string, shape: Shape | 'frame' | typeof CONTAINER) {
   const f = store.field(id, 'shape');

@@ -40,6 +40,7 @@ import {
   lineKindOf,
   lineKinds,
   moveBox,
+  neighbour,
   reconnect,
   setColor,
   setDesc,
@@ -203,19 +204,25 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     } else if (selectedBox && selectedBox !== ctl.zoomId) ctl.deleteItem(selectedBox);
     setSel(null);
   };
+  // Keys on the selection. The listener stays put and reads the latest render, so keys typed quickly one after another all count.
+  const onKey = useRef<(e: KeyboardEvent) => boolean>(() => false);
+  onKey.current = (e) => {
+    if (!sel || renaming || describing || menu || edgeMenu) return false;
+    if (e.key === 'Escape') setSel(null);
+    else if (e.key === 'Delete' || e.key === 'Backspace') remove();
+    else if (d.kind === 'tree' && selectedBox) return !(e.metaKey || e.ctrlKey || e.altKey) && mindMapKey(e, selectedBox);
+    else if (e.key === 'Enter' && selectedBox) setRenaming(selectedBox);
+    else return false;
+    return true;
+  };
   useEffect(() => {
-    if (!sel || renaming || describing || menu || edgeMenu) return;
-    const onKey = (e: KeyboardEvent) => {
+    const key = (e: KeyboardEvent) => {
       if ((e.target as Element).closest('input, textarea, [contenteditable]')) return;
-      if (e.key === 'Escape') setSel(null);
-      else if (e.key === 'Delete' || e.key === 'Backspace') remove();
-      else if (e.key === 'Enter' && selectedBox) setRenaming(selectedBox);
-      else return;
-      e.preventDefault();
+      if (onKey.current(e)) e.preventDefault();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
 
   if (!d.nodes.size) {
     return (
@@ -233,7 +240,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             </>
           )}
         </p>
-        {editable && <AddBox onAdd={() => addBox(id)} />}
+        {editable && <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />}
       </div>
     );
   }
@@ -383,11 +390,37 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   /** A new box under parent (before another, or last), named at once. */
   function addBox(parent: string, before: string | null = null) {
     const kids = store.node(parent).children;
-    const n = store.addChild(parent, before ? kids.indexOf(before) : -1, t('新しい箱', 'New box'));
+    const n = store.addChild(
+      parent,
+      before ? kids.indexOf(before) : -1,
+      d.kind === 'tree' ? t('新しいトピック', 'New topic') : t('新しい箱', 'New box')
+    );
     ctl.commit();
     setSel({ box: n.id });
     setRenaming(n.id);
   }
+  /** A row after nid (under the same row), or under it when it is the one the mind map grows from. */
+  const addAfter = (nid: string) => {
+    if (nid === id) return addBox(id);
+    const parent = store.parentOf(nid)!;
+    const kids = store.node(parent).children;
+    addBox(parent, kids[kids.indexOf(nid) + 1] ?? null);
+  };
+  /**
+   * A mind map's keys, on the selected row: Tab adds a row under it, Enter
+   * one after it, F2 or Space renames it, and the arrow keys go along the
+   * branches. False for any other key.
+   */
+  const mindMapKey = (e: KeyboardEvent, nid: string): boolean => {
+    if (e.key === 'Tab' && !e.shiftKey) addBox(nid);
+    else if (e.key === 'Enter' && !e.shiftKey) addAfter(nid);
+    else if (e.key === 'F2' || e.key === ' ') setRenaming(nid);
+    else if (e.key.startsWith('Arrow')) {
+      const to = neighbour(d, nid, e.key);
+      if (to) setSel({ box: to });
+    } else return false;
+    return true;
+  };
   /** Whether a box can be added inside: a frame, a plain box (which becomes a container), any row of a mind map. */
   const holdsBoxes = (nid: string) => d.kind === 'tree' || d.nodes.get(nid)!.isFrame || d.nodes.get(nid)!.shape === 'box';
 
@@ -417,7 +450,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
       {!embedded && (
         <div class="diagram-tools">
-          <AddBox onAdd={() => addBox(id)} />
+          <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />
           <ExportTools
             class="diagram-export"
             drawing={() => ({ svg: standaloneSvg(svgRef.current!), width: W, height: H })}
@@ -647,19 +680,15 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             if (d.kind === 'flow' && !d.nodes.get(menu.id)!.isFrame) setShape(store, menu.id, CONTAINER);
             addBox(menu.id);
           }}
-          onAddAfter={() => {
-            const parent = store.parentOf(menu.id)!;
-            const kids = store.node(parent).children;
-            addBox(parent, kids[kids.indexOf(menu.id) + 1] ?? null);
-          }}
+          onAddAfter={() => addAfter(menu.id)}
         />
       )}
       {!embedded && (
         <p class="diagram-hint">
           {kind === 'tree'
             ? t(
-                'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで色や追加 ・ ドラッグで別の行の下へ ・ Delete で削除 ・ この項目に direction: TB で縦に',
-                'Click to select · Double-click or Enter to rename · Right-click for colour and adding · Drag under another row · Delete removes · direction: TB on this item to grow down'
+                'クリックで選択 ・ Tab で子、Enter で次の行を追加 ・ 矢印キーで移動 ・ ダブルクリックか F2 で名前を変更 ・ ドラッグで別の行の下へ ・ Delete で削除 ・ この項目に direction: TB で縦に',
+                'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · Delete removes · direction: TB on this item to grow down'
               )
             : t(
                 'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
@@ -671,10 +700,10 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   );
 }
 
-function AddBox({ onAdd }: { onAdd: () => void }) {
+function AddBox({ onAdd, tree }: { onAdd: () => void; tree?: boolean }) {
   return (
     <button class="mini dg-add" onClick={onAdd}>
-      {t('+ 箱を追加', '+ Add a box')}
+      {tree ? t('+ トピックを追加', '+ Add a topic') : t('+ 箱を追加', '+ Add a box')}
     </button>
   );
 }

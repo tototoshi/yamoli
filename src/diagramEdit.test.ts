@@ -10,6 +10,7 @@ import {
   lineKindOf,
   lineKinds,
   moveBox,
+  neighbour,
   reconnect,
   setColor,
   setDesc,
@@ -225,4 +226,23 @@ test("an arrow's kind is the field it is written in: changing it moves the link,
   const dep = draw().d.edges.find((e) => e.from === b && e.to === x)!;
   expect(lineKindOf(s, dep)).toBe('after');
   expect(setLineKind(s, dep, 'to')).toBe(false);
+});
+
+test('in a mind map the arrow keys go along the branches, turned with the direction', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const [a, b] = ['A', 'B'].map((x) => s.addChild(p, -1, x).id);
+  const a1 = s.addChild(a, -1, 'A1').id;
+  const d = buildDiagram(s, p, { kind: 'tree' });
+  expect(neighbour(d, p, 'ArrowRight')).toBe(a);
+  expect(neighbour(d, a, 'ArrowDown')).toBe(b);
+  expect(neighbour(d, b, 'ArrowUp')).toBe(a);
+  expect(neighbour(d, a, 'ArrowRight')).toBe(a1);
+  expect(neighbour(d, a1, 'ArrowLeft')).toBe(a);
+  expect(neighbour(d, p, 'ArrowLeft')).toBeNull();
+  expect(neighbour(d, b, 'ArrowDown')).toBeNull();
+  s.addField(p, 'direction', 'TB');
+  const down = buildDiagram(s, p, { kind: 'tree' });
+  expect(neighbour(down, p, 'ArrowDown')).toBe(a);
+  expect(neighbour(down, a, 'ArrowRight')).toBe(b);
 });

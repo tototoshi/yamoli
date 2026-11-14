@@ -197,7 +197,7 @@ Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map and Sli
 - **Outline**: where every kind of editing can be done.
 - **Gantt**: the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
 - **Diagram**: the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
-- **Mind map**: the rows branching out from the zoomed item, as they are nested. No frames or arrows: every row is a node. Turned on with `views: mindmap` (`マインドマップ`). Renaming, adding and dragging rows elsewhere work as in the diagram.
+- **Mind map**: the rows branching out from the zoomed item, as they are nested. No frames or arrows: every row is a node. Turned on with `views: mindmap` (`マインドマップ`). Select a row: Tab adds a row under it and Enter one after it, named as you type. The arrow keys go along the branches; F2, Space or a double-click renames, Delete removes, and dragging moves a row under another.
 - **Slides**: the rows as a slide deck (see Slides). Turned on with `views: slides`.
 - **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
 - **YAML / JSON**: the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
