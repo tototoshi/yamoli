@@ -28,3 +28,20 @@ export function sizeLabel(bytes: number): string {
   const [n, unit] = bytes < 1024 * 1024 ? [bytes / 1024, 'KB'] : [bytes / 1024 / 1024, 'MB'];
   return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${unit}`;
 }
+
+/** How many kept files nothing uses any more (not the outline, not its backups), and their size. */
+export async function unusedFiles(remove = false): Promise<{ count: number; bytes: number }> {
+  const res = await fetch('./api/files/unused', { method: remove ? 'DELETE' : 'GET' });
+  if (!res.ok) throw new Error((await res.text()) || `${res.status}`);
+  return res.json();
+}
+
+/** Put back the files in a backup archive; resolves to its outline (JSON), not yet loaded. */
+export async function restoreBackup(archive: File): Promise<unknown> {
+  const res = await fetch('./api/backup.zip', { method: 'POST', body: archive });
+  if (!res.ok) throw new Error((await res.text()) || `${res.status}`);
+  return res.json();
+}
+
+/** Where the backup archive (the outline file and the files it uses) downloads from. */
+export const BACKUP_URL = './api/backup.zip';

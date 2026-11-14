@@ -289,6 +289,22 @@ export async function resolveConflict(keep: 'file' | 'mine', mine: OutlineStore)
 
 // ================================================================ images
 
+/** Resolves once everything typed so far is in the file; rejects if it can't get there (a conflict, the server down). */
+export function whenSaved(): Promise<void> {
+  flush();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      if (state.kind === 'conflict' || state.kind === 'error') reject(new Error('message' in state ? state.message : 'conflict'));
+      else if (unsaved === null && !pending)
+        resolve(); // a write under way leaves `unsaved` set until it's done
+      else return;
+      listeners.delete(check);
+    };
+    listeners.add(check);
+    check();
+  });
+}
+
 /** Whether images can be added: only with a file on disk to keep them beside (server/files.ts). */
 export const canAddFiles = () => dataFile !== null;
 

@@ -20,13 +20,13 @@ function dataFile(): Plugin {
     async configureServer(server) {
       await moveLegacy(path, (m) => server.config.logger.info(m));
       server.middlewares.use(dataMiddleware(path));
-      server.middlewares.use(filesMiddleware(files));
+      server.middlewares.use(filesMiddleware(files, path));
       server.config.logger.info(`  outline file: ${path}`);
     },
     async configurePreviewServer(server) {
       await moveLegacy(path, (m) => server.config.logger.info(m));
       server.middlewares.use(dataMiddleware(path));
-      server.middlewares.use(filesMiddleware(files));
+      server.middlewares.use(filesMiddleware(files, path));
     },
   };
 }

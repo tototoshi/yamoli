@@ -184,6 +184,8 @@ Outline, Text, YAML and JSON work for any item. Gantt, Diagram and Slides only m
 
 The outline saves itself as you type (the top bar shows when it has). If it changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 
-When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time). Pasted images and files are in the `files/` folder; once kept, one is never changed or removed.
+When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time). Pasted images and files are in the `files/` folder; once kept, one is never changed.
 
-The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it (without the images and files: keep the `files/` folder with it). It also adds the usage-guide slides and the samples (a scheduled project, a system architecture) again.
+The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it (without the images and files). When saving to a file it also exports a **backup (ZIP)** of the outline with the images and files it uses; **Restore from a backup** takes either (a ZIP's images and files go back into `files/`).
+
+**Clean up unused files** deletes images and files that neither the outline nor any backup in `backups/` uses, added over a week ago. It says how many and how large before it does. It also adds the usage-guide slides and the samples (a scheduled project, a system architecture) again.

@@ -1,11 +1,12 @@
 // @vitest-environment node
-import { mkdtemp, readdir, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { expect, test } from 'vitest';
-import { attachment, extensionFor, filesMiddleware, imageType, saveFile } from './files';
+import { attachment, backupZip, extensionFor, filesMiddleware, imageType, restoreZip, saveFile, unusedFiles } from './files';
+import { unzip, zip } from './zip';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
@@ -53,7 +54,11 @@ async function call(dir: string, method: string, url: string, body?: Buffer, rem
     end: (b?: string | Buffer) => ((out.body = Buffer.from(b ?? '')), res),
   };
   let passed = false;
-  await filesMiddleware(dir, allowRemote)(req as unknown as IncomingMessage, res as unknown as ServerResponse, () => (passed = true));
+  await filesMiddleware(dir, join(dir, '..', 'data.json'), allowRemote)(
+    req as unknown as IncomingMessage,
+    res as unknown as ServerResponse,
+    () => (passed = true)
+  );
   return { ...out, passed };
 }
 
@@ -82,4 +87,55 @@ test('serves kept files so that nothing in them runs, and only to this computer'
   expect((await call(dir, 'GET', '/api/' + ref, undefined, '192.168.1.20')).status).toBe(403);
   expect((await call(dir, 'GET', '/api/' + ref, undefined, '192.168.1.20', true)).status).toBe(200);
   expect((await call(dir, 'GET', '/api/data')).passed).toBe(true);
+});
+
+/** An outline file in a folder of its own, with files/ and backups/ beside it. */
+async function folder() {
+  const root = await mkdtemp(join(tmpdir(), 'yamoli-'));
+  return { root, dir: join(root, 'files'), data: join(root, 'data.json'), backups: join(root, 'backups') };
+}
+const outlineUsing = (...refs: string[]) =>
+  JSON.stringify({
+    rootId: 'r',
+    nodes: { r: { id: 'r', text: '', children: [] }, ...Object.fromEntries(refs.map((r, i) => [`n${i}`, { text: r }])) },
+  });
+const WEEK = 7 * 24 * 60 * 60 * 1000;
+
+test('a file is unused only when neither the outline nor any backup uses it, and it was kept over a week ago', async () => {
+  const { dir, data, backups } = await folder();
+  const [inOutline, inBackup, unused] = await Promise.all(
+    ['a', 'b', 'c'].map(async (x) => (await saveFile(dir, Buffer.from(x), `${x}.txt`)) as { ref: string })
+  );
+  await writeFile(data, outlineUsing(inOutline.ref));
+  await mkdir(backups);
+  await writeFile(join(backups, 'data-2026-11-01.json'), outlineUsing(inBackup.ref));
+  const name = (ref: string) => ref.slice('files/'.length);
+
+  expect(await unusedFiles(dir, data)).toEqual([]); // all just kept
+  expect(await unusedFiles(dir, data, Date.now() + WEEK + 1000)).toEqual([{ name: name(unused.ref), size: 1 }]);
+});
+
+test('a backup archive holds the outline and the files it uses, and restores them', async () => {
+  const from = await folder();
+  const used = (await saveFile(from.dir, PNG)) as { ref: string };
+  await saveFile(from.dir, Buffer.from('not used'), 'x.txt');
+  await writeFile(from.data, outlineUsing(used.ref));
+  const archive = (await backupZip(from.dir, from.data))!;
+  expect(unzip(archive).map((e) => e.name)).toEqual(['data.json', used.ref]);
+
+  const to = await folder();
+  expect(await restoreZip(to.dir, archive)).toBe(outlineUsing(used.ref));
+  expect(await readdir(to.dir)).toEqual([used.ref.slice('files/'.length)]);
+  expect(await backupZip(to.dir, to.data)).toBeNull(); // the outline isn't written: the app loads it
+
+  // A file whose contents don't match its name, or outside files/, is not put back.
+  const forged = zip([
+    { name: 'data.json', data: Buffer.from('{}') },
+    { name: `files/${'0'.repeat(64)}.png`, data: PNG },
+    { name: '../evil.txt', data: Buffer.from('x') },
+  ]);
+  const elsewhere = await folder();
+  await restoreZip(elsewhere.dir, forged);
+  expect(await readdir(elsewhere.dir)).toEqual([]);
+  await expect(restoreZip(elsewhere.dir, zip([{ name: 'a.txt', data: Buffer.from('x') }]))).rejects.toThrow(/data.json/);
 });

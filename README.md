@@ -27,13 +27,14 @@ On first launch the outline comes with a usage-guide slide deck, a sample projec
 
 - Under `npm run dev` or `npm run preview`, the outline is saved to **`~/yamoli/data.json`**. Set `YAMOLI_DATA` to use another path.
 - Before the first write of each day, the previous contents are kept in `backups/` (30 days). So are the contents before any write that removes 10 or more rows at once (the last 20 such copies, named with the time).
-- Images and files pasted or dropped into rows are kept in `files/` next to it, named by their contents (up to 50 MB each), and never changed or removed once kept. Images (PNG, JPEG, GIF, WebP, told by their bytes) are shown; anything else is only ever downloaded.
+- Images and files pasted or dropped into rows are kept in `files/` next to it, named by their contents (up to 50 MB each), and never changed once kept. Images (PNG, JPEG, GIF, WebP, told by their bytes) are shown; anything else is only ever downloaded. **Clean up unused files** in the ⋯ menu removes those that neither the outline nor any backup uses, after a week.
 - If the file changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
 - Only the computer running the server can read or write the file. With `--host` (to open the app from a phone, say) other devices save in their own browser instead; set `YAMOLI_ALLOW_REMOTE=1` to let them use the file too, on a network you trust, since anyone who can reach the server can then read and overwrite the outline.
 - When `dist/` is served statically with no server, the outline is saved in the browser (localStorage).
 - The ⋯ menu exports the outline:
   - **YAML**: for reading, or for handing to other tools.
   - **Backup (JSON)**: the full outline, which can be loaded back to restore it.
+  - **Backup (ZIP)**: the outline file with the images and files it uses (when saving to a file); loading it puts them back.
 
 A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/yamoli/` on start.
 
@@ -68,7 +69,8 @@ src/
   DocsView.tsx    The usage guide (docs/guide.*.md) at #/docs
 server/
   dataFile.ts     /api/data (reading and writing the data file), used by a Vite plugin
-  files.ts        /api/files (images and files kept next to it)
+  files.ts        /api/files (images and files kept next to it), /api/backup.zip
+  zip.ts          Writing and reading ZIP archives
 ```
 
 Built with Vite 8, TypeScript and Preact. Markdown is rendered with marked and sanitized with DOMPurify before display.

@@ -9,7 +9,8 @@ import { saveFile } from './exportImage';
 import { toValue, toYaml } from './serialize';
 import { OutlineStore } from './model';
 import { imeActive } from './RowEditor';
-import { dataFile, flush, saveState, type FieldsMode } from './storage';
+import { dataFile, flush, saveState, whenSaved, type FieldsMode } from './storage';
+import { BACKUP_URL, restoreBackup, sizeLabel, unusedFiles } from './files';
 
 // ================================================================ top bar
 
@@ -85,13 +86,46 @@ function MoreMenu() {
     input.value = '';
     if (!file) return;
     try {
-      const next = OutlineStore.fromJSON(JSON.parse(await file.text()));
+      // A ZIP backup's files go back next to the outline file first.
+      const isZip = /\.zip$/i.test(file.name);
+      if (isZip && !dataFile)
+        throw new Error(t('ZIP はファイルに保存しているときだけ読み込めます', 'A ZIP can only be loaded when saving to a file'));
+      const next = OutlineStore.fromJSON(isZip ? await restoreBackup(file) : JSON.parse(await file.text()));
       if (
         confirm(t('現在のアウトラインを置き換えますか？（元に戻すで取り消せます）', 'Replace the current outline? (Undo brings it back)'))
       )
         ctl.replaceStore(next);
     } catch (err) {
       alert(t('読み込みに失敗しました: ', 'Couldn’t load the file: ') + (err as Error).message);
+    }
+  };
+
+  const exportZip = async () => {
+    try {
+      await whenSaved();
+      const a = Object.assign(document.createElement('a'), { href: BACKUP_URL, download: `yamoli-${day()}.zip` });
+      a.click();
+    } catch (err) {
+      alert(t('書き出せませんでした: ', 'Couldn’t export: ') + (err as Error).message);
+    }
+  };
+
+  const cleanUp = async () => {
+    try {
+      const { count, bytes } = await unusedFiles();
+      if (!count) return ctl.showToast(t('使われていないファイルはありません', 'No unused files'));
+      const what = t(`${count} 個（${sizeLabel(bytes)}）`, `${count} file${count > 1 ? 's' : ''} (${sizeLabel(bytes)})`);
+      const ok = confirm(
+        t(
+          `どこからも使われていない画像・ファイル ${what}を削除します。アウトラインにもバックアップにも残っておらず、1週間以上前に追加されたものです。元に戻せません。`,
+          `Delete ${what} that nothing uses: not the outline, not any backup, and added over a week ago. This can’t be undone.`
+        )
+      );
+      if (!ok) return;
+      const done = await unusedFiles(true);
+      ctl.showToast(t(`${done.count} 個のファイルを削除しました`, `Deleted ${done.count} file${done.count === 1 ? '' : 's'}`));
+    } catch (err) {
+      alert(t('整理できませんでした: ', 'Couldn’t clean up: ') + (err as Error).message);
     }
   };
 
@@ -131,9 +165,33 @@ function MoreMenu() {
               >
                 {t('バックアップを書き出す（JSON）', 'Export a backup (JSON)')}
               </button>
+              {dataFile && (
+                <button
+                  role="menuitem"
+                  title={t(
+                    'アウトラインと、そこで使っている画像・ファイルをまとめて保存（読み込みで復元できます）',
+                    'Save the outline with the images and files it uses (load it to restore)'
+                  )}
+                  onClick={run(() => void exportZip())}
+                >
+                  {t('バックアップを書き出す（ZIP、画像・ファイル込み）', 'Export a backup (ZIP, with images and files)')}
+                </button>
+              )}
               <button role="menuitem" onClick={run(() => fileRef.current?.click())}>
                 {t('バックアップから読み込む…', 'Restore from a backup…')}
               </button>
+              {dataFile && (
+                <button
+                  role="menuitem"
+                  title={t(
+                    'アウトラインにもバックアップにも残っていない、1週間以上前の画像・ファイルを削除',
+                    'Delete images and files that neither the outline nor any backup uses, added over a week ago'
+                  )}
+                  onClick={run(() => void cleanUp())}
+                >
+                  {t('使われていないファイルを整理…', 'Clean up unused files…')}
+                </button>
+              )}
               <hr />
               <button
                 role="menuitem"
@@ -164,7 +222,7 @@ function MoreMenu() {
           );
         }}
       </Popup>
-      <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importJson} />
+      <input ref={fileRef} type="file" accept="application/json,.json,application/zip,.zip" hidden onChange={importJson} />
     </>
   );
 }
