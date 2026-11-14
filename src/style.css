@@ -1143,8 +1143,24 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-type-at .dg-rename { pointer-events: auto; }
 .dg-type-at .dg-rename.dg-type-idle { opacity: 0; pointer-events: none; }
 .dg-label-input { font-size: 12px; font-weight: 400; }
-.dg-describe { height: 80px; padding: 4px 6px; resize: none; font: inherit; font-size: 12px; font-weight: 400; line-height: 1.4; text-align: left; }
 .dg-menu { min-width: 240px; }
+/* A name, description or label typed in the menu. */
+.dg-menu-input {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% - 12px);
+  margin: 2px 6px 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--faint);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+input.dg-menu-input { font-weight: 600; }
+.dg-menu-input:focus { border-color: var(--accent); outline: none; }
 .dg-menu-note { padding: 4px 10px; color: var(--muted); font-size: 12px; }
 .dg-menu-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; }
 .item-menu .dg-chip { display: inline-block; width: auto; padding: 3px 8px; border: 1px solid var(--faint); border-radius: 12px; font-size: 12px; }

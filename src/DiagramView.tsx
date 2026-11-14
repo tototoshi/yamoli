@@ -221,8 +221,6 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   const [labeling, setLabeling] = useState<string | null>(null);
   /** Counts what was typed straight onto the selection, so the box waiting for it starts empty again. */
   const [typedIn, setTypedIn] = useState(0);
-  /** The box whose description is being written. */
-  const [describing, setDescribing] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   /** The arrow right-clicked, and where. */
   const [edgeMenu, setEdgeMenu] = useState<{ x: number; y: number } | null>(null);
@@ -250,7 +248,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   // Keys on the selection. The listener stays put and reads the latest render, so keys typed quickly one after another all count.
   const onKey = useRef<(e: KeyboardEvent) => boolean>(() => false);
   onKey.current = (e) => {
-    if (!sel || renaming || describing || labeling || menu || edgeMenu) return false;
+    if (!sel || renaming || labeling || menu || edgeMenu) return false;
     if (e.key === 'Escape') setSel(null);
     else if (e.key === 'Delete' || e.key === 'Backspace') remove();
     else if ((e.key === 'Enter' || e.key === 'F2') && selectedEdge && canLabel(selectedEdge)) setLabeling(edgeKey(selectedEdge));
@@ -433,12 +431,6 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     if (setLabel(store, e, text)) ctl.commit();
     setSel(null); // its key goes with its label
   };
-  const describe = (nid: string, text: string | null) => {
-    setDescribing(null);
-    if (text === null || text.trim() === descOf(store, nid).trim()) return;
-    setDesc(store, nid, text);
-    ctl.commit();
-  };
   /** A new box under parent (before another, or last), named at once. */
   function addBox(parent: string, before: string | null = null) {
     const kids = store.node(parent).children;
@@ -478,8 +470,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
 
   /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
   const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
-  const dotFor =
-    editable && !link && !bend && !moving && !renaming && !describing && !labeling && hover !== null && hover !== id ? hover : null;
+  const dotFor = editable && !link && !bend && !moving && !renaming && !labeling && hover !== null && hover !== id ? hover : null;
   const linkFrom = link && L.boxes.get(link.from);
   const movingBox = moving && L.boxes.get(moving.id);
   const dropHolder = moving?.drop && moving.drop.parent !== id ? L.boxes.get(moving.drop.parent) : undefined;
@@ -502,7 +493,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     return { x: b.frame ? b.x + 6 : b.x + b.w / 2 - width / 2, y: b.frame ? b.y + 3 : b.y + b.h / 2 - 14, width, height: 28 };
   };
   // Typing on the selection writes its name (an arrow's label) at once: an unseen box waits there for it.
-  const idle = editable && !renaming && !describing && !labeling && !menu && !edgeMenu && !moving && !link && !bend;
+  const idle = editable && !renaming && !labeling && !menu && !edgeMenu && !moving && !link && !bend;
   const typeAt = !idle
     ? undefined
     : sb
@@ -516,7 +507,6 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     setTypedIn((n) => n + 1);
   };
   const renamed = renaming ? L.boxes.get(renaming) : undefined;
-  const described = describing ? L.boxes.get(describing) : undefined;
 
   return (
     <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
@@ -734,24 +724,6 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
               </foreignObject>
             );
           })()}
-        {/* Under a box's name: in a frame, below its title; else over the box from its name down. */}
-        {describing && described && (
-          <foreignObject
-            x={described.frame ? described.x + 6 : described.x + described.w / 2 - Math.max(described.w, 240) / 2}
-            y={described.frame ? described.y + 24 : described.y + described.h / 2 - 8}
-            width={Math.max(described.frame ? 280 : described.w, 240)}
-            height={84}
-          >
-            <CellInput
-              key={describing}
-              class="dg-rename dg-describe"
-              lines
-              placeholder={t('説明（Shift+Enter で改行）', 'Description (Shift+Enter for a new line)')}
-              value={descOf(store, describing)}
-              onDone={(text) => describe(describing, text)}
-            />
-          </foreignObject>
-        )}
       </svg>
       {edgeMenu && selectedEdge && (
         <EdgeMenu
@@ -761,7 +733,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           kinds={lineKinds(store, id)}
           onClose={() => setEdgeMenu(null)}
           onRemove={remove}
-          onLabel={canLabel(selectedEdge) ? () => setLabeling(edgeKey(selectedEdge)) : undefined}
+          onLabel={canLabel(selectedEdge) ? (text) => label(selectedEdge, text) : undefined}
         />
       )}
       {menu && store.get(menu.id) && (
@@ -772,8 +744,6 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           root={id}
           holds={holdsBoxes(menu.id)}
           onClose={() => setMenu(null)}
-          onRename={() => setRenaming(menu.id)}
-          onDescribe={() => setDescribing(menu.id)}
           onAddInside={() => {
             if (d.kind === 'flow' && !d.nodes.get(menu.id)!.isFrame) setShape(store, menu.id, CONTAINER);
             addBox(menu.id);
@@ -833,14 +803,28 @@ function BoxMenu(props: {
   root: string;
   holds: boolean;
   onClose: () => void;
-  onRename: () => void;
-  onDescribe: () => void;
   onAddInside: () => void;
   onAddAfter: () => void;
 }) {
-  const { id, x, y, root, holds, onClose } = props;
+  const { id, x, y, root, holds } = props;
   const ctl = useCtl();
   const { store } = ctl;
+  // The name and description, typed here and written when the menu closes (unless by Escape).
+  const [name, setName] = useState(store.node(id).text);
+  const [desc, setDescText] = useState(() => descOf(store, id));
+  const onClose = () => {
+    props.onClose();
+    let changed = false;
+    if (name.trim() && name.trim() !== store.node(id).text) {
+      store.setText(id, name.trim());
+      changed = true;
+    }
+    if (desc.trim() !== descOf(store, id).trim()) {
+      setDesc(store, id, desc);
+      changed = true;
+    }
+    if (changed) ctl.commit();
+  };
   const run = (fn: () => void) => () => {
     onClose();
     fn();
@@ -855,13 +839,23 @@ function BoxMenu(props: {
         : 'box';
   const color = store.fieldValue(id, 'color')?.toLowerCase();
   return (
-    <PopupMenu x={x} y={y} title={nodeLabel(store, id)} onClose={onClose}>
-      <button role="menuitem" onClick={run(props.onRename)}>
-        {t('名前を変更', 'Rename')}
-      </button>
-      <button role="menuitem" onClick={run(props.onDescribe)}>
-        {t('説明を編集', 'Edit the description')}
-      </button>
+    <PopupMenu x={x} y={y} onClose={onClose} onCancel={props.onClose}>
+      <input
+        class="dg-menu-input"
+        aria-label={t('名前', 'Name')}
+        value={name}
+        onInput={(e) => setName(e.currentTarget.value)}
+        onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && (e.preventDefault(), onClose())}
+      />
+      <textarea
+        class="dg-menu-input"
+        rows={2}
+        aria-label={t('説明', 'Description')}
+        placeholder={t('説明（Shift+Enter で改行）', 'Description (Shift+Enter for a new line)')}
+        value={desc}
+        onInput={(e) => setDescText(e.currentTarget.value)}
+        onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), onClose())}
+      />
       <div class="dg-menu-row" role="group" aria-label={t('形', 'Shape')}>
         {SHAPE_CHOICES.map(([s, label]) => (
           <button
@@ -930,26 +924,36 @@ function PopupMenu({
   y,
   title,
   onClose,
+  onCancel = onClose,
   children,
 }: {
   x: number;
   y: number;
-  title: string;
+  title?: string;
+  /** Closed by a press elsewhere or scrolling. */
   onClose: () => void;
+  /** Closed by Escape. */
+  onCancel?: () => void;
   children: ComponentChildren;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // The latest of them, for the listeners set up once.
+  const on = useRef({ onClose, onCancel });
+  on.current = { onClose, onCancel };
   useEffect(() => {
-    ref.current?.querySelector('button')?.focus();
-    const away = (e: Event) => !ref.current?.contains(e.target as Node) && onClose();
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const first = ref.current?.querySelector<HTMLInputElement | HTMLButtonElement>('input, textarea, button');
+    first?.focus();
+    if (first instanceof HTMLInputElement) first.select();
+    const away = (e: Event) => !ref.current?.contains(e.target as Node) && on.current.onClose();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && !imeActive(e) && on.current.onCancel();
+    const scroll = () => on.current.onClose();
     window.addEventListener('pointerdown', away, true);
     window.addEventListener('keydown', key);
-    window.addEventListener('scroll', onClose, true);
+    window.addEventListener('scroll', scroll, true);
     return () => {
       window.removeEventListener('pointerdown', away, true);
       window.removeEventListener('keydown', key);
-      window.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('scroll', scroll, true);
     };
   }, []);
   return (
@@ -960,7 +964,7 @@ function PopupMenu({
       style={{ left: `${Math.min(x, window.innerWidth - 260)}px`, top: `${Math.min(y, window.innerHeight - 380)}px` }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div class="item-menu-title">{title}</div>
+      {title && <div class="item-menu-title">{title}</div>}
       {children}
     </div>
   );
@@ -991,14 +995,30 @@ function EdgeMenu({
   onClose: () => void;
   onRemove: () => void;
   /** Write its label, when it can have one. */
-  onLabel?: () => void;
+  onLabel?: (text: string) => void;
 }) {
   const ctl = useCtl();
   const { store } = ctl;
   const current = lineKindOf(store, edge);
   const dep = current === DEP_KEY;
+  // The label, typed here and written when the menu closes (unless by Escape, or to delete the arrow).
+  const [text, setText] = useState(() => labelOf(store, edge));
+  const close = () => {
+    onClose();
+    if (onLabel && text.trim() !== labelOf(store, edge)) onLabel(text);
+  };
   return (
-    <PopupMenu x={x} y={y} title={`${nodeLabel(store, edge.from)} → ${nodeLabel(store, edge.to)}`} onClose={onClose}>
+    <PopupMenu x={x} y={y} title={`${nodeLabel(store, edge.from)} → ${nodeLabel(store, edge.to)}`} onClose={close} onCancel={onClose}>
+      {onLabel && (
+        <input
+          class="dg-menu-input"
+          aria-label={t('ラベル', 'Label')}
+          placeholder={t('ラベル', 'Label')}
+          value={text}
+          onInput={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && (e.preventDefault(), close())}
+        />
+      )}
       {dep ? (
         <div class="dg-menu-note">{t('依存（after）の矢印です。種類は変えられません', 'A dependency (after); its kind stays')}</div>
       ) : (
@@ -1008,7 +1028,7 @@ function EdgeMenu({
               key={k}
               class={'dg-chip' + (current === k ? ' on' : '')}
               onClick={() => {
-                onClose();
+                close();
                 if (setLineKind(store, edge, k)) ctl.commit();
               }}
             >
@@ -1016,17 +1036,6 @@ function EdgeMenu({
             </button>
           ))}
         </div>
-      )}
-      {onLabel && (
-        <button
-          role="menuitem"
-          onClick={() => {
-            onClose();
-            onLabel();
-          }}
-        >
-          {t('ラベルを編集', 'Edit the label')}
-        </button>
       )}
       <hr />
       <button
