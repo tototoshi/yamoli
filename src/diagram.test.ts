@@ -52,7 +52,7 @@ test('`after` arrows run from the dependency to the item waiting for it', () => 
   const p = s.addChild(s.rootId, -1, 'Plan').id;
   const a = s.addChild(p, -1, 'Design').id;
   const b = s.addChild(p, -1, 'Build').id;
-  s.addField(b, 'after', '^');
+  s.addField(b, 'after', `[[${a}]]`);
   const d = buildDiagram(s, p);
   expect(d.edges).toMatchObject([{ from: a, to: b, label: '' }]);
 });

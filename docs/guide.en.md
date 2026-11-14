@@ -77,8 +77,7 @@ The Gantt chart is there for items with `views: gantt` (see Views). It reads the
 | `duration` | `3d` / `2w` / `10cd` / `0d` | Length in working days / weeks / calendar days. `0d` is a milestone |
 | `start` | `2026-11-10` | Don't start before this date. Inherited by children |
 | `end` | `2026-11-14` | Instead of `duration`: the last day, the bar running from `start` to here (calendar days, so weekends count). Dependencies that end later move it whole |
-| `after` | `[[Requirements]], [[API design]]` | Dependencies: starts once they have all finished. A parent's dependencies apply to its children. `^` is the item just above |
-| `sequential` | `true` | On a parent: each child starts after the one above it, unless it has its own `after` |
+| `after` | `[[Requirements]], [[API design]]` | Dependencies: starts once they have all finished. A parent's dependencies apply to its children |
 | `due` | `2026-11-20` | Deadline; finishing later is shown as late |
 | `completed` | `2026-11-09` | Set to the day an item is completed (⌘Shift+Enter); removed when it is reopened |
 | `workdays` | `mon-fri` | Working days of the week (default `mon-fri`). Inherited by children |
