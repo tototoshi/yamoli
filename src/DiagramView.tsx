@@ -27,6 +27,7 @@ import {
   type DiagramEdge,
   type DiagramNode,
   type Direction,
+  type Side,
   type Layout,
   type Measure,
   arrangeOf,
@@ -49,6 +50,7 @@ import {
   setLabel,
   setLineKind,
   setShape,
+  setSide,
   group,
   outermost,
   ungroup,
@@ -80,13 +82,60 @@ const measure: Measure = (text, size) => {
 
 type Pt = [number, number];
 
+/** The sides of boxes a and b facing each other: along the diagram's direction when they are apart that way. */
+function facing(a: Box, b: Box, dir: Direction): [Side, Side] {
+  const apartX = b.x >= a.x + a.w ? 1 : b.x + b.w <= a.x ? -1 : 0;
+  const apartY = b.y >= a.y + a.h ? 1 : b.y + b.h <= a.y ? -1 : 0;
+  const horizontal = !!apartX && (dir === 'LR' || !apartY);
+  const ahead = horizontal ? apartX > 0 : apartY ? apartY > 0 : b.y + b.h / 2 >= a.y + a.h / 2;
+  return horizontal ? (ahead ? ['right', 'left'] : ['left', 'right']) : ahead ? ['bottom', 'top'] : ['top', 'bottom'];
+}
+
+/** The side of a box nearest a point. */
+function nearestSide(r: Box, [x, y]: Pt): Side {
+  const away: [Side, number][] = [
+    ['top', Math.abs(y - r.y)],
+    ['bottom', Math.abs(y - (r.y + r.h))],
+    ['left', Math.abs(x - r.x)],
+    ['right', Math.abs(x - (r.x + r.w))],
+  ];
+  return away.sort((p, q) => p[1] - q[1])[0][0];
+}
+
+/** A point on a side of a box, at t (0 to 1) along it, and the way out of the box there. */
+function onSide(r: Box, side: Side, t: number): { p: Pt; out: Pt } {
+  if (side === 'top') return { p: [r.x + r.w * t, r.y], out: [0, -1] };
+  if (side === 'bottom') return { p: [r.x + r.w * t, r.y + r.h], out: [0, 1] };
+  if (side === 'left') return { p: [r.x, r.y + r.h * t], out: [-1, 0] };
+  return { p: [r.x + r.w, r.y + r.h * t], out: [1, 0] };
+}
+
 /**
  * An arrow from box a to box b: out of the side facing b, in through the side
- * facing a, along the diagram's direction when the boxes are apart that way.
- * A curve that would cross another box goes around it instead, in a lane
- * above or below (left or right of) the boxes in the way.
+ * facing a, along the diagram's direction when the boxes are apart that way;
+ * along says how far along those sides (half way: the middle). A
+ * curve that would cross another box goes around it instead, in a lane above
+ * or below (left or right of) the boxes in the way. Pinned to other sides, it
+ * curves straight out of one and into the other.
  */
-function route(a: Box, b: Box, dir: Direction, others: Box[], labelWidth = 0): { d: string; mid: Pt; pts: Pt[]; ends: [Pt, Pt] } {
+function route(
+  a: Box,
+  b: Box,
+  dir: Direction,
+  others: Box[],
+  labelWidth = 0,
+  sides: [Side, Side] = facing(a, b, dir),
+  along: [number, number] = [0.5, 0.5]
+): { d: string; mid: Pt; pts: Pt[]; ends: [Pt, Pt] } {
+  const natural = facing(a, b, dir);
+  if (sides[0] !== natural[0] || sides[1] !== natural[1]) {
+    const [s, e] = [onSide(a, sides[0], along[0]), onSide(b, sides[1], along[1])];
+    const k = Math.max(32, Math.hypot(e.p[0] - s.p[0], e.p[1] - s.p[1]) / 2);
+    const c1: Pt = [s.p[0] + s.out[0] * k, s.p[1] + s.out[1] * k];
+    const c2: Pt = [e.p[0] + e.out[0] * k, e.p[1] + e.out[1] * k];
+    const mid = [0, 1].map((i) => (s.p[i] + 3 * c1[i] + 3 * c2[i] + e.p[i]) / 8) as Pt;
+    return { d: `M${s.p} C${c1} ${c2} ${e.p}`, mid, pts: [], ends: [s.p, e.p] };
+  }
   const apartX = b.x >= a.x + a.w ? 1 : b.x + b.w <= a.x ? -1 : 0;
   const apartY = b.y >= a.y + a.h ? 1 : b.y + b.h <= a.y ? -1 : 0;
   const horizontal = !!apartX && (dir === 'LR' || !apartY);
@@ -96,8 +145,8 @@ function route(a: Box, b: Box, dir: Direction, others: Box[], labelWidth = 0): {
   const [A, B] = [swb(a), swb(b)];
   const ahead = horizontal ? apartX > 0 : apartY ? apartY > 0 : b.y + b.h / 2 >= a.y + a.h / 2;
   const s = ahead ? 1 : -1;
-  const p0: Pt = [ahead ? A.x + A.w : A.x, A.y + A.h / 2];
-  const p3: Pt = [ahead ? B.x : B.x + B.w, B.y + B.h / 2];
+  const p0: Pt = [ahead ? A.x + A.w : A.x, A.y + A.h * along[0]];
+  const p3: Pt = [ahead ? B.x : B.x + B.w, B.y + B.h * along[1]];
   const k = Math.max(24, Math.abs(p3[0] - p0[0]) / 2);
   const c1: Pt = [p0[0] + s * k, p0[1]];
   const c2: Pt = [p3[0] - s * k, p3[1]];
@@ -376,10 +425,42 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     if (b.frame && n.desc) heads.set(nid, { x: b.x, y: b.y + 4, w: b.w, h: frameHead(n, b.w, measure) - 4, frame: false });
   }
   const all = [...L.boxes.values()];
+  // The sides each arrow joins its boxes by: where pinned, else facing each other.
+  const sidesOf = new Map(
+    d.edges.map((e) => {
+      const natural = facing(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction);
+      return [e, [e.sides.from ?? natural[0], e.sides.to ?? natural[1]] as [Side, Side]];
+    })
+  );
+  // Ends sharing a side of a box spread out along it, in the order of the boxes at their other ends, so they don't cross.
+  const at = new Map(d.edges.map((e) => [e, [0.5, 0.5] as [number, number]]));
+  const sharing = new Map<string, { e: DiagramEdge; end: 0 | 1; box: string; side: Side; other: Box }[]>();
+  for (const e of d.edges) {
+    const [s0, s1] = sidesOf.get(e)!;
+    for (const end of [
+      { e, end: 0 as const, box: e.from, side: s0, other: L.boxes.get(e.to)! },
+      { e, end: 1 as const, box: e.to, side: s1, other: L.boxes.get(e.from)! },
+    ]) {
+      const k = `${end.box} ${end.side}`;
+      sharing.set(k, [...(sharing.get(k) ?? []), end]);
+    }
+  }
+  for (const ends of sharing.values()) {
+    if (ends.length < 2) continue;
+    const { box, side } = ends[0];
+    const b = L.boxes.get(box)!;
+    const across = side === 'top' || side === 'bottom';
+    const centre = (r: Box) => (across ? r.x + r.w / 2 : r.y + r.h / 2);
+    const len = across ? b.w : b.h;
+    const step = Math.min(len / (ends.length + 1), 16) / len;
+    ends.sort((p, q) => centre(p.other) - centre(q.other));
+    ends.forEach(({ e, end }, i) => (at.get(e)![end] = 0.5 + (i - (ends.length - 1) / 2) * step));
+  }
   const routes = new Map(
     d.edges.map((e) => {
       const others = [...all, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
-      return [e, route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, e.label ? measure(e.label, PROP_SIZE) + 8 : 0)];
+      const labelWidth = e.label ? measure(e.label, PROP_SIZE) + 8 : 0;
+      return [e, route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, labelWidth, sidesOf.get(e), at.get(e))];
     })
   );
   // The drawing's bounds: the boxes, and lines going around them with their labels.
@@ -487,7 +568,15 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       (ev) => setBend(at(ev)),
       (ev) => {
         setBend(null);
-        const to = at(ev).to;
+        const { to, at: p } = at(ev);
+        // Let go on its own box: the end is pinned to the side nearest.
+        if (to === edge[end]) {
+          const side = nearestSide(L.boxes.get(to)!, p);
+          if (side !== sidesOf.get(edge)![end === 'from' ? 0 : 1] || edge.sides[end]) {
+            if (setSide(store, edge, end, side)) ctl.commit();
+          }
+          return select(null);
+        }
         if (!to || !reconnect(store, d, edge, end, to)) return;
         ctl.commit();
         select(null);
@@ -1161,6 +1250,18 @@ function EdgeMenu({
             </button>
           ))}
         </div>
+      )}
+      {(edge.sides.from || edge.sides.to) && (
+        <button
+          role="menuitem"
+          onClick={() => {
+            close();
+            const unpinned = setSide(store, edge, 'from', null);
+            if (setSide(store, edge, 'to', null) || unpinned) ctl.commit();
+          }}
+        >
+          {t('付く位置を自動に戻す', 'Let its ends face each other again')}
+        </button>
       )}
       <hr />
       <button

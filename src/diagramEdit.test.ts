@@ -18,6 +18,7 @@ import {
   setLabel,
   setLineKind,
   setShape,
+  setSide,
   group,
   ungroup,
 } from './diagramEdit';
@@ -295,4 +296,24 @@ test('boxes selected together go into a line-up where the first was, in outline 
 
   ungroup(s, g);
   expect(texts(p)).toEqual(['A', 'F', 'B']);
+});
+
+test('the ends of an arrow are pinned to sides beside its link, kept by its label and dropped when moved', () => {
+  const { s, a, b, x, draw } = drawing();
+  s.addField(a, 'to', `[[${b}]] HTTPS`);
+  const edge = (from: string, to: string) => draw().d.edges.find((e) => e.from === from && e.to === to)!;
+  expect(setSide(s, edge(a, b), 'to', 'top')).toBe(true);
+  expect(s.fieldValue(a, 'to')).toMatch(/^\[\[\w+\]\] HTTPS @(上|top)$/);
+  expect(edge(a, b)).toMatchObject({ label: 'HTTPS', sides: { to: 'top' } });
+  setSide(s, edge(a, b), 'from', 'bottom');
+  expect(edge(a, b).sides).toEqual({ from: 'bottom', to: 'top' });
+  // A new label keeps the sides; the label read back is without them.
+  setLabel(s, edge(a, b), 'gRPC');
+  expect(labelOf(s, edge(a, b))).toBe('gRPC');
+  expect(edge(a, b)).toMatchObject({ label: 'gRPC', sides: { from: 'bottom', to: 'top' } });
+  // Joined to another box, that end faces it again; the other stays pinned.
+  reconnect(s, draw().d, edge(a, b), 'to', x);
+  expect(edge(a, x).sides).toEqual({ from: 'bottom' });
+  setSide(s, edge(a, x), 'from', null);
+  expect(s.fieldValue(a, 'to')).toBe(`[[${x}]] gRPC`);
 });

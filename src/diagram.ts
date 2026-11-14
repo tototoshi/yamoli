@@ -80,6 +80,45 @@ export interface LineStyle {
   color?: string;
 }
 
+/** A side of a box. */
+export type Side = 'top' | 'right' | 'bottom' | 'left';
+/** The sides an arrow leaves its first box by and enters its second by, where pinned. */
+export type Sides = { from?: Side; to?: Side };
+const SIDE_WORDS: Record<string, Side> = {
+  top: 'top',
+  上: 'top',
+  right: 'right',
+  右: 'right',
+  bottom: 'bottom',
+  下: 'bottom',
+  left: 'left',
+  左: 'left',
+};
+
+/** The sides in a word like `下@上` (leaving by the bottom, entering by the top), `@上` or `下@`; null for any other word. */
+export function sidesOf(word: string): Sides | null {
+  const m = word.match(/^([^@\s]*)@([^@\s]*)$/);
+  if (!m || (!m[1] && !m[2])) return null;
+  const [from, to] = [m[1], m[2]].map((w) => (w ? (SIDE_WORDS[w.toLowerCase()] ?? null) : undefined));
+  if (from === null || to === null) return null;
+  return { ...(from && { from }), ...(to && { to }) };
+}
+
+/** The words beside a link: its label, and the sides it is pinned to (the word saying so taken out). */
+export function splitSides(words: string): { label: string; sides: Sides } {
+  let sides: Sides = {};
+  const label = words
+    .replace(/(^|\s)(\S*@\S*)(?=\s|$)/g, (m, _sp, w: string) => {
+      const found = sidesOf(w);
+      if (!found) return m;
+      sides = found;
+      return '';
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { label, sides };
+}
+
 /** Field names with a look of their own, and no label of their name. */
 export const LINE_KEYS: Record<string, string> = { to: '', async: 'dashed', both: 'both', link: 'none' };
 
@@ -124,6 +163,8 @@ export interface DiagramEdge {
   to: string;
   label: string;
   style: LineStyle;
+  /** The sides of its boxes it is pinned to (`下@上` beside its link); else the sides facing each other. */
+  sides: Sides;
   /** Where the arrow is written: the links (to ref) in these fields, which removing it takes out. */
   links: { field: string; ref: string }[];
 }
@@ -233,12 +274,19 @@ export function buildDiagram(
 
   const edges: DiagramEdge[] = [];
   const seen = new Map<string, DiagramEdge>();
-  const push = (from: string | null, to: string | null, label: string, style: LineStyle, link: { field: string; ref: string }) => {
+  const push = (
+    from: string | null,
+    to: string | null,
+    label: string,
+    style: LineStyle,
+    link: { field: string; ref: string },
+    sides: Sides = {}
+  ) => {
     if (!from || !to || from === to) return;
     const k = `${from}>${to}>${label}`;
     const e = seen.get(k);
     if (e) return void e.links.push(link);
-    seen.set(k, { from, to, label, style, links: [link] });
+    seen.set(k, { from, to, label, style, sides, links: [link] });
     edges.push(seen.get(k)!);
   };
   for (const id of nodes.keys()) {
@@ -251,8 +299,8 @@ export function buildDiagram(
         for (const part of text.split(',')) {
           const ref = refIds(part)[0];
           if (!ref || !store.get(ref)) continue;
-          const words = part.replace(/\[\[[^\]]*\]\]/g, '').trim();
-          push(id, drawn(ref), words || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), look(key), { field: c, ref });
+          const { label, sides } = splitSides(part.replace(/\[\[[^\]]*\]\]/g, ''));
+          push(id, drawn(ref), label || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), look(key), { field: c, ref }, sides);
         }
       }
     }

@@ -4,7 +4,20 @@
  * in another place. Each is written to the rows and fields the diagram is
  * drawn from (diagram.ts), so the outline stays the one source.
  */
-import { CONTAINER, DESC_KEYS, LINE_KEYS, type Arrange, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
+import {
+  CONTAINER,
+  DESC_KEYS,
+  LINE_KEYS,
+  splitSides,
+  type Arrange,
+  type Diagram,
+  type DiagramEdge,
+  type Layout,
+  type Shape,
+  type Side,
+  type Sides,
+} from './diagram';
+import { lang } from './i18n';
 import { DEP_KEY, wouldCycle } from './deps';
 import { addPart, addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
@@ -120,9 +133,48 @@ function* linkParts(store: OutlineStore, field: string, ref: string) {
 export function labelOf(store: OutlineStore, edge: DiagramEdge): string {
   for (const { field, ref } of edge.links) {
     if (!store.get(field)) continue;
-    for (const { parts, i } of linkParts(store, field, ref)) return parts[i].replace(LINK_RE, '').trim();
+    for (const { parts, i } of linkParts(store, field, ref)) return splitSides(parts[i].replace(LINK_RE, '')).label;
   }
   return '';
+}
+
+/** How a side is written beside a link, in the language of the app. */
+const SIDE_WORD: Record<Side, [string, string]> = {
+  top: ['上', 'top'],
+  right: ['右', 'right'],
+  bottom: ['下', 'bottom'],
+  left: ['左', 'left'],
+};
+const sideWord = (side: Side | undefined) => (side ? SIDE_WORD[side][lang() === 'ja' ? 0 : 1] : '');
+
+/** Write each of an arrow's link parts anew from its label and sides, as change gives them. A dependency has none. */
+function rewrite(store: OutlineStore, edge: DiagramEdge, change: (label: string, sides: Sides) => [string, Sides]): boolean {
+  let changed = false;
+  for (const { field, ref } of edge.links) {
+    if (!store.get(field) || store.node(field).key?.trim().toLowerCase() === DEP_KEY) continue;
+    for (const { n, parts, i } of [...linkParts(store, field, ref)]) {
+      const lead = parts[i].match(/^\s*/)![0];
+      const written = splitSides(parts[i].replace(LINK_RE, ''));
+      const [label, sides] = change(written.label, written.sides);
+      const pinned = sides.from || sides.to ? `${sideWord(sides.from)}@${sideWord(sides.to)}` : '';
+      parts[i] = lead + [parts[i].match(LINK_RE)!.join(' '), label, pinned].filter(Boolean).join(' ');
+      const next = parts.join(',');
+      if (next === store.node(n).text) continue;
+      store.setText(n, next);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Pin one end of an arrow to a side of its box, or (null) let it face the other box again. */
+export function setSide(store: OutlineStore, edge: DiagramEdge, end: 'from' | 'to', side: Side | null): boolean {
+  return rewrite(store, edge, (label, sides) => {
+    const next = { ...sides };
+    if (side) next[end] = side;
+    else delete next[end];
+    return [label, next];
+  });
 }
 
 /**
@@ -134,19 +186,7 @@ export function setLabel(store: OutlineStore, edge: DiagramEdge, text: string): 
     .replace(/\s*,\s*/g, '、')
     .replace(/\s+/g, ' ')
     .trim();
-  let changed = false;
-  for (const { field, ref } of edge.links) {
-    if (!store.get(field) || store.node(field).key?.trim().toLowerCase() === DEP_KEY) continue;
-    for (const { n, parts, i } of [...linkParts(store, field, ref)]) {
-      const lead = parts[i].match(/^\s*/)![0];
-      parts[i] = lead + parts[i].match(LINK_RE)!.join(' ') + (words ? ' ' + words : '');
-      const next = parts.join(',');
-      if (next === store.node(n).text) continue;
-      store.setText(n, next);
-      changed = true;
-    }
-  }
-  return changed;
+  return rewrite(store, edge, (_, sides) => [words, sides]);
 }
 
 /** Take out the links an arrow is drawn from. */
@@ -178,6 +218,8 @@ export function reconnect(store: OutlineStore, d: Diagram, edge: DiagramEdge, en
     const [id, dep] = m.onOwner ? [target, m.ref] : [m.owner, target];
     if (id === dep || wouldCycle(store, id, dep)) return false;
   }
+  // Pinned to a side of the box it leaves, the end faces the new box instead.
+  if (edge.sides[end]) setSide(store, edge, end, null);
   // A link already there isn't written twice: the old one just goes.
   const links = (field: string | undefined, to: string) => !!field && store.fieldTexts(field).some((text) => refIds(text).includes(to));
   for (const { field, ref, key, onOwner } of moves) {
@@ -322,7 +364,13 @@ export function outermost(store: OutlineStore, ids: string[]): string[] {
     return a.length - b.length;
   };
   return [...set]
-    .filter((id) => !store.path(id).slice(0, -1).some((p) => set.has(p)))
+    .filter(
+      (id) =>
+        !store
+          .path(id)
+          .slice(0, -1)
+          .some((p) => set.has(p))
+    )
     .sort((a, b) => before(place(a), place(b)));
 }
 

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { arrangeOf, buildDiagram, descLines, estimate, frameDesc, layout, wrap, type Box } from './diagram';
+import { arrangeOf, buildDiagram, sidesOf, splitSides, descLines, estimate, frameDesc, layout, wrap, type Box } from './diagram';
 import { OutlineStore } from './model';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
@@ -442,4 +442,14 @@ test('a process and a data store, for data flow diagrams: a process is roomier, 
   const [pa, pb] = [L.boxes.get(a)!, L.boxes.get(b)!];
   expect(pa.w).toBeGreaterThan(pb.w);
   expect(pa.h).toBeGreaterThan(pb.h);
+});
+
+test('a word beside a link pins its ends to sides: before the @ where it leaves, after it where it enters', () => {
+  expect(sidesOf('下@上')).toEqual({ from: 'bottom', to: 'top' });
+  expect(sidesOf('@Right')).toEqual({ to: 'right' });
+  expect(sidesOf('left@')).toEqual({ from: 'left' });
+  expect(sidesOf('@')).toBeNull();
+  expect(sidesOf('me@example.com')).toBeNull();
+  expect(splitSides(' SQL 書き込み @上 ')).toEqual({ label: 'SQL 書き込み', sides: { to: 'top' } });
+  expect(splitSides('mail me@example.com')).toEqual({ label: 'mail me@example.com', sides: {} });
 });
