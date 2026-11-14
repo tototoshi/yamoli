@@ -13,7 +13,6 @@ import { Ctx, keepFocus, useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
-import { TableView } from './TableView';
 import { DataView } from './DataView';
 import { DocsView } from './DocsView';
 import { SegView } from './InlineText';
@@ -125,7 +124,7 @@ export function App() {
       <main
         class={
           'page' +
-          (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'slides' || ctl.view === 'table' ? ' wide' : '') +
+          (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') +
           (ctl.view === 'slides' ? ' slides-page' : '')
         }
       >
@@ -142,9 +141,7 @@ export function App() {
             </div>
           )}
         </div>
-        {ctl.view === 'table' ? (
-          <TableView />
-        ) : ctl.view === 'gantt' ? (
+        {ctl.view === 'gantt' ? (
           <GanttView />
         ) : ctl.view === 'diagram' ? (
           <DiagramView />

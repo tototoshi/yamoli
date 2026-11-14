@@ -1063,33 +1063,6 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   .docs-toc { position: static; max-height: none; }
 }
 
-/* ---------------------------------------------------------------- table */
-
-.table-view { overflow-x: auto; }
-.table-view table { border-collapse: collapse; min-width: 100%; }
-.table-view th, .table-view td { border: 1px solid var(--faint); padding: 0; text-align: left; vertical-align: middle; }
-.table-view th { padding: 6px 8px; font-weight: 600; font-size: 13px; color: var(--muted); background: var(--attr-bg); white-space: nowrap; }
-.table-view td input {
-  width: 100%;
-  min-width: 8em;
-  padding: 6px 8px;
-  border: 0;
-  background: transparent;
-  outline: none;
-}
-.table-view td input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
-.table-view td.table-empty { background: var(--data-bg); }
-.table-view td.table-fixed { padding: 6px 8px; font-size: 13px; color: var(--muted); }
-.table-view .table-row-head { width: 24px; padding: 0 4px; border-left: 0; border-top: 0; border-bottom: 0; background: none; }
-.table-view .table-row-head .bullet { position: static; }
-.table-view th.table-add-col { padding: 0; background: none; border-top: 0; border-right: 0; }
-.table-view th.table-add-col input { width: 7em; padding: 6px 8px; border: 0; background: transparent; outline: none; font-weight: 400; }
-.table-view tr.done input { text-decoration: line-through; color: var(--muted); }
-.table-view .add-first { margin-top: 8px; }
-.table-view td.table-fixed a { color: inherit; text-decoration: none; }
-.table-view td.table-fixed a:hover { color: var(--accent); }
-.table-view td.table-fixed a::after { content: ' ›'; }
-
 /* Editing in the Gantt chart: names and dates typed in, bars dragged. */
 .gantt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; }
 .gantt-name.summary .gantt-label { font-weight: 600; }

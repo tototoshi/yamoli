@@ -23,10 +23,3 @@ test('unknown words in a views field are ignored', () => {
   s.addField(item, 'views', 'Gantt  kanban、スライド');
   expect([...enabledViews(s, item)].sort()).toEqual(['gantt', 'slides']);
 });
-
-test('the table is turned on like the other views', () => {
-  const s = OutlineStore.create();
-  const item = s.addChild(s.rootId, -1, 'Item').id;
-  s.addField(item, 'views', '表, gantt');
-  expect([...enabledViews(s, item)].sort()).toEqual(['gantt', 'table']);
-});

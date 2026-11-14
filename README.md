@@ -40,7 +40,7 @@ A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/y
 
 ## Using it
 
-The usage guide is in [docs/guide.en.md](docs/guide.en.md) (日本語: [docs/guide.ja.md](docs/guide.ja.md)), and in the app from the **?** menu at the top right (`#/docs`), in the interface language. It covers rows, fields and blocks, tasks, copying and pasting, scheduling and the Gantt chart, diagrams, slides, the table, search and the views.
+The usage guide is in [docs/guide.en.md](docs/guide.en.md) (日本語: [docs/guide.ja.md](docs/guide.ja.md)), and in the app from the **?** menu at the top right (`#/docs`), in the interface language. It covers rows, fields and blocks, tasks, copying and pasting, scheduling and the Gantt chart, diagrams, slides, search and the views.
 
 ## Code layout
 
@@ -62,7 +62,6 @@ src/
   deps.ts         Dependencies        gantt.ts / GanttView.tsx
   ganttEdit.ts    Editing the schedule from the Gantt chart (drags and typed dates → fields)
   slides.ts / SlidesView.tsx          search.ts    links.ts
-  TableView.tsx   The table view (rows × fields, edited in place)
   diagram.ts / DiagramView.tsx        Diagrams
   i18n.ts         The interface language: t('日本語', 'English')
   formats.ts      Showing blocks (Markdown, CSV, code, text, images, files)
