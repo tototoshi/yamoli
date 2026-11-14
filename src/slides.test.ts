@@ -34,6 +34,9 @@ test('a deck: title slide, one slide per item, fields as settings', () => {
   expect(d.slides[2].embedAs).toBe('gantt');
   s.setText(s.field(b, 'embed')!.id, `[[${a}]] 図`);
   expect(buildDeck(s, deck).slides[2].embedAs).toBe('diagram');
+  // Without a link, the slide's own rows: drawn, not listed.
+  s.addField(a, 'embed', 'diagram');
+  expect(buildDeck(s, deck).slides[1]).toMatchObject({ embed: a, embedAs: 'diagram', bullets: [] });
   // Home is not a slide of its own.
   expect(buildDeck(s, s.rootId).slides.map((x) => x.id)).toEqual([deck]);
 });

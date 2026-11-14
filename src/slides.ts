@@ -11,6 +11,8 @@
  *                  image: https://…    picture beside the bullets
  *                  embed: [[item]]     that item's Gantt chart
  *                  embed: [[item]] diagram   …or its diagram (also `図`)
+ *                  embed: diagram      the slide's own rows as a diagram
+ *                                      (`gantt` / `ガント`: a Gantt chart), not bullets
  */
 import { refIds } from './links';
 import type { OutlineStore } from './model';
@@ -60,14 +62,16 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
   for (const id of store.items(deckId)) {
     const layout = value(id, 'layout') as Layout | undefined;
     const embed = value(id, 'embed');
+    // No link: the slide's own rows are drawn, rather than listed.
+    const own = !!embed && !refIds(embed).length;
     slides.push({
       id,
       layout: layout && LAYOUTS.includes(layout) ? layout : 'default',
-      bullets: bullets(id),
+      bullets: own ? [] : bullets(id),
       subtitle: value(id, 'subtitle'),
       notes: value(id, 'notes'),
       image: value(id, 'image'),
-      embed: embed ? refIds(embed).find((r) => store.get(r)) : undefined,
+      embed: own ? id : embed ? refIds(embed).find((r) => store.get(r)) : undefined,
       embedAs: embed ? (/diagram|図/i.test(embed.replace(/\[\[[^\]]*\]\]/g, '')) ? 'diagram' : 'gantt') : undefined,
     });
   }

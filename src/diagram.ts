@@ -41,7 +41,19 @@ const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
-const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'diagram', 'lines', 'layout', 'completed', DEP_KEY, VIEWS_KEY]);
+const DRAWING_KEYS = new Set([
+  'shape',
+  'color',
+  'icon',
+  'direction',
+  'diagram',
+  'lines',
+  'layout',
+  'embed',
+  'completed',
+  DEP_KEY,
+  VIEWS_KEY,
+]);
 
 /** How the boxes in a frame are lined up: in a row, a column, or a grid of `columns` across (0: as square as it gets). */
 export type Arrange = { kind: 'row' } | { kind: 'column' } | { kind: 'grid'; columns: number };

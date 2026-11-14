@@ -146,6 +146,9 @@ function branch(a: Box, b: Box, dir: Direction): string {
   return `M${p0} C${p0[0]},${my} ${p3[0]},${my} ${p3}`;
 }
 
+/** How much larger than its own size an embedded diagram may be drawn. */
+const EMBED_GROW = 2;
+
 /** Shapes and colours offered in a box's menu. */
 const SHAPE_CHOICES: [ShapeKind | 'frame' | typeof CONTAINER, () => string][] = [
   ['box', () => t('箱', 'Box')],
@@ -426,8 +429,10 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
         ref={svgRef}
         class={'diagram' + (editable ? ' editable' : '')}
         viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`}
-        width={W}
-        height={H}
+        width={embedded ? '100%' : W}
+        height={embedded ? '100%' : H}
+        // Embedded, it fills the space it is given, though a small drawing grows no more than so much.
+        style={embedded ? { maxWidth: `${W * EMBED_GROW}px`, maxHeight: `${H * EMBED_GROW}px` } : undefined}
         onMouseLeave={() => setHover(null)}
         onPointerDown={(e) => e.target === e.currentTarget && setSel(null)}
       >

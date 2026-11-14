@@ -168,7 +168,7 @@ For items with `views: slides`: the zoomed item is the deck, and each row under 
 | `layout` | slide | `center` / `two-column` / `title` |
 | `notes` | slide | Speaker notes |
 | `image` | slide | Image: a URL, or a pasted image's `files/….png` |
-| `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram) |
+| `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram). Without a link, `diagram` / `図` draws the slide's own rows as a diagram instead of bullets (`gantt` / `ガント`: a Gantt chart) |
 
 ## Search
 

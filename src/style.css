@@ -1004,7 +1004,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .diagram-wrap { overflow-x: auto; padding: 4px 0 16px; }
 /* Full size in its view (scrolling sideways when wide), shrunk to fit when embedded. */
 .diagram { display: block; height: auto; margin: 0 auto; font-size: 13px; user-select: none; }
-.diagram-wrap.embedded { overflow: hidden; }
+.diagram-wrap.embedded { overflow: hidden; height: 100%; padding: 0; }
 .diagram-wrap.embedded .diagram { max-width: 100%; max-height: 100%; }
 .diagram-tools { display: flex; justify-content: flex-end; gap: 6px; margin: 0 0 8px; }
 .diagram-empty, .diagram-hint { color: var(--muted); font-size: 13px; }
