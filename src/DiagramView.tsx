@@ -265,6 +265,38 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, []);
+  // Copying the selected box takes the rows under it and the arrows among them; pasting adds the boxes after the selected one.
+  const onClip = useRef<(e: ClipboardEvent) => void>(() => {});
+  onClip.current = (e) => {
+    if (renaming || labeling || menu || edgeMenu || !e.clipboardData) return;
+    // Words typed or selected are copied and pasted as usual; the unseen box waiting on the selection isn't typed in yet.
+    const target = e.target as Element;
+    if (target.closest?.('input, textarea, [contenteditable]') && !target.classList.contains('dg-type-idle')) return;
+    if (e.type !== 'paste' && !document.getSelection()?.isCollapsed) return;
+    if (e.type === 'paste') {
+      const text = e.clipboardData.getData('text');
+      if (!text.trim()) return;
+      e.preventDefault();
+      const after = selectedBox && selectedBox !== id ? selectedBox : null;
+      const parent = after ? store.parentOf(after)! : id;
+      const index = after ? store.indexOf(after) + 1 : store.node(parent).children.length;
+      const added = ctl.pasteItems(text, parent, index);
+      if (!added.length) return;
+      ctl.commit();
+      setSel({ box: added[added.length - 1] });
+    } else if (selectedBox) {
+      e.preventDefault();
+      e.clipboardData.setData('text/plain', ctl.copyItems([selectedBox]));
+      if (e.type === 'cut' && selectedBox !== id) remove();
+    }
+  };
+  useEffect(() => {
+    if (embedded) return;
+    const clip = (e: Event) => onClip.current(e as ClipboardEvent);
+    const types = ['copy', 'cut', 'paste'];
+    types.forEach((type) => window.addEventListener(type, clip));
+    return () => types.forEach((type) => window.removeEventListener(type, clip));
+  }, []);
 
   if (!d.nodes.size) {
     return (
@@ -755,12 +787,12 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
         <p class="diagram-hint">
           {kind === 'tree'
             ? t(
-                'クリックで選択 ・ Tab で子、Enter で次の行を追加 ・ 矢印キーで移動 ・ ダブルクリックか F2 で名前を変更 ・ ドラッグで別の行の下へ ・ Delete で削除 ・ この項目に direction: TB で縦に',
-                'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · Delete removes · direction: TB on this item to grow down'
+                'クリックで選択 ・ Tab で子、Enter で次の行を追加 ・ 矢印キーで移動 ・ ダブルクリックか F2 で名前を変更 ・ ドラッグで別の行の下へ ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ この項目に direction: TB で縦に',
+                'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · ⌘C / ⌘V copy and paste · Delete removes · direction: TB on this item to grow down'
               )
             : t(
-                'クリックで選択 ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
-                'Click to select · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
+                'クリックで選択 ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
+                'Click to select · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
               )}
         </p>
       )}

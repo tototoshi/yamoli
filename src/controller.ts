@@ -11,9 +11,12 @@ import { fKey, fText } from './focus';
 import { arrowOf, IS_MAC, isMod } from './keys';
 import { Editing } from './editing';
 import { filesIn } from './files';
+import { replaceRefs } from './links';
 
 /** A row as it was copied, with the rows under it. */
 interface Copied {
+  /** The row it was copied from: links to it, among the rows copied, go to its copy. */
+  id: string;
   text: string;
   key: string | null;
   format: string | null;
@@ -25,7 +28,7 @@ interface Copied {
 
 const copyOf = (store: OutlineStore, id: string): Copied => {
   const { text, key, format, completed, task, collapsed, children } = store.node(id);
-  return { text, key, format, completed, task, collapsed, children: children.map((c) => copyOf(store, c)) };
+  return { id, text, key, format, completed, task, collapsed, children: children.map((c) => copyOf(store, c)) };
 };
 
 export class Controller extends Editing {
@@ -39,9 +42,14 @@ export class Controller extends Editing {
    * under them), and keep them whole for pasting back here as they were.
    */
   private copyRows(ids: string[], children: (id: string) => string[]): Promise<void> {
+    return navigator.clipboard.writeText(this.copyItems(ids, children));
+  }
+
+  /** Keep rows whole for pasting back here, and return them as text for the clipboard (all rows under them, unless children picks). */
+  copyItems(ids: string[], children = (id: string) => this.store.node(id).children): string {
     const text = toMarkdownRows(this.store, ids, children);
     this.copied = { text, rows: ids.map((r) => copyOf(this.store, r)) };
-    return navigator.clipboard.writeText(text);
+    return text;
   }
 
   /** Copy an item with everything under it, hidden and folded rows too. */
@@ -422,35 +430,75 @@ export class Controller extends Editing {
    * one, keeping their nesting; `key: value` lines become fields.
    */
   private pasteTree(e: ClipboardEvent, ta: HTMLTextAreaElement, tree: TextRow[]) {
-    const { store } = this;
-    const add = (parent: string, index: number, r: TextRow): string => {
-      const n = store.addChild(parent, index, r.text);
-      n.key = r.key;
-      n.format = r.key !== null ? (r.format ?? null) : null;
-      // A checklist line (`- [ ]`, `- [x]`) comes in as a task.
-      if (r.task) n.task = true;
-      if (r.task === 'done') this.setDone(n.id, true);
-      r.children.forEach((c) => add(n.id, -1, c));
-      return n.id;
-    };
-    this.pasteRows(e, ta, tree, add);
+    this.pasteRows(e, ta, tree, (parent, index, r) => this.addTextRow(parent, index, r));
   }
 
   /** Paste rows copied here: copies of them as they were, fields, blocks and all. */
   private pasteCopied(e: ClipboardEvent, ta: HTMLTextAreaElement, rows: Copied[]) {
-    const { store } = this;
-    const add = (parent: string, index: number, r: Copied): string => {
-      const n = store.addChild(parent, index, r.text);
-      r.children.forEach((c) => add(n.id, -1, c));
-      // After the children, as adding one opens its parent.
-      Object.assign(n, { key: r.key, format: r.format, completed: r.completed, task: r.task, collapsed: r.collapsed });
-      return n.id;
-    };
-    this.pasteRows(e, ta, rows, add);
+    const copies = new Map<string, string>();
+    this.pasteRows(
+      e,
+      ta,
+      rows,
+      (parent, index, r) => this.addCopied(parent, index, r, copies),
+      () => this.relink(copies)
+    );
+  }
+
+  /** A row (and the rows under it) from text: `key: value` lines as fields, checklist lines as tasks. */
+  private addTextRow(parent: string, index: number, r: TextRow): string {
+    const n = this.store.addChild(parent, index, r.text);
+    n.key = r.key;
+    n.format = r.key !== null ? (r.format ?? null) : null;
+    // A checklist line (`- [ ]`, `- [x]`) comes in as a task.
+    if (r.task) n.task = true;
+    if (r.task === 'done') this.setDone(n.id, true);
+    r.children.forEach((c) => this.addTextRow(n.id, -1, c));
+    return n.id;
+  }
+
+  /** A copy of a row as it was copied, noting in copies which row each copy is of. */
+  private addCopied(parent: string, index: number, r: Copied, copies: Map<string, string>): string {
+    const n = this.store.addChild(parent, index, r.text);
+    copies.set(r.id, n.id);
+    r.children.forEach((c) => this.addCopied(n.id, -1, c, copies));
+    // After the children, as adding one opens its parent.
+    Object.assign(n, { key: r.key, format: r.format, completed: r.completed, task: r.task, collapsed: r.collapsed });
+    return n.id;
+  }
+
+  /** Links among the rows copied go to their copies: copied boxes keep the arrows between them. */
+  private relink(copies: Map<string, string>) {
+    for (const c of copies.values()) {
+      const n = this.store.node(c);
+      n.text = replaceRefs(n.text, copies);
+    }
+  }
+
+  /**
+   * Paste the clipboard's text as rows under parent from index, without
+   * committing: rows copied here as they were, else indented text keeping
+   * its nesting, a row per line. Returns the rows added.
+   */
+  pasteItems(text: string, parent: string, index: number): string[] {
+    const lf = (t: string) => t.replace(/\r\n?/g, '\n').trimEnd();
+    if (this.copied && lf(text) === lf(this.copied.text)) {
+      const copies = new Map<string, string>();
+      const ids = this.copied.rows.map((r, i) => this.addCopied(parent, index + i, r, copies));
+      this.relink(copies);
+      return ids;
+    }
+    return parseOutlineText(text).map((r, i) => this.addTextRow(parent, index + i, r));
   }
 
   /** Put rows after the row being edited (or into it, when it is empty), each made by add. */
-  private pasteRows<T>(e: ClipboardEvent, ta: HTMLTextAreaElement, tree: T[], add: (parent: string, index: number, r: T) => string) {
+  private pasteRows<T>(
+    e: ClipboardEvent,
+    ta: HTMLTextAreaElement,
+    tree: T[],
+    add: (parent: string, index: number, r: T) => string,
+    after = () => {}
+  ) {
     e.preventDefault();
     const { store } = this;
     const id = ta.dataset.id!;
@@ -462,6 +510,7 @@ export class Controller extends Editing {
     const empty = id !== this.zoomId && !ta.value && !store.node(id).children.length;
     let last = id;
     tree.forEach((r, i) => (last = add(parent, index + i, r)));
+    after();
     if (empty) store.remove(id);
     this.commit(fText(last));
   }

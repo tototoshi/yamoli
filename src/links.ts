@@ -13,6 +13,10 @@ export function refIds(text: string): string[] {
   return [...text.matchAll(REF_RE)].map((m) => m[1]);
 }
 
+/** text with the links to ids in map pointing at what map gives instead. */
+export const replaceRefs = (text: string, map: Map<string, string>) =>
+  text.replace(REF_RE, (m, ref: string) => (map.has(ref) ? `[[${map.get(ref)}]]` : m));
+
 /** Add a link to ref to id's field named key: inline after the others, or as a row when the field is a list. */
 export function addRef(store: OutlineStore, id: string, key: string, ref: string) {
   addPart(store, id, key, `[[${ref}]]`);

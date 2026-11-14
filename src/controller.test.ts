@@ -340,6 +340,30 @@ test('Copy tree takes everything under an item, hidden rows too, and pastes it b
   expect(store.node(store.items(copy)[1]).completed).toBe(true);
 });
 
+test('boxes copied in the diagram paste after another, their links among them going to the copies', () => {
+  let api = '';
+  let web = '';
+  let db = '';
+  const ctl = setup((s, add) => {
+    api = add(s.rootId, 'API');
+    const orders = add(api, 'Orders');
+    const stock = add(api, 'Stock');
+    db = add(s.rootId, 'DB');
+    s.addField(orders, 'to', `[[${stock}]] call, [[${db}]] SQL`);
+    web = add(s.rootId, 'Web');
+  });
+  const { store } = ctl;
+  const text = ctl.copyItems([api]);
+  const [copy] = ctl.pasteItems(text, store.rootId, store.indexOf(web) + 1);
+  expect(store.items(store.rootId).map((c) => store.node(c).text)).toEqual(['API', 'DB', 'Web', 'API']);
+  const [orders, stock] = store.items(copy);
+  // The arrow inside goes to the copy of Stock; the one out still to DB.
+  expect(store.fieldValue(orders, 'to')).toBe(`[[${stock}]] call, [[${db}]] SQL`);
+
+  // Text from elsewhere comes in a box a line.
+  expect(ctl.pasteItems('Queue\nCache', store.rootId, 0).map((c) => store.node(c).text)).toEqual(['Queue', 'Cache']);
+});
+
 test('#/docs opens the guide over the outline, and leaving it comes back', () => {
   let a = '';
   const ctl = setup((s, add) => {
