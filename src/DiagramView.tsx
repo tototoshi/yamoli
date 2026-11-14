@@ -49,6 +49,9 @@ import {
   setLabel,
   setLineKind,
   setShape,
+  group,
+  outermost,
+  ungroup,
   type ShapeChoice,
   type Drop,
 } from './diagramEdit';
@@ -203,6 +206,20 @@ const SHAPE_CHOICES: [ShapeChoice, () => string][] = [
   ['column', () => t('縦並び', 'Column')],
   ['grid', () => t('格子', 'Grid')],
 ];
+/** What boxes selected together can be put in, from their menu. */
+const GROUP_CHOICES = [
+  ['row', () => t('横に並べる', 'Line up in a row')],
+  ['column', () => t('縦に並べる', 'Line up in a column')],
+  ['grid', () => t('格子に並べる', 'Line up in a grid')],
+  ['frame', () => t('枠で囲む', 'Put in a frame')],
+] as const;
+/** The names of what they are put in: a line-up's is unseen, a note in the outline. */
+const GROUP_NAMES = {
+  row: () => t('横並び', 'Row'),
+  column: () => t('縦並び', 'Column'),
+  grid: () => t('格子', 'Grid'),
+  frame: () => t('グループ', 'Group'),
+};
 const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
 
 const edgeKey = (e: DiagramEdge) => `${e.from}>${e.to}>${e.label}>${e.style.dash}${e.style.ends}`;
@@ -220,6 +237,14 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   const svgRef = useRef<SVGSVGElement>(null);
   /** The box or arrow clicked, which Delete removes (and Enter renames, for a box). */
   const [sel, setSel] = useState<{ box: string } | { edge: string } | null>(null);
+  /** More boxes picked with Shift or ⌘ besides the selected one, to line up, frame or remove together. */
+  const [more, setMore] = useState<string[]>([]);
+  const select = (s: { box: string } | { edge: string } | null) => {
+    setSel(s);
+    setMore([]);
+  };
+  /** The selected boxes and where they were right-clicked. */
+  const [manyMenu, setManyMenu] = useState<{ x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   /** The arrow whose label is being written (its key). */
   const [labeling, setLabeling] = useState<string | null>(null);
@@ -242,18 +267,37 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
 
   const selectedEdge = sel && 'edge' in sel ? d.edges.find((e) => edgeKey(e) === sel.edge) : undefined;
   const selectedBox = sel && 'box' in sel && L.boxes.has(sel.box) ? sel.box : null;
+  /** All the boxes selected: the selected one first. */
+  const chosen = selectedBox ? [selectedBox, ...more.filter((m) => m !== selectedBox && L.boxes.has(m))] : [];
+  const many = chosen.length > 1;
+  /** Add a box to the selection, or take it out. */
+  const toggle = (nid: string) => {
+    if (!selectedBox) return select({ box: nid });
+    const rest = chosen.includes(nid) ? chosen.filter((c) => c !== nid) : [...chosen, nid];
+    setSel(rest.length ? { box: rest[0] } : null);
+    setMore(rest.slice(1));
+  };
   const remove = () => {
     if (selectedEdge) {
       disconnect(store, selectedEdge);
       ctl.commit();
+    } else if (many) {
+      for (const c of outermost(
+        store,
+        chosen.filter((c) => c !== id)
+      ))
+        store.remove(c);
+      ctl.commit();
     } else if (selectedBox && selectedBox !== ctl.zoomId) ctl.deleteItem(selectedBox);
-    setSel(null);
+    select(null);
   };
   // Keys on the selection. The listener stays put and reads the latest render, so keys typed quickly one after another all count.
   const onKey = useRef<(e: KeyboardEvent) => boolean>(() => false);
   onKey.current = (e) => {
-    if (!sel || renaming || labeling || menu || edgeMenu) return false;
-    if (e.key === 'Escape') setSel(null);
+    if (!sel || renaming || labeling || menu || edgeMenu || manyMenu) return false;
+    if (e.key === 'Escape') select(null);
+    else if (many && (e.key === 'Delete' || e.key === 'Backspace')) remove();
+    else if (many) return false;
     else if (e.key === 'Delete' || e.key === 'Backspace') remove();
     else if ((e.key === 'Enter' || e.key === 'F2') && selectedEdge && canLabel(selectedEdge)) setLabeling(edgeKey(selectedEdge));
     else if (d.kind === 'tree' && selectedBox) return !(e.metaKey || e.ctrlKey || e.altKey) && mindMapKey(e, selectedBox);
@@ -272,7 +316,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   // Copying the selected box takes the rows under it and the arrows among them; pasting adds the boxes after the selected one.
   const onClip = useRef<(e: ClipboardEvent) => void>(() => {});
   onClip.current = (e) => {
-    if (renaming || labeling || menu || edgeMenu || !e.clipboardData) return;
+    if (renaming || labeling || menu || edgeMenu || manyMenu || !e.clipboardData) return;
     // Words typed or selected are copied and pasted as usual; the unseen box waiting on the selection isn't typed in yet.
     const target = e.target as Element;
     if (target.closest?.('input, textarea, [contenteditable]') && !target.classList.contains('dg-type-idle')) return;
@@ -287,11 +331,11 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       const added = ctl.pasteItems(text, parent, index);
       if (!added.length) return;
       ctl.commit();
-      setSel({ box: added[added.length - 1] });
+      select({ box: added[added.length - 1] });
     } else if (selectedBox) {
       e.preventDefault();
-      e.clipboardData.setData('text/plain', ctl.copyItems([selectedBox]));
-      if (e.type === 'cut' && selectedBox !== id) remove();
+      e.clipboardData.setData('text/plain', ctl.copyItems(many ? outermost(store, chosen) : [selectedBox]));
+      if (e.type === 'cut' && (many || selectedBox !== id)) remove();
     }
   };
   useEffect(() => {
@@ -394,10 +438,10 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       },
       (ev) => {
         setMoving(null);
-        if (!dragging) return setSel({ box: nid });
+        if (!dragging) return e.shiftKey || e.metaKey || e.ctrlKey ? toggle(nid) : select({ box: nid });
         const drop = dropAt(d, L, id, nid, at(ev).p);
         if (drop && moveBox(store, nid, drop)) ctl.commit();
-        setSel({ box: nid });
+        select({ box: nid });
       },
       () => setMoving(null)
     );
@@ -424,7 +468,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       },
       () => setLink(null)
     );
-    setSel(null);
+    select(null);
     setLink(at(e));
   };
 
@@ -446,7 +490,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
         const to = at(ev).to;
         if (!to || !reconnect(store, d, edge, end, to)) return;
         ctl.commit();
-        setSel(null);
+        select(null);
       },
       () => setBend(null)
     );
@@ -465,7 +509,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     setLabeling(null);
     if (text === null || text.trim() === labelOf(store, e)) return;
     if (setLabel(store, e, text)) ctl.commit();
-    setSel(null); // its key goes with its label
+    select(null); // its key goes with its label
   };
   /** A new box under parent (before another, or last), named at once. */
   function addBox(parent: string, before: string | null = null) {
@@ -476,7 +520,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       d.kind === 'tree' ? t('新しいトピック', 'New topic') : t('新しい箱', 'New box')
     );
     ctl.commit();
-    setSel({ box: n.id });
+    select({ box: n.id });
     setRenaming(n.id);
   }
   /** A row after nid (under the same row), or under it when it is the one the mind map grows from. */
@@ -497,7 +541,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     else if (e.key === 'F2' || e.key === ' ') setRenaming(nid);
     else if (e.key.startsWith('Arrow')) {
       const to = neighbour(d, nid, e.key);
-      if (to) setSel({ box: to });
+      if (to) select({ box: to });
     } else return false;
     return true;
   };
@@ -514,10 +558,11 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   const handlers = editable
     ? {
         press: pressBox,
-        rename: (nid: string) => (setSel({ box: nid }), setRenaming(nid)),
+        rename: (nid: string) => (select({ box: nid }), setRenaming(nid)),
         menu: (e: MouseEvent, nid: string) => {
           e.preventDefault();
-          setSel({ box: nid });
+          if (many && chosen.includes(nid)) return setManyMenu({ x: e.clientX, y: e.clientY });
+          select({ box: nid });
           setMenu({ id: nid, x: e.clientX, y: e.clientY });
         },
       }
@@ -529,14 +574,27 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     return { x: b.frame ? b.x + 6 : b.x + b.w / 2 - width / 2, y: b.frame ? b.y + 3 : b.y + b.h / 2 - 14, width, height: 28 };
   };
   // Typing on the selection writes its name (an arrow's label) at once: an unseen box waits there for it.
-  const idle = editable && !renaming && !labeling && !menu && !edgeMenu && !moving && !link && !bend;
+  const idle = editable && !renaming && !labeling && !menu && !edgeMenu && !manyMenu && !moving && !link && !bend;
   const typeAt = !idle
     ? undefined
-    : sb
+    : sb && !many
       ? nameAt(sb)
       : selectedEdge && canLabel(selectedEdge)
         ? labelAt(routes.get(selectedEdge)!.mid)
         : undefined;
+  /** Put the selected boxes in a new line-up or frame; a frame's name is typed at once. */
+  const groupChosen = (shape: (typeof GROUP_CHOICES)[number][0]) => {
+    const g = group(
+      store,
+      chosen.filter((c) => c !== id),
+      shape,
+      GROUP_NAMES[shape]()
+    );
+    if (!g) return;
+    ctl.commit();
+    select({ box: g });
+    if (shape === 'frame') setRenaming(g);
+  };
   const typed = (text: string) => {
     if (selectedBox) rename(selectedBox, text);
     else if (selectedEdge) label(selectedEdge, text);
@@ -565,7 +623,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
         // Embedded, it fills the space it is given, though a small drawing grows no more than so much.
         style={embedded ? { maxWidth: `min(100%, ${W * EMBED_GROW}px)`, maxHeight: `min(100%, ${H * EMBED_GROW}px)` } : undefined}
         onMouseLeave={() => setHover(null)}
-        onPointerDown={(e) => e.target === e.currentTarget && setSel(null)}
+        onPointerDown={(e) => e.target === e.currentTarget && select(null)}
       >
         <defs>
           <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -597,11 +655,11 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                   class="dg-edge-hit"
                   d={r.d}
                   onPointerDown={(ev) => ev.stopPropagation()}
-                  onClick={() => setSel({ edge: k })}
-                  onDblClick={() => canLabel(e) && (setSel({ edge: k }), setLabeling(k))}
+                  onClick={() => select({ edge: k })}
+                  onDblClick={() => canLabel(e) && (select({ edge: k }), setLabeling(k))}
                   onContextMenu={(ev) => {
                     ev.preventDefault();
-                    setSel({ edge: k });
+                    select({ edge: k });
                     setEdgeMenu({ x: ev.clientX, y: ev.clientY });
                   }}
                 >
@@ -648,7 +706,11 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
         })}
 
         {/* editing: the selection, the dot to draw arrows from, an arrow or a box being dragged */}
-        {sb && !moving && <rect class="dg-selected" x={sb.x - 4} y={sb.y - 4} width={sb.w + 8} height={sb.h + 8} rx={9} />}
+        {!moving &&
+          chosen.map((c) => {
+            const b = L.boxes.get(c)!;
+            return <rect key={c} class="dg-selected" x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} rx={9} />;
+          })}
         {selectedEdge && (
           <g
             class="dg-delete"
@@ -785,7 +847,30 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             addBox(menu.id);
           }}
           onAddAfter={() => addAfter(menu.id)}
+          onUngroup={
+            d.kind === 'flow' && d.nodes.get(menu.id)?.isFrame && menu.id !== id
+              ? () => {
+                  ungroup(store, menu.id);
+                  ctl.commit();
+                  select(null);
+                }
+              : undefined
+          }
         />
+      )}
+      {manyMenu && many && (
+        <PopupMenu x={manyMenu.x} y={manyMenu.y} onClose={() => setManyMenu(null)}>
+          {d.kind === 'flow' &&
+            GROUP_CHOICES.map(([shape, label]) => (
+              <button key={shape} role="menuitem" onClick={() => (setManyMenu(null), groupChosen(shape))}>
+                {label()}
+              </button>
+            ))}
+          {d.kind === 'flow' && <hr />}
+          <button role="menuitem" class="danger" onClick={() => (setManyMenu(null), remove())}>
+            {t(`${chosen.filter((c) => c !== id).length} 個を削除`, `Delete ${chosen.filter((c) => c !== id).length}`)}
+          </button>
+        </PopupMenu>
       )}
       {!embedded && (
         <p class="diagram-hint">
@@ -795,8 +880,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                 'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · ⌘C / ⌘V copy and paste · Delete removes · direction: TB on this item to grow down'
               )
             : t(
-                'クリックで選択 ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ shape: row / column / grid で並べる、この項目に direction: TB',
-                'Click to select · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · shape: row / column / grid lines boxes up, direction: TB on this item'
+                'クリックで選択、Shift+クリックで複数選択して右クリックで並べる ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ shape: row / column / grid で並べる、この項目に direction: TB',
+                'Click to select, Shift+click more and right-click to line them up · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · shape: row / column / grid lines boxes up, direction: TB on this item'
               )}
         </p>
       )}
@@ -841,6 +926,8 @@ function BoxMenu(props: {
   onClose: () => void;
   onAddInside: () => void;
   onAddAfter: () => void;
+  /** Take the boxes out of it, when it is a frame. */
+  onUngroup?: () => void;
 }) {
   const { id, x, y, root, holds } = props;
   const ctl = useCtl();
@@ -934,6 +1021,11 @@ function BoxMenu(props: {
       {id !== root && (
         <button role="menuitem" onClick={run(props.onAddAfter)}>
           {t('後ろに箱を追加', 'Add a box after it')}
+        </button>
+      )}
+      {props.onUngroup && (
+        <button role="menuitem" onClick={run(props.onUngroup)}>
+          {t('囲みを外す', 'Take the boxes out')}
         </button>
       )}
       <button role="menuitem" onClick={run(() => ctl.openRow(id))}>

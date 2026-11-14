@@ -312,3 +312,44 @@ export function moveBox(store: OutlineStore, id: string, drop: Drop): boolean {
     setShape(store, from, 'box');
   return true;
 }
+
+/** Rows in outline order, leaving out those inside another of them. */
+export function outermost(store: OutlineStore, ids: string[]): string[] {
+  const set = new Set(ids);
+  const place = (id: string) => store.path(id).map((p) => store.indexOf(p));
+  const before = (a: number[], b: number[]) => {
+    for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i];
+    return a.length - b.length;
+  };
+  return [...set]
+    .filter((id) => !store.path(id).slice(0, -1).some((p) => set.has(p)))
+    .sort((a, b) => before(place(a), place(b)));
+}
+
+/**
+ * Put boxes in a new row lining them up (`shape: row` / `column` / `grid`)
+ * or in a frame, named name, where the first of them was. Returns the new
+ * row; null with no boxes (or with one, to line up).
+ */
+export function group(store: OutlineStore, ids: string[], shape: Arrange['kind'] | 'frame', name: string): string | null {
+  const rows = outermost(store, ids);
+  if (rows.length < (shape === 'frame' ? 1 : 2)) return null;
+  const parent = store.parentOf(rows[0])!;
+  const g = store.addChild(parent, store.indexOf(rows[0]), name);
+  store.addField(g.id, 'shape', shape);
+  const from = new Set(rows.map((r) => store.parentOf(r)!));
+  for (const r of rows) store.moveTo(r, g.id, null);
+  // A container emptied is a plain box again.
+  for (const f of from)
+    if (store.fieldValue(f, 'shape')?.trim().toLowerCase() === CONTAINER && !store.items(f).length) setShape(store, f, 'box');
+  return g.id;
+}
+
+/** Take the boxes out of a frame (or a line-up) to where it was, and remove it. */
+export function ungroup(store: OutlineStore, id: string): boolean {
+  const parent = store.parentOf(id);
+  if (!parent) return false;
+  for (const c of store.items(id)) store.moveTo(c, parent, id);
+  store.remove(id);
+  return true;
+}

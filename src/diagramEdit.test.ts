@@ -18,6 +18,8 @@ import {
   setLabel,
   setLineKind,
   setShape,
+  group,
+  ungroup,
 } from './diagramEdit';
 import { OutlineStore } from './model';
 
@@ -277,4 +279,20 @@ test("an arrow's label is the words beside its link: written there, a comma kept
   expect(s.fieldValue(b, 'calls')).toBe(`[[${x}]]`);
   expect(calls().label).toBe('calls');
   expect(labelOf(s, calls())).toBe('');
+});
+
+test('boxes selected together go into a line-up where the first was, in outline order, and come out again', () => {
+  const { s, p, a, f, x, z, b } = drawing();
+  const texts = (id: string) => s.items(id).map((c) => s.node(c).text);
+  // Picked in any order, and Z twice over (with its frame): the frame takes it along.
+  const g = group(s, [b, z, a, f], 'column', 'Column')!;
+  expect(texts(p)).toEqual(['Column']);
+  expect(texts(g)).toEqual(['A', 'F', 'B']);
+  expect(s.fieldValue(g, 'shape')).toBe('column');
+  expect(s.items(f)).toContain(z);
+  expect(group(s, [x], 'row', 'Row')).toBeNull(); // one box is no line-up
+  expect(group(s, [x], 'frame', 'Group')).not.toBeNull(); // but can be framed
+
+  ungroup(s, g);
+  expect(texts(p)).toEqual(['A', 'F', 'B']);
 });
