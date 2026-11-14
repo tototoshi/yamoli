@@ -132,6 +132,7 @@ is drawn as:
 | --- | --- |
 | A row | A box, listing the rows under it (`• …`) |
 | `shape: frame` | A frame around the rows under it, drawn as boxes; `frame solid` / `frame none` for its border (dashed by default) |
+| `shape: container` | A box with boxes inside: like a frame, the rows under it are boxes, but it looks like a box |
 | `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency |
 | `shape` | `box` / `actor` / `db` / `queue` / `external` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
@@ -149,10 +150,10 @@ An arrow to or from a row listed in a box is drawn to the box; a mind map (`diag
 You can edit the diagram where it is drawn. Each edit changes the outline's rows and fields, so the diagram and the outline always match.
 
 - **Names**: double-click a box (or select it and press Enter) to rename it.
-- **Shape and colour**: right-click a box and pick them from the menu (they become the `shape` and `color` fields). The same menu adds a box inside a frame or after the box, opens the row in the outline, or deletes it.
+- **Shape and colour**: right-click a box and pick them from the menu (they become the `shape` and `color` fields). The same menu adds a box inside (a plain box becomes a container) or after the box, opens the row in the outline, or deletes it.
 - **New boxes**: **+ Add a box** at the top left of the diagram.
 - **Arrows**: hover over a box and drag from the dot that appears to another box (this adds `to: [[box]]`). Click an arrow and press × or Delete to remove it.
-- **Moving**: drag a box onto another frame to move it inside. In a frame with a `layout`, where you drop it sets its place in the order. Press Esc during a drag to cancel.
+- **Moving**: drag a box onto another frame to move it inside. Dropped on the middle of a plain box, it goes inside and that box becomes a container (`shape: container`); dropped on its edge, it goes before it. A container left empty is a plain box again. In a frame with a `layout`, where you drop it sets its place in the order. Press Esc during a drag to cancel.
 - Delete removes the selected box (⌘Z brings it back).
 
 ## Slides

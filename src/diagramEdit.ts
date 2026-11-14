@@ -4,12 +4,12 @@
  * in another place. Each is written to the rows and fields the diagram is
  * drawn from (diagram.ts), so the outline stays the one source.
  */
-import type { Diagram, DiagramEdge, Layout, Shape } from './diagram';
+import { CONTAINER, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
 import { addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
 
-/** Make id a box of a shape (`box` takes the field away) or a frame. */
-export function setShape(store: OutlineStore, id: string, shape: Shape | 'frame') {
+/** Make id a box of a shape (`box` takes the field away), a frame or a container. */
+export function setShape(store: OutlineStore, id: string, shape: Shape | 'frame' | typeof CONTAINER) {
   const f = store.field(id, 'shape');
   if (shape === 'box') {
     if (f) store.remove(f.id);
@@ -67,18 +67,33 @@ export interface Drop {
   parent: string;
   /** The row it goes before, or null for after the last. */
   before: string | null;
+  /** Dropped on a plain box, which becomes a container to hold it. */
+  nest?: boolean;
 }
 
+/** How far into a box a drop counts as into it rather than beside it, from each side. */
+const EDGE = 0.25;
+
 /**
- * Where a box dragged to a point would go: into the frame (in a mind map, the
+ * Where a box dragged to a point would go: into the middle of a plain box,
+ * inside it (it becomes a container); into the frame (in a mind map, the
  * row) under the point, else the zoomed item (rootId), before the box it is
- * dropped on or where it falls in the frame's row, column or grid. Null when
- * it stays: dropped back on itself, on nothing in the frame it is in (laid
- * out along arrows, where the order hardly shows), or in a mind map's empty space.
+ * dropped on the edge of or where it falls in the frame's row, column or grid.
+ * Null when it stays: dropped back on itself, on nothing in the frame it is
+ * in (laid out along arrows, where the order hardly shows), or in a mind map's empty space.
  */
 export function dropAt(d: Diagram, L: Layout, rootId: string, id: string, [x, y]: Pt): Drop | null {
   if (boxAt(L, [x, y], (n) => n === id)) return null;
   const inside = (n: string) => n === id || holders(d, n).includes(id);
+  if (d.kind === 'flow') {
+    const into = boxAt(L, [x, y], (n) => {
+      const node = d.nodes.get(n)!;
+      if (inside(n) || node.isFrame || node.shape !== 'box') return false;
+      const b = L.boxes.get(n)!;
+      return Math.abs(x - b.x - b.w / 2) < b.w * (0.5 - EDGE) && Math.abs(y - b.y - b.h / 2) < b.h * (0.5 - EDGE);
+    });
+    if (into) return { parent: into, before: null, nest: true };
+  }
   const holder = boxAt(L, [x, y], (n) => !inside(n) && (d.kind === 'tree' || d.nodes.get(n)!.isFrame));
   if (!holder && d.kind === 'tree') return null;
   const kids = (holder ? d.nodes.get(holder)!.children : d.top).filter((c) => c !== id);
@@ -101,5 +116,12 @@ export function dropAt(d: Diagram, L: Layout, rootId: string, id: string, [x, y]
   return { parent: holder ?? rootId, before: before ?? null };
 }
 
-/** Move id as a drop says; false when it would stay where it is. */
-export const moveBox = (store: OutlineStore, id: string, drop: Drop) => store.moveTo(id, drop.parent, drop.before);
+/** Move id as a drop says; false when it would stay where it is. A container left empty is a box again. */
+export function moveBox(store: OutlineStore, id: string, drop: Drop): boolean {
+  const from = store.parentOf(id);
+  if (!store.moveTo(id, drop.parent, drop.before)) return false;
+  if (drop.nest) store.setField(drop.parent, 'shape', CONTAINER);
+  if (from && store.fieldValue(from, 'shape')?.trim().toLowerCase() === CONTAINER && !store.items(from).length)
+    setShape(store, from, 'box');
+  return true;
+}

@@ -55,8 +55,11 @@ export function arrangeOf(value: string | undefined): Arrange | undefined {
   return undefined;
 }
 
-export type FrameStyle = 'dashed' | 'solid' | 'none';
+/** A frame's border: `box` is a container, drawn like a box with boxes inside (`shape: container`). */
+export type FrameStyle = 'dashed' | 'solid' | 'none' | 'box';
 const FRAME_STYLES: FrameStyle[] = ['dashed', 'solid', 'none'];
+/** The `shape` of a box with boxes inside. */
+export const CONTAINER = 'container';
 
 export interface LineStyle {
   dash: 'solid' | 'dashed' | 'dotted';
@@ -171,9 +174,11 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
       if (store.fieldTexts(c).some((t) => refIds(t).length)) continue; // drawn as arrows
       props.push(clip(f.children.length ? `${key}: …` : `${key}: ${f.text.trim()}`));
     }
-    // `frame`, `frame solid`; a border style alone (`solid`) also means a frame.
+    // `frame`, `frame solid`; a border style alone (`solid`) also means a frame, and `container` a box holding boxes.
     const shape = (store.fieldValue(id, 'shape') ?? '').toLowerCase().split(/\s+/);
-    const border = shape.find((w) => FRAME_STYLES.includes(w as FrameStyle)) as FrameStyle | undefined;
+    const border = shape.includes(CONTAINER)
+      ? 'box'
+      : (shape.find((w) => FRAME_STYLES.includes(w as FrameStyle)) as FrameStyle | undefined);
     nodes.set(id, {
       id,
       label: nodeLabel(store, id),

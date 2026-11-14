@@ -89,10 +89,11 @@ test('a box dropped in a lined-up frame goes in where it falls; elsewhere, befor
   expect(dropAt(d, L, row.p, row.y, [fb.x + fb.w - 4, centre(L, row.z)[1]])).toEqual({ parent: row.f, before: null });
   expect(dropAt(d, L, row.p, row.y, centre(L, row.y))).toBeNull(); // back on itself
 
-  // Outside any frame: to the zoomed item, before the box it is dropped on.
+  // Outside any frame: to the zoomed item, before the box it is dropped on the edge of.
   const free = drawing();
   ({ d, L } = free.draw());
-  expect(dropAt(d, L, free.p, free.x, centre(L, free.b))).toEqual({ parent: free.p, before: free.b });
+  const bb = L.boxes.get(free.b)!;
+  expect(dropAt(d, L, free.p, free.x, [bb.x + 4, bb.y + bb.h / 2])).toEqual({ parent: free.p, before: free.b });
   // In empty space of the frame it is already in (laid out along arrows): stays.
   const fb2 = L.boxes.get(free.f)!;
   expect(dropAt(d, L, free.p, free.x, [fb2.x + 4, fb2.y + fb2.h - 4])).toBeNull();
@@ -114,4 +115,28 @@ test('a grid takes a box before the one it falls on the left of, row by row', ()
   expect(dropAt(d, L, g.p, g.a, [zx - 20, zy])).toEqual({ parent: g.f, before: g.z });
   const [yx, yy] = centre(L, g.y);
   expect(dropAt(d, L, g.p, g.a, [yx + 30, yy])).toEqual({ parent: g.f, before: g.z }); // after Y: the next row's first
+});
+
+test('a box dropped on the middle of a plain box goes inside it, which becomes a container until it is empty', () => {
+  const { s, p, a, b, x, draw } = drawing();
+  let { d, L } = draw();
+  const drop = dropAt(d, L, p, a, centre(L, b))!;
+  expect(drop).toEqual({ parent: b, before: null, nest: true });
+  expect(moveBox(s, a, drop)).toBe(true);
+  expect(s.items(b)).toEqual([a]);
+  expect(s.fieldValue(b, 'shape')).toBe('container');
+  ({ d, L } = draw());
+  expect(d.nodes.get(b)).toMatchObject({ isFrame: true, frame: 'box', children: [a] });
+  const inner = L.boxes.get(a)!;
+  const outer = L.boxes.get(b)!;
+  expect(inner.x > outer.x && inner.x + inner.w < outer.x + outer.w).toBe(true);
+  // Not into a box inside the one dragged, nor into a database.
+  expect(dropAt(d, L, p, b, centre(L, a))).toBeNull();
+  s.setField(x, 'shape', 'db');
+  ({ d, L } = draw());
+  expect(dropAt(d, L, p, a, centre(L, x))?.nest).toBeUndefined();
+
+  // Moved out again: a box once more.
+  expect(moveBox(s, a, { parent: p, before: null })).toBe(true);
+  expect(s.field(b, 'shape')).toBeFalsy();
 });

@@ -19,6 +19,7 @@ import {
   PAD,
   PROP_SIZE,
   colorValue,
+  CONTAINER,
   type Box,
   type Diagram,
   type DiagramEdge,
@@ -128,13 +129,14 @@ function branch(a: Box, b: Box, dir: Direction): string {
 }
 
 /** Shapes and colours offered in a box's menu. */
-const SHAPE_CHOICES: [ShapeKind | 'frame', () => string][] = [
+const SHAPE_CHOICES: [ShapeKind | 'frame' | typeof CONTAINER, () => string][] = [
   ['box', () => t('箱', 'Box')],
   ['actor', () => t('人', 'Actor')],
   ['db', () => t('DB', 'Database')],
   ['queue', () => t('キュー', 'Queue')],
   ['external', () => t('外部', 'External')],
   ['frame', () => t('枠', 'Frame')],
+  [CONTAINER, () => t('入れ物', 'Container')],
 ];
 const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
 
@@ -328,7 +330,8 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
     setSel({ box: n.id });
     setRenaming(n.id);
   }
-  const holdsBoxes = (nid: string) => d.kind === 'tree' || d.nodes.get(nid)!.isFrame;
+  /** Whether a box can be added inside: a frame, a plain box (which becomes a container), any row of a mind map. */
+  const holdsBoxes = (nid: string) => d.kind === 'tree' || d.nodes.get(nid)!.isFrame || d.nodes.get(nid)!.shape === 'box';
 
   /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
   const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
@@ -415,7 +418,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           return (
             <g key={nid}>
               {n.icon && <Icon value={n.icon} x={b.x + 12} y={b.y + 5} size={15} color={n.color} />}
-              <text class="dg-frame-title" x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
+              <text class={'dg-frame-title' + (n.frame === 'box' ? ' box' : '')} x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
                 {n.label}
               </text>
               {frameDesc(n, b.w, measure).map((l, i) => (
@@ -513,7 +516,10 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           holds={holdsBoxes(menu.id)}
           onClose={() => setMenu(null)}
           onRename={() => setRenaming(menu.id)}
-          onAddInside={() => addBox(menu.id)}
+          onAddInside={() => {
+            if (d.kind === 'flow' && !d.nodes.get(menu.id)!.isFrame) setShape(store, menu.id, CONTAINER);
+            addBox(menu.id);
+          }}
           onAddAfter={() => {
             const parent = store.parentOf(menu.id)!;
             const kids = store.node(parent).children;
@@ -594,7 +600,13 @@ function BoxMenu(props: {
     fn();
   };
   const shapeWords = (store.fieldValue(id, 'shape') ?? '').toLowerCase().split(/\s+/);
-  const shape = shapeWords.includes('frame') ? 'frame' : SHAPE_CHOICES.some(([s]) => s === shapeWords[0]) ? shapeWords[0] : 'box';
+  const shape = shapeWords.includes(CONTAINER)
+    ? CONTAINER
+    : shapeWords.includes('frame')
+      ? 'frame'
+      : SHAPE_CHOICES.some(([s]) => s === shapeWords[0])
+        ? shapeWords[0]
+        : 'box';
   const color = store.fieldValue(id, 'color')?.toLowerCase();
   return (
     <div
