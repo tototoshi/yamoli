@@ -621,8 +621,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
         )}
         {/* Titles and labels over the lines, so a line passing behind one keeps it readable. */}
         {[...L.boxes].map(([nid, b]) => {
-          if (!b.frame) return null;
           const n = d.nodes.get(nid)!;
+          if (!b.frame || n.frame === 'hidden') return null;
           return (
             <g key={nid}>
               {n.icon && <Icon value={n.icon} x={b.x + 12} y={b.y + 5} size={15} color={n.color} />}
@@ -1132,7 +1132,12 @@ function Frame({ node, box, on, onHover }: Drawn) {
       onContextMenu={on && ((e) => on.menu(e, node.id))}
     >
       <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
-      <rect width={box.w} height={box.h} rx={8} style={node.frame === 'none' ? undefined : tint(node.color, 6)} />
+      <rect
+        width={box.w}
+        height={box.h}
+        rx={8}
+        style={node.frame === 'none' || node.frame === 'hidden' ? undefined : tint(node.color, 6)}
+      />
     </g>
   );
 }

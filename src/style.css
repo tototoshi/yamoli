@@ -1045,7 +1045,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-node.done .dg-label { text-decoration: line-through; }
 .dg-frame rect { fill: var(--data-bg); stroke: #c9ced6; stroke-width: 1; stroke-dasharray: 6 4; }
 .dg-frame.solid rect { stroke: #aeb5bf; stroke-dasharray: none; }
-.dg-frame.none rect { fill: transparent; stroke: transparent; }
+.dg-frame.none rect, .dg-frame.hidden rect { fill: transparent; stroke: transparent; }
 /* A container: a frame drawn like a box. */
 .dg-frame.box rect { fill: var(--bg); stroke: #9aa3ae; stroke-width: 1.2; stroke-dasharray: none; }
 .dg-icon { fill: none; stroke: var(--fg); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }

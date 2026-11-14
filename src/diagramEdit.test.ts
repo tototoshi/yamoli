@@ -55,6 +55,17 @@ test('shape and colour are set as fields, and a plain box or no colour takes the
   expect(s.node(a).children).toEqual([]);
 });
 
+test('lining up a frame keeps it drawn as it was; a plain box lined up is unseen', () => {
+  const { s, a } = drawing();
+  setShape(s, a, 'row');
+  expect(s.fieldValue(a, 'shape')).toBe('row');
+  s.setField(a, 'shape', 'frame solid');
+  setShape(s, a, 'column');
+  expect(s.fieldValue(a, 'shape')).toBe('column frame solid');
+  setShape(s, a, 'grid');
+  expect(s.fieldValue(a, 'shape')).toBe('grid frame solid');
+});
+
 test('an arrow drawn is a link in `to`; removing it takes out the links it is drawn from', () => {
   const { s, a, b, x, draw } = drawing();
   connect(s, a, b);

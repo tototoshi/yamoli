@@ -133,7 +133,7 @@ is drawn as:
 | A row | A box, listing the rows under it (`• …`) |
 | `shape: frame` | A frame around the rows under it, drawn as boxes; `frame solid` / `frame none` for its border (dashed by default) |
 | `shape: container` | A box with boxes inside: like a frame, the rows under it are boxes, but it looks like a box |
-| `shape: row` / `column` / `grid` | A frame lining up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). A border word can follow: `row none` (no border), `grid 3 solid`. Arrows between them are still drawn, but don't move them |
+| `shape: row` / `column` / `grid` | Lines up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). Alone it draws no border and no name: an unseen line-up (the row's name is a note in the outline). With a border word or `frame` after it (`row dashed`, `grid 3 solid`, `row none`, `frame row`) it is a named frame. Arrows between them are still drawn, but don't move them |
 | `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency |
 | `shape` | `box` / `actor` / `db` / `queue` / `external` / `process` (an ellipse) / `store` (a data store). For a data flow diagram: external entities as `box`, processes as `process`, data stores as `store`, and data flows as labelled arrows like `to: [[box]] order data` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |

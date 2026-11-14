@@ -33,12 +33,23 @@ export function neighbour(d: Diagram, id: string, key: string): string | null {
 /** What a box's menu sets its `shape` to: a shape, a frame, a container, or a frame lining up its boxes. */
 export type ShapeChoice = Shape | 'frame' | typeof CONTAINER | Arrange['kind'];
 
+/**
+ * Set a box's `shape`. Lining up the boxes in a frame keeps the frame as it
+ * is drawn (`row dashed`), so only a row that was no frame becomes unseen.
+ */
 export function setShape(store: OutlineStore, id: string, shape: ShapeChoice) {
   const f = store.field(id, 'shape');
   if (shape === 'box') {
     if (f) store.remove(f.id);
+  } else if (shape === 'row' || shape === 'column' || shape === 'grid') {
+    const words = (f?.text ?? '').toLowerCase().split(/\s+/);
+    const border = words.filter((w) => w === 'frame' || w === CONTAINER || FRAME_WORDS.includes(w));
+    store.setField(id, 'shape', [shape, ...border].join(' '));
   } else store.setField(id, 'shape', shape);
 }
+
+/** Words for a frame's border, in `shape`. */
+const FRAME_WORDS = ['dashed', 'solid', 'none'];
 
 /** Give id a colour, or none. */
 export function setColor(store: OutlineStore, id: string, color: string | null) {

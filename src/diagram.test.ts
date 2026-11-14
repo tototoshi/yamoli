@@ -373,7 +373,7 @@ test('a grid wraps into rows: as square as it gets, or the columns asked for', (
   for (const bs of [auto, two]) bs.forEach((a, i) => bs.slice(i + 1).forEach((b) => expect(overlap(a, b)).toBe(false)));
 });
 
-test('shape: row, column or grid is a frame lining up its boxes, with a border word or not', () => {
+test('shape: row, column or grid lines up its boxes: unseen alone, a frame with a border word', () => {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'P').id;
   const frame = (shape: string) => {
@@ -382,7 +382,7 @@ test('shape: row, column or grid is a frame lining up its boxes, with a border w
     ['a', 'b', 'c', 'd'].forEach((t) => s.addChild(f, -1, t));
     return f;
   };
-  const [row, grid, none, both] = ['row', 'grid 3 solid', '横 none', 'column'].map(frame);
+  const [row, grid, none, both, framed] = ['row', 'grid 3 solid', '横 none', 'column', 'frame row'].map(frame);
   s.addField(both, 'layout', 'row'); // `layout` wins
   const d = buildDiagram(s, p);
   expect([row, grid, none, both].map((f) => d.nodes.get(f)!.arrange)).toEqual([
@@ -391,12 +391,17 @@ test('shape: row, column or grid is a frame lining up its boxes, with a border w
     { kind: 'row' },
     { kind: 'row' },
   ]);
-  expect([row, grid, none].map((f) => [d.nodes.get(f)!.isFrame, d.nodes.get(f)!.frame])).toEqual([
-    [true, 'dashed'],
+  expect([row, grid, none, framed].map((f) => [d.nodes.get(f)!.isFrame, d.nodes.get(f)!.frame])).toEqual([
+    [true, 'hidden'],
     [true, 'solid'],
     [true, 'none'],
+    [true, 'dashed'],
   ]);
   expect(d.nodes.get(row)!.shape).toBe('box');
+  // Unseen, it has no head for a name: its boxes start near its top, below a frame's title.
+  const L = layout(d);
+  const top = (f: string) => L.boxes.get(s.items(f)[0])!.y - L.boxes.get(f)!.y;
+  expect(top(row)).toBeLessThan(top(framed));
 });
 
 test('layout on the zoomed item lines up the top boxes, and asks for a flow', () => {

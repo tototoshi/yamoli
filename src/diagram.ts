@@ -26,11 +26,12 @@
  * an arrow to or from a row listed in a box is the box's. The mind map view
  * draws a tree: the item and all its rows as a mind map.
  *
- * In a flow, `shape: row` makes a frame that lines up the boxes in it in
- * outline order instead of along their arrows: `row` (横) across, `column`
- * (縦) down, `grid` (格子) in rows of a few, `grid 3` of three. With a border
- * word too: `row none`, `grid 3 solid`. `layout` with the same words does it
- * for the zoomed item (or a frame).
+ * In a flow, `shape: row` lines up the boxes in it in outline order instead
+ * of along their arrows: `row` (横) across, `column` (縦) down, `grid` (格子)
+ * in rows of a few, `grid 3` of three. Alone it is unseen, a way to line
+ * boxes up with no name of its own; with `frame` or a border word (`row
+ * dashed`, `grid 3 solid`) it is a frame, its name on top. `layout` with the
+ * same words does it for the zoomed item (or a frame).
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
@@ -63,8 +64,12 @@ function arrangeIn(shape: string[]): Arrange | undefined {
   return i < 0 ? undefined : arrangeOf(shape.slice(i).join(' '));
 }
 
-/** A frame's border: `box` is a container, drawn like a box with boxes inside (`shape: container`). */
-export type FrameStyle = 'dashed' | 'solid' | 'none' | 'box';
+/**
+ * A frame's border: `box` is a container, drawn like a box with boxes inside
+ * (`shape: container`), and `hidden` only lines boxes up (`shape: row`): no
+ * border, no name.
+ */
+export type FrameStyle = 'dashed' | 'solid' | 'none' | 'box' | 'hidden';
 const FRAME_STYLES: FrameStyle[] = ['dashed', 'solid', 'none'];
 /** The `shape` of a box with boxes inside. */
 export const CONTAINER = 'container';
@@ -198,7 +203,7 @@ export function buildDiagram(
       label: nodeLabel(store, id),
       shape: SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
       isFrame: shape.includes('frame') || !!border || !!arranged,
-      frame: border ?? 'dashed',
+      frame: border ?? (arranged && !shape.includes('frame') ? 'hidden' : 'dashed'),
       color: colorValue(store.fieldValue(id, 'color')),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       desc,
@@ -450,8 +455,12 @@ export function descLines(n: DiagramNode, measure: Measure): string[] {
 /** A frame's description, run across the frame (of width w) rather than kept narrow like a box's. */
 export const frameDesc = (n: DiagramNode, w: number, measure: Measure) => (n.desc ? evenWrap(n.desc, w - 2 * FRAME_PAD, measure) : []);
 
-/** The height of a frame's head: its title, and its description under it. */
-export const frameHead = (n: DiagramNode, w: number, measure: Measure) => FRAME_HEAD + frameDesc(n, w, measure).length * PROP_LINE;
+/** The height of a frame's head: its title, and its description under it (none, unseen). */
+export const frameHead = (n: DiagramNode, w: number, measure: Measure) =>
+  n.frame === 'hidden' ? 0 : FRAME_HEAD + frameDesc(n, w, measure).length * PROP_LINE;
+
+/** Room around a frame's contents: little for an unseen one, lining boxes up. */
+const framePad = (n: DiagramNode) => (n.frame === 'hidden' ? 4 : FRAME_PAD);
 
 /** Space above and below a process's text, in its ellipse. */
 export const PROCESS_PAD = 8;
@@ -605,9 +614,10 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
   /** A frame's size around its contents (the title and description sit on top, whatever the direction). */
   const framed = (inner: { rs: number; os: number }, n: DiagramNode) => {
     // At least as wide as the description would be in a box; wider contents give it more room.
-    const head = Math.max(titleWidth(n, measure), ...descLines(n, measure).map((l) => measure(l, PROP_SIZE)));
-    const w = Math.max((dir === 'LR' ? inner.rs : inner.os) + 2 * FRAME_PAD, head + 2 * FRAME_PAD);
-    const h = (dir === 'LR' ? inner.os : inner.rs) + 2 * FRAME_PAD + frameHead(n, w, measure);
+    const head = n.frame === 'hidden' ? 0 : Math.max(titleWidth(n, measure), ...descLines(n, measure).map((l) => measure(l, PROP_SIZE)));
+    const pad = framePad(n);
+    const w = Math.max((dir === 'LR' ? inner.rs : inner.os) + 2 * pad, head + 2 * pad);
+    const h = (dir === 'LR' ? inner.os : inner.rs) + 2 * pad + frameHead(n, w, measure);
     return extents({ w, h }, dir);
   };
 
@@ -629,7 +639,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const w = dir === 'LR' ? abs.rs : abs.os;
       const innerW = dir === 'LR' ? inner.rs : inner.os;
       const cx = x0 + (w - innerW) / 2;
-      const cy = y0 + frameHead(n, w, measure) + FRAME_PAD;
+      const cy = y0 + frameHead(n, w, measure) + framePad(n);
       if (dir === 'LR') settle(n.children, cx, cy);
       else settle(n.children, cy, cx);
     }
