@@ -597,8 +597,19 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       colW[i % cols] = Math.max(colW[i % cols] ?? 0, w);
       rowH[Math.floor(i / cols)] = Math.max(rowH[Math.floor(i / cols)] ?? 0, h);
     });
-    const starts = (sizes: number[]) => sizes.map((_, i) => sizes.slice(0, i).reduce((s, x) => s + x + ARRANGE_GAP, 0));
-    const [colX, rowY] = [starts(colW), starts(rowH)];
+    // Between side-by-side boxes, room for the label on an arrow joining them.
+    const colGap = colW.map(() => ARRANGE_GAP);
+    const rowGap = rowH.map(() => ARRANGE_GAP);
+    const set = new Set(units);
+    for (const e of d.edges) {
+      if (!e.label) continue;
+      const [a, b] = [liftTo(e.from, set), liftTo(e.to, set)].map((u) => (u ? units.indexOf(u) : -1));
+      if (a < 0 || b < 0 || Math.floor(a / cols) !== Math.floor(b / cols) || Math.abs((a % cols) - (b % cols)) !== 1) continue;
+      const c = Math.min(a % cols, b % cols);
+      colGap[c] = Math.max(colGap[c], measure(e.label, PROP_SIZE) + 40);
+    }
+    const starts = (sizes: number[], gaps: number[]) => sizes.map((_, i) => sizes.slice(0, i).reduce((s, x, j) => s + x + gaps[j], 0));
+    const [colX, rowY] = [starts(colW, colGap), starts(rowH, rowGap)];
     units.forEach((u, i) => {
       const [c, r] = [i % cols, Math.floor(i / cols)];
       const { w, h } = wh(u);
@@ -606,8 +617,8 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const y = rowY[r] + (rowH[r] - h) / 2;
       local.set(u, { ...size.get(u)!, ...(dir === 'LR' ? { r: x, o: y } : { r: y, o: x }) });
     });
-    const total = (sizes: number[]) => sizes.reduce((s, x) => s + x, 0) + ARRANGE_GAP * Math.max(0, sizes.length - 1);
-    const [w, h] = [total(colW), total(rowH)];
+    const total = (sizes: number[], gaps: number[]) => sizes.reduce((s, x, i) => s + x + (i ? gaps[i - 1] : 0), 0);
+    const [w, h] = [total(colW, colGap), total(rowH, rowGap)];
     return dir === 'LR' ? { rs: w, os: h } : { rs: h, os: w };
   };
 

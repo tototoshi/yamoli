@@ -362,6 +362,21 @@ test('layout lines up the boxes in a frame in outline order, whatever the direct
   }
 });
 
+test('boxes lined up side by side move apart for the label on the arrow between them', () => {
+  const gap = (label: string) => {
+    const s = OutlineStore.create();
+    const p = s.addChild(s.rootId, -1, 'P').id;
+    const row = s.addChild(p, -1, 'Row').id;
+    s.addField(row, 'shape', 'row');
+    const [a, b] = ['a', 'b'].map((t) => s.addChild(row, -1, t).id);
+    s.addField(a, 'to', `[[${b}]] ${label}`);
+    const L = layout(buildDiagram(s, p));
+    return L.boxes.get(b)!.x - (L.boxes.get(a)!.x + L.boxes.get(a)!.w);
+  };
+  expect(gap('ok')).toBeGreaterThanOrEqual(gap('')); // no label: the usual gap
+  expect(gap('a rather long label for this arrow')).toBeGreaterThan(estimate('a rather long label for this arrow', 11));
+});
+
 test('a grid wraps into rows: as square as it gets, or the columns asked for', () => {
   const xs = (bs: Box[]) => new Set(bs.map((b) => centre(b)[0])).size;
   const ys = (bs: Box[]) => new Set(bs.map((b) => centre(b)[1])).size;
