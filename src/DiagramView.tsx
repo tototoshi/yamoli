@@ -133,8 +133,20 @@ function route(
     const k = Math.max(32, Math.hypot(e.p[0] - s.p[0], e.p[1] - s.p[1]) / 2);
     const c1: Pt = [s.p[0] + s.out[0] * k, s.p[1] + s.out[1] * k];
     const c2: Pt = [e.p[0] + e.out[0] * k, e.p[1] + e.out[1] * k];
-    const mid = [0, 1].map((i) => (s.p[i] + 3 * c1[i] + 3 * c2[i] + e.p[i]) / 8) as Pt;
-    return { d: `M${s.p} C${c1} ${c2} ${e.p}`, mid, pts: [], ends: [s.p, e.p] };
+    const curve = (t: number) => {
+      const u = 1 - t;
+      return [0, 1].map((i) => u * u * u * s.p[i] + 3 * u * u * t * c1[i] + 3 * u * t * t * c2[i] + t * t * t * e.p[i]) as Pt;
+    };
+    // The curve, unless it would cross a box (its own two too, away from its ends): then around them.
+    const solid = others.filter((r) => !r.frame && r !== a && r !== b);
+    const near = (r: Box, [x, y]: Pt) => x > r.x - 4 && x < r.x + r.w + 4 && y > r.y - 4 && y < r.y + r.h + 4;
+    const samples = Array.from({ length: 24 }, (_, i) => (i + 1) / 25);
+    const crosses = samples.some(
+      (t) => solid.some((r) => near(r, curve(t))) || (t > 0.15 && t < 0.85 && [a, b].some((r) => near(r, curve(t))))
+    );
+    const around = crosses && aroundBoxes(s, e, [...solid, a, b]);
+    if (around) return around;
+    return { d: `M${s.p} C${c1} ${c2} ${e.p}`, mid: curve(0.5), pts: [], ends: [s.p, e.p] };
   }
   const apartX = b.x >= a.x + a.w ? 1 : b.x + b.w <= a.x ? -1 : 0;
   const apartY = b.y >= a.y + a.h ? 1 : b.y + b.h <= a.y ? -1 : 0;
@@ -173,6 +185,125 @@ function route(
   const x2 = p3[0] - s * 16;
   const pts: Pt[] = [p0, [x1, p0[1]], [x1, lane], [x2, lane], [x2, p3[1]], p3];
   return { d: rounded(pts.map(sw)), mid: sw([(x1 + x2) / 2, lane]), pts: pts.map(sw), ends: [sw(p0), sw(p3)] };
+}
+
+/** Room kept between a line going around boxes and the boxes. */
+const CLEAR = 12;
+
+/**
+ * A line from s to e (points on sides of boxes, with the way out of each)
+ * going around boxes at right angles: a little way straight out of each
+ * side, then the shortest way between on lines clear of every box, with as
+ * few turns as it can. Null when no way is found.
+ */
+export function aroundBoxes(s: { p: Pt; out: Pt }, e: { p: Pt; out: Pt }, boxes: Box[]) {
+  const stub = CLEAR + 8;
+  const q0: Pt = [s.p[0] + s.out[0] * stub, s.p[1] + s.out[1] * stub];
+  const q3: Pt = [e.p[0] + e.out[0] * stub, e.p[1] + e.out[1] * stub];
+  const inside = ([x, y]: Pt) => boxes.some((r) => x > r.x - CLEAR && x < r.x + r.w + CLEAR && y > r.y - CLEAR && y < r.y + r.h + CLEAR);
+  const blocked = ([x1, y1]: Pt, [x2, y2]: Pt) =>
+    boxes.some(
+      (r) =>
+        Math.max(x1, x2) > r.x - CLEAR &&
+        Math.min(x1, x2) < r.x + r.w + CLEAR &&
+        Math.max(y1, y2) > r.y - CLEAR &&
+        Math.min(y1, y2) < r.y + r.h + CLEAR
+    );
+  // Lines to run on: through both ends, and just clear of each box's sides.
+  const lines = (pick: (p: Pt) => number, lo: (r: Box) => number, size: (r: Box) => number) =>
+    [...new Set([pick(q0), pick(q3), ...boxes.flatMap((r) => [lo(r) - CLEAR - 4, lo(r) + size(r) + CLEAR + 4])])].sort((m, n) => m - n);
+  const xs = lines(
+    (p) => p[0],
+    (r) => r.x,
+    (r) => r.w
+  );
+  const ys = lines(
+    (p) => p[1],
+    (r) => r.y,
+    (r) => r.h
+  );
+  const W = xs.length;
+  const at = (n: number): Pt => [xs[n % W], ys[Math.floor(n / W)]];
+  const start = xs.indexOf(q0[0]) + ys.indexOf(q0[1]) * W;
+  const goal = xs.indexOf(q3[0]) + ys.indexOf(q3[1]) * W;
+  // Shortest by length, each turn counting as more length. A state is a point and the way it was reached.
+  const TURN = 40;
+  const steps: [number, number][] = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  const cost = new Map<number, number>();
+  const from = new Map<number, number>();
+  const queue: [number, number][] = [];
+  const push = (state: number, c: number, prev: number) => {
+    if (c >= (cost.get(state) ?? Infinity)) return;
+    cost.set(state, c);
+    from.set(state, prev);
+    queue.push([c, state]);
+    // Kept in order by bubbling up: a small heap.
+    for (let i = queue.length - 1; i > 0;) {
+      const up = (i - 1) >> 1;
+      if (queue[up][0] <= queue[i][0]) break;
+      [queue[up], queue[i]] = [queue[i], queue[up]];
+      i = up;
+    }
+  };
+  const pop = () => {
+    const top = queue[0];
+    const last = queue.pop()!;
+    if (queue.length) {
+      queue[0] = last;
+      for (let i = 0; ;) {
+        const [l, r] = [2 * i + 1, 2 * i + 2];
+        let m = i;
+        if (l < queue.length && queue[l][0] < queue[m][0]) m = l;
+        if (r < queue.length && queue[r][0] < queue[m][0]) m = r;
+        if (m === i) break;
+        [queue[m], queue[i]] = [queue[i], queue[m]];
+        i = m;
+      }
+    }
+    return top;
+  };
+  for (let dir = 0; dir < 4; dir++) push(start * 4 + dir, 0, -1);
+  let end = -1;
+  while (queue.length) {
+    const [c, state] = pop();
+    if (c > (cost.get(state) ?? Infinity)) continue;
+    const [n, dir] = [state >> 2, state & 3];
+    if (n === goal) {
+      end = state;
+      break;
+    }
+    const [i, j] = [n % W, Math.floor(n / W)];
+    steps.forEach(([di, dj], nd) => {
+      const [i2, j2] = [i + di, j + dj];
+      if (i2 < 0 || i2 >= W || j2 < 0 || j2 >= ys.length) return;
+      const m = i2 + j2 * W;
+      const [p, q] = [at(n), at(m)];
+      if ((m !== goal && inside(q)) || blocked(p, q)) return;
+      push(m * 4 + nd, c + Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) + (nd === dir ? 0 : TURN), state);
+    });
+  }
+  if (end < 0) return null;
+  const path: Pt[] = [];
+  for (let st = end; st >= 0; st = from.get(st)!) path.unshift(at(st >> 2));
+  // Only the corners: points where the line turns.
+  const pts = [s.p, ...path, e.p].filter((p, i, all) => {
+    if (i === 0 || i === all.length - 1) return true;
+    const [a, b] = [all[i - 1], all[i + 1]];
+    return !((a[0] === p[0] && p[0] === b[0]) || (a[1] === p[1] && p[1] === b[1]));
+  });
+  // The label on the longest stretch.
+  let mid: Pt = pts[0];
+  let longest = -1;
+  for (let i = 1; i < pts.length; i++) {
+    const len = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
+    if (len > longest) [longest, mid] = [len, [(pts[i][0] + pts[i - 1][0]) / 2, (pts[i][1] + pts[i - 1][1]) / 2]];
+  }
+  return { d: rounded(pts), mid, pts, ends: [s.p, e.p] as [Pt, Pt] };
 }
 
 /** A polyline with its corners rounded. */
