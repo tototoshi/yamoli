@@ -1138,6 +1138,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   text-align: center;
   outline: none;
 }
+.dg-label-input { font-size: 12px; font-weight: 400; }
 .dg-describe { height: 80px; padding: 4px 6px; resize: none; font: inherit; font-size: 12px; font-weight: 400; line-height: 1.4; text-align: left; }
 .dg-menu { min-width: 240px; }
 .dg-menu-note { padding: 4px 10px; color: var(--muted); font-size: 12px; }

@@ -38,6 +38,7 @@ import {
   descOf,
   disconnect,
   dropAt,
+  labelOf,
   lineKindOf,
   lineKinds,
   moveBox,
@@ -45,6 +46,7 @@ import {
   reconnect,
   setColor,
   setDesc,
+  setLabel,
   setLineKind,
   setShape,
   type Drop,
@@ -181,6 +183,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   /** The box or arrow clicked, which Delete removes (and Enter renames, for a box). */
   const [sel, setSel] = useState<{ box: string } | { edge: string } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  /** The arrow whose label is being written (its key). */
+  const [labeling, setLabeling] = useState<string | null>(null);
   /** The box whose description is being written. */
   const [describing, setDescribing] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -210,9 +214,10 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   // Keys on the selection. The listener stays put and reads the latest render, so keys typed quickly one after another all count.
   const onKey = useRef<(e: KeyboardEvent) => boolean>(() => false);
   onKey.current = (e) => {
-    if (!sel || renaming || describing || menu || edgeMenu) return false;
+    if (!sel || renaming || describing || labeling || menu || edgeMenu) return false;
     if (e.key === 'Escape') setSel(null);
     else if (e.key === 'Delete' || e.key === 'Backspace') remove();
+    else if ((e.key === 'Enter' || e.key === 'F2') && selectedEdge && canLabel(selectedEdge)) setLabeling(edgeKey(selectedEdge));
     else if (d.kind === 'tree' && selectedBox) return !(e.metaKey || e.ctrlKey || e.altKey) && mindMapKey(e, selectedBox);
     else if (e.key === 'Enter' && selectedBox) setRenaming(selectedBox);
     else return false;
@@ -384,6 +389,14 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     store.setText(nid, text.trim());
     ctl.commit();
   };
+  /** Whether an arrow has words to write: not a dependency. */
+  const canLabel = (e: DiagramEdge) => lineKindOf(store, e) !== DEP_KEY;
+  const label = (e: DiagramEdge, text: string | null) => {
+    setLabeling(null);
+    if (text === null || text.trim() === labelOf(store, e)) return;
+    if (setLabel(store, e, text)) ctl.commit();
+    setSel(null); // its key goes with its label
+  };
   const describe = (nid: string, text: string | null) => {
     setDescribing(null);
     if (text === null || text.trim() === descOf(store, nid).trim()) return;
@@ -429,7 +442,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
 
   /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
   const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
-  const dotFor = editable && !link && !bend && !moving && !renaming && !describing && hover !== null && hover !== id ? hover : null;
+  const dotFor =
+    editable && !link && !bend && !moving && !renaming && !describing && !labeling && hover !== null && hover !== id ? hover : null;
   const linkFrom = link && L.boxes.get(link.from);
   const movingBox = moving && L.boxes.get(moving.id);
   const dropHolder = moving?.drop && moving.drop.parent !== id ? L.boxes.get(moving.drop.parent) : undefined;
@@ -503,6 +517,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                   d={r.d}
                   onPointerDown={(ev) => ev.stopPropagation()}
                   onClick={() => setSel({ edge: k })}
+                  onDblClick={() => canLabel(e) && (setSel({ edge: k }), setLabeling(k))}
                   onContextMenu={(ev) => {
                     ev.preventDefault();
                     setSel({ edge: k });
@@ -510,7 +525,10 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                   }}
                 >
                   <title>
-                    {t('クリックで選択、右クリックで種類、Delete で削除', 'Click to select, right-click for its kind, Delete to remove')}
+                    {t(
+                      'クリックで選択、ダブルクリックでラベル、右クリックで種類、Delete で削除',
+                      'Click to select, double-click for its label, right-click for its kind, Delete to remove'
+                    )}
                   </title>
                 </path>
               )}
@@ -640,6 +658,23 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
           </foreignObject>
         )}
+        {labeling &&
+          (() => {
+            const e = d.edges.find((x) => edgeKey(x) === labeling);
+            if (!e) return null;
+            const [mx, my] = routes.get(e)!.mid;
+            return (
+              <foreignObject x={mx - 90} y={my - 14} width={180} height={28}>
+                <CellInput
+                  key={labeling}
+                  class="dg-rename dg-label-input"
+                  placeholder={t('ラベル', 'Label')}
+                  value={labelOf(store, e)}
+                  onDone={(text) => label(e, text)}
+                />
+              </foreignObject>
+            );
+          })()}
         {/* Under a box's name: in a frame, below its title; else over the box from its name down. */}
         {describing && described && (
           <foreignObject
@@ -667,6 +702,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           kinds={lineKinds(store, id)}
           onClose={() => setEdgeMenu(null)}
           onRemove={remove}
+          onLabel={canLabel(selectedEdge) ? () => setLabeling(edgeKey(selectedEdge)) : undefined}
         />
       )}
       {menu && store.get(menu.id) && (
@@ -694,8 +730,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                 'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · Delete removes · direction: TB on this item to grow down'
               )
             : t(
-                'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
-                'Click to select · Double-click or Enter to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
+                'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
+                'Click to select · Double-click or Enter to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
               )}
         </p>
       )}
@@ -887,6 +923,7 @@ function EdgeMenu({
   kinds,
   onClose,
   onRemove,
+  onLabel,
 }: {
   edge: DiagramEdge;
   x: number;
@@ -894,6 +931,8 @@ function EdgeMenu({
   kinds: string[];
   onClose: () => void;
   onRemove: () => void;
+  /** Write its label, when it can have one. */
+  onLabel?: () => void;
 }) {
   const ctl = useCtl();
   const { store } = ctl;
@@ -918,6 +957,17 @@ function EdgeMenu({
             </button>
           ))}
         </div>
+      )}
+      {onLabel && (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onClose();
+            onLabel();
+          }}
+        >
+          {t('ラベルを編集', 'Edit the label')}
+        </button>
       )}
       <hr />
       <button

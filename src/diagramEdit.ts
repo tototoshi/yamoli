@@ -92,6 +92,49 @@ export function connect(store: OutlineStore, from: string, to: string) {
   addRef(store, from, 'to', to);
 }
 
+const LINK_RE = /\[\[[^\]]*\]\]/g;
+
+/** The parts of a field (its text and its list's rows split at commas) holding a link to ref, with where they are. */
+function* linkParts(store: OutlineStore, field: string, ref: string) {
+  for (const n of [field, ...store.node(field).children]) {
+    const parts = store.node(n).text.split(',');
+    for (let i = 0; i < parts.length; i++) if (refIds(parts[i]).includes(ref)) yield { n, parts, i };
+  }
+}
+
+/** An arrow's label as written: the words beside its link (with none, a field's own name shows instead). */
+export function labelOf(store: OutlineStore, edge: DiagramEdge): string {
+  for (const { field, ref } of edge.links) {
+    if (!store.get(field)) continue;
+    for (const { parts, i } of linkParts(store, field, ref)) return parts[i].replace(LINK_RE, '').trim();
+  }
+  return '';
+}
+
+/**
+ * Write an arrow's label: the words beside each of its links. A comma, which
+ * would split the field, becomes 、. A dependency has no label to write.
+ */
+export function setLabel(store: OutlineStore, edge: DiagramEdge, text: string): boolean {
+  const words = text
+    .replace(/\s*,\s*/g, '、')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let changed = false;
+  for (const { field, ref } of edge.links) {
+    if (!store.get(field) || store.node(field).key?.trim().toLowerCase() === DEP_KEY) continue;
+    for (const { n, parts, i } of [...linkParts(store, field, ref)]) {
+      const lead = parts[i].match(/^\s*/)![0];
+      parts[i] = lead + parts[i].match(LINK_RE)!.join(' ') + (words ? ' ' + words : '');
+      const next = parts.join(',');
+      if (next === store.node(n).text) continue;
+      store.setText(n, next);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /** Take out the links an arrow is drawn from. */
 export function disconnect(store: OutlineStore, edge: DiagramEdge) {
   for (const { field, ref } of edge.links) removeRef(store, field, ref);

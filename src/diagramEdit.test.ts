@@ -7,6 +7,7 @@ import {
   descOf,
   disconnect,
   dropAt,
+  labelOf,
   lineKindOf,
   lineKinds,
   moveBox,
@@ -14,6 +15,7 @@ import {
   reconnect,
   setColor,
   setDesc,
+  setLabel,
   setLineKind,
   setShape,
 } from './diagramEdit';
@@ -245,4 +247,23 @@ test('in a mind map the arrow keys go along the branches, turned with the direct
   const down = buildDiagram(s, p, { kind: 'tree' });
   expect(neighbour(down, p, 'ArrowDown')).toBe(a);
   expect(neighbour(down, a, 'ArrowRight')).toBe(b);
+});
+
+test("an arrow's label is the words beside its link: written there, a comma kept from splitting the field", () => {
+  const { s, a, b, x, draw } = drawing();
+  s.addField(a, 'to', `[[${b}]] HTTPS, [[${x}]]`);
+  const edge = (to: string) => draw().d.edges.find((e) => e.from === a && e.to === to)!;
+  expect(labelOf(s, edge(b))).toBe('HTTPS');
+  expect(setLabel(s, edge(b), 'gRPC, TLS')).toBe(true);
+  expect(s.fieldValue(a, 'to')).toBe(`[[${b}]] gRPC、TLS, [[${x}]]`);
+  expect(edge(b).label).toBe('gRPC、TLS');
+  expect(setLabel(s, edge(x), 'events')).toBe(true);
+  expect(s.fieldValue(a, 'to')).toBe(`[[${b}]] gRPC、TLS, [[${x}]] events`);
+  // Cleared: no words, and a field's own name shows again.
+  s.addField(b, 'calls', `[[${x}]] sync`);
+  const calls = () => draw().d.edges.find((e) => e.from === b)!;
+  expect(setLabel(s, calls(), '')).toBe(true);
+  expect(s.fieldValue(b, 'calls')).toBe(`[[${x}]]`);
+  expect(calls().label).toBe('calls');
+  expect(labelOf(s, calls())).toBe('');
 });
