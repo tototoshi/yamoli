@@ -124,7 +124,7 @@ export function App() {
       <main
         class={
           'page' +
-          (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'slides' ? ' wide' : '') +
+          (ctl.view === 'gantt' ? ' full' : ctl.view === 'diagram' || ctl.view === 'mindmap' || ctl.view === 'slides' ? ' wide' : '') +
           (ctl.view === 'slides' ? ' slides-page' : '')
         }
       >
@@ -143,8 +143,8 @@ export function App() {
         </div>
         {ctl.view === 'gantt' ? (
           <GanttView />
-        ) : ctl.view === 'diagram' ? (
-          <DiagramView />
+        ) : ctl.view === 'diagram' || ctl.view === 'mindmap' ? (
+          <DiagramView key={ctl.view} kind={ctl.view === 'mindmap' ? 'tree' : 'flow'} />
         ) : ctl.view === 'slides' ? (
           <SlidesView />
         ) : ctl.view === 'text' || ctl.view === 'yaml' || ctl.view === 'json' ? (

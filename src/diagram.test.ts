@@ -67,12 +67,14 @@ test('a link to a field or to a row inside a hidden part points at the drawn row
   expect(buildDiagram(s, p).edges).toMatchObject([{ from: a, to: b, label: '' }]);
 });
 
-test('without arrows it is a mind map from the zoomed item; direction and kind can be set', () => {
+test('a flow unless a mind map is asked for, which grows from the zoomed item; direction can be set', () => {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'Topic').id;
   const a = s.addChild(p, -1, 'A').id;
   s.addChild(a, -1, 'A1');
-  const d = buildDiagram(s, p);
+  // Without arrows too: a flow, unless drawn as a mind map.
+  expect(buildDiagram(s, p).kind).toBe('flow');
+  const d = buildDiagram(s, p, { kind: 'tree' });
   expect(d.kind).toBe('tree');
   expect(d.top).toEqual([p]);
   const L = layout(d);
@@ -81,10 +83,8 @@ test('without arrows it is a mind map from the zoomed item; direction and kind c
   expect(child.x).toBeGreaterThan(root.x + root.w);
 
   s.addField(p, 'direction', 'TB');
-  const L2 = layout(buildDiagram(s, p));
+  const L2 = layout(buildDiagram(s, p, { kind: 'tree' }));
   expect(L2.boxes.get(a)!.y).toBeGreaterThan(L2.boxes.get(p)!.y + L2.boxes.get(p)!.h);
-  s.addField(p, 'diagram', 'flow');
-  expect(buildDiagram(s, p).kind).toBe('flow');
 });
 
 const inside = (inner: Box, outer: Box) =>
@@ -190,7 +190,6 @@ test('icons, emoji and frame styles; an unknown icon is left out', async () => {
   const a = s.addChild(g, -1, 'Application server').id; // wider than a box's least width
   s.addField(g, 'shape', 'solid');
   s.addField(a, 'icon', 'server');
-  s.addField(p, 'diagram', 'flow');
   const d = buildDiagram(s, p);
   expect(d.nodes.get(g)!.frame).toBe('solid');
   expect(d.nodes.get(a)!.frame).toBe('dashed');
@@ -225,16 +224,14 @@ test('only `shape: frame` makes a frame; under other rows, the rows are listed i
   expect(layout(d).boxes.get(group)!.frame).toBe(true);
 
   // A mind map draws every row, frames or not.
-  s.addField(p, 'diagram', 'tree');
-  expect(buildDiagram(s, p).nodes.has(auth)).toBe(true);
+  expect(buildDiagram(s, p, { kind: 'tree' }).nodes.has(auth)).toBe(true);
 });
 
-test('a frame asks for a flow even without arrows', () => {
+test('a frame is drawn around its rows, without arrows too', () => {
   const s = OutlineStore.create();
   const p = s.addChild(s.rootId, -1, 'P').id;
   const g = s.addChild(p, -1, 'Group').id;
   s.addChild(g, -1, 'A');
-  expect(buildDiagram(s, p).kind).toBe('tree');
   s.addField(g, 'shape', 'frame');
   const d = buildDiagram(s, p);
   expect(d.kind).toBe('flow');
@@ -261,16 +258,16 @@ test('a note or description is shown as text under the name, also from a block',
   const p = s.addChild(s.rootId, -1, 'P').id;
   const a = s.addChild(p, -1, 'API').id;
   const b = s.addChild(p, -1, 'Worker').id;
+  const c = s.addChild(p, -1, 'Cache').id;
   s.addField(a, 'description', 'Serves the **app**');
   s.addField(a, 'tech', 'Go');
   s.addBlock(b, 'note', 'markdown', '# Jobs\n\n- sends [mail](https://x.example)\n- cleans up');
-  s.addField(p, 'diagram', 'flow');
   const d = buildDiagram(s, p);
   expect(d.nodes.get(a)).toMatchObject({ desc: 'Serves the app', props: ['tech: Go'] });
   expect(d.nodes.get(b)!.desc).toBe('Jobs sends mail cleans up');
   // The text makes the box taller.
-  const plainHeight = layout(buildDiagram(s, s.rootId)).boxes.get(p)!.h;
-  expect(layout(d).boxes.get(a)!.h).toBeGreaterThan(plainHeight);
+  const L = layout(d);
+  expect(L.boxes.get(a)!.h).toBeGreaterThan(L.boxes.get(c)!.h);
 });
 
 test('descriptions wrap between words and phrases, and are cut after a few lines', () => {

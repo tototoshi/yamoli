@@ -20,11 +20,10 @@
  * `calls: dotted red`, `sync: both` (words: solid / dashed / dotted, arrow /
  * both / none, a colour).
  *
- * On the zoomed item: `direction: LR | TB`, and `diagram: flow | tree`. A
- * flow (the default when there are arrows or frames) puts each box after the ones its
- * arrows come from, frames laid out inside out; an arrow to or from a row
- * listed in a box is the box's. A tree (the default without arrows or
- * frames) draws the item and all its rows as a mind map.
+ * On the zoomed item: `direction: LR | TB`. The diagram view draws a flow:
+ * each box after the ones its arrows come from, frames laid out inside out;
+ * an arrow to or from a row listed in a box is the box's. The mind map view
+ * draws a tree: the item and all its rows as a mind map.
  *
  * In a flow, `layout` on a frame (or the zoomed item) lines up the boxes in it
  * in outline order instead of along their arrows: `row` (横) across, `column`
@@ -41,19 +40,7 @@ const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
-const DRAWING_KEYS = new Set([
-  'shape',
-  'color',
-  'icon',
-  'direction',
-  'diagram',
-  'lines',
-  'layout',
-  'embed',
-  'completed',
-  DEP_KEY,
-  VIEWS_KEY,
-]);
+const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'lines', 'layout', 'embed', 'completed', DEP_KEY, VIEWS_KEY]);
 
 /** How the boxes in a frame are lined up: in a row, a column, or a grid of `columns` across (0: as square as it gets). */
 export type Arrange = { kind: 'row' } | { kind: 'column' } | { kind: 'grid'; columns: number };
@@ -169,7 +156,12 @@ const plain = (texts: string[]) =>
 const PROP_MAX = 32;
 const clip = (s: string) => (s.length > PROP_MAX ? s.slice(0, PROP_MAX - 1) + '…' : s);
 
-export function buildDiagram(store: OutlineStore, rootId: string, { showCompleted = true } = {}): Diagram {
+/** The rows under rootId as a flow (the diagram view) or a tree (the mind map view). */
+export function buildDiagram(
+  store: OutlineStore,
+  rootId: string,
+  { showCompleted = true, kind = 'flow' }: { showCompleted?: boolean; kind?: 'flow' | 'tree' } = {}
+): Diagram {
   const nodes = new Map<string, DiagramNode>();
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
   const add = (id: string, children = rows(id)) => {
@@ -252,11 +244,7 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
   }
 
   const dir = store.fieldValue(rootId, 'direction')?.toUpperCase();
-  const asked = store.fieldValue(rootId, 'diagram')?.toLowerCase();
   const arrange = arrangeOf(store.fieldValue(rootId, 'layout'));
-  // Arrows, frames or a layout ask for a flow; without any, it is a mind map.
-  const framed = [...nodes.values()].some((n) => n.isFrame);
-  const kind = asked === 'tree' || asked === 'flow' ? asked : edges.length || framed || arrange ? 'flow' : 'tree';
   // A mind map grows from the zoomed item itself.
   if (kind === 'tree' && rootId !== store.rootId) {
     add(rootId, top);

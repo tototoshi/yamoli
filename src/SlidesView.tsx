@@ -188,7 +188,11 @@ function SlideBody({ slide }: { slide: Slide }) {
           {body}
           {slide.embed && (
             <div class="slide-embed">
-              {slide.embedAs === 'diagram' ? <DiagramView rootId={slide.embed} embedded /> : <GanttView rootId={slide.embed} embedded />}
+              {slide.embedAs === 'gantt' ? (
+                <GanttView rootId={slide.embed} embedded />
+              ) : (
+                <DiagramView rootId={slide.embed} embedded kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
+              )}
             </div>
           )}
         </div>

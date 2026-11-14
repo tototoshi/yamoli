@@ -164,10 +164,10 @@ const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gr
 const edgeKey = (e: DiagramEdge) => `${e.from}>${e.to}>${e.label}>${e.style.dash}${e.style.ends}`;
 
 /**
- * The diagram for the zoomed item, or (embedded, e.g. in a slide) for rootId,
- * without the hints and not editable.
+ * The diagram (a flow, or a mind map) for the zoomed item, or (embedded, e.g.
+ * in a slide) for rootId, without the hints and not editable.
  */
-export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: boolean }) {
+export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: string; embedded?: boolean; kind?: 'flow' | 'tree' }) {
   const ctl = useCtl();
   const { store } = ctl;
   const id = rootId ?? ctl.zoomId;
@@ -190,7 +190,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   const [moving, setMoving] = useState<{ id: string; dx: number; dy: number; drop: Drop | null } | null>(null);
   const showCompleted = ctl.prefs.showCompleted;
   // Built anew on each render: the store changes in place, and laying out a page of boxes is quick.
-  const d = buildDiagram(store, id, { showCompleted });
+  const d = buildDiagram(store, id, { showCompleted, kind });
   const L = layout(d, measure);
   const editable = !embedded;
 
@@ -223,12 +223,12 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
         <p class="diagram-empty">
           {lang() === 'en' ? (
             <>
-              Nothing to draw yet. Each row becomes a box, rows under a row a frame around them, and a link in a field (
-              <code>to: [[API]] gRPC</code>) an arrow.
+              Nothing to draw yet. Each row becomes a box, a row with <code>shape: frame</code> a frame around the rows under it, and a link
+              in a field (<code>to: [[API]] gRPC</code>) an arrow.
             </>
           ) : (
             <>
-              まだ描くものがありません。行が箱に、子を持つ行がそれを囲む枠に、属性に書いたリンク（
+              まだ描くものがありません。行が箱に、<code>shape: frame</code> の行がその下の行を囲む枠に、属性に書いたリンク（
               <code>to: [[API]] gRPC</code>）が矢印になります。
             </>
           )}
@@ -656,10 +656,15 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
       )}
       {!embedded && (
         <p class="diagram-hint">
-          {t(
-            'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
-            'Click to select · Double-click or Enter to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
-          )}
+          {kind === 'tree'
+            ? t(
+                'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで色や追加 ・ ドラッグで別の行の下へ ・ Delete で削除 ・ この項目に direction: TB で縦に',
+                'Click to select · Double-click or Enter to rename · Right-click for colour and adding · Drag under another row · Delete removes · direction: TB on this item to grow down'
+              )
+            : t(
+                'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
+                'Click to select · Double-click or Enter to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
+              )}
         </p>
       )}
     </div>

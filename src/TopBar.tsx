@@ -426,6 +426,7 @@ export function ViewSwitch() {
     outline: t('アウトライン', 'Outline'),
     gantt: t('ガント', 'Gantt'),
     diagram: t('図', 'Diagram'),
+    mindmap: t('マインドマップ', 'Mind map'),
     slides: t('スライド', 'Slides'),
     text: t('テキスト', 'Text'),
     yaml: 'YAML',
@@ -441,6 +442,7 @@ export function ViewSwitch() {
   const hint: Record<DrawnView, string> = {
     gantt: t('日程をチャートで', 'The schedule as a chart'),
     diagram: t('行を箱と矢印で', 'The rows as boxes and arrows'),
+    mindmap: t('行の入れ子を枝分かれで', 'The rows branching from the item'),
     slides: t('行をスライドに', 'The rows as slides'),
   };
   return (
@@ -485,7 +487,7 @@ export function ViewSwitch() {
 export function ViewToggles() {
   const ctl = useCtl();
   const { view, prefs } = ctl;
-  if (view !== 'outline' && view !== 'gantt' && view !== 'diagram' && view !== 'text') return null;
+  if (view !== 'outline' && view !== 'gantt' && view !== 'diagram' && view !== 'mindmap' && view !== 'text') return null;
   return (
     <div class="view-toggles">
       {(view === 'outline' || view === 'text') && (

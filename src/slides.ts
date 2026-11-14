@@ -10,9 +10,10 @@
  *                  notes: …            speaker notes (also as a list)
  *                  image: https://…    picture beside the bullets
  *                  embed: [[item]]     that item's Gantt chart
- *                  embed: [[item]] diagram   …or its diagram (also `図`)
+ *                  embed: [[item]] diagram   …or its diagram (also `図`),
+ *                                      or mind map (`mindmap` / `マインドマップ`)
  *                  embed: diagram      the slide's own rows as a diagram
- *                                      (`gantt` / `ガント`: a Gantt chart), not bullets
+ *                                      (`mindmap`, `gantt`: a mind map, a Gantt chart), not bullets
  */
 import { refIds } from './links';
 import type { OutlineStore } from './model';
@@ -35,7 +36,7 @@ export interface Slide {
   image?: string;
   embed?: string;
   /** What of the embedded item to show. */
-  embedAs?: 'gantt' | 'diagram';
+  embedAs?: 'gantt' | 'diagram' | 'mindmap';
 }
 
 export interface Deck {
@@ -72,11 +73,14 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
       notes: value(id, 'notes'),
       image: value(id, 'image'),
       embed: own ? id : embed ? refIds(embed).find((r) => store.get(r)) : undefined,
-      embedAs: embed ? (/diagram|図/i.test(embed.replace(/\[\[[^\]]*\]\]/g, '')) ? 'diagram' : 'gantt') : undefined,
+      embedAs: embed ? embedKind(embed.replace(/\[\[[^\]]*\]\]/g, '')) : undefined,
     });
   }
   return { theme: value(deckId, 'theme') === 'dark' ? 'dark' : 'light', slides };
 }
+
+/** What an `embed` asks to show, from its words: a mind map, a diagram, else a Gantt chart. */
+const embedKind = (words: string) => (/mindmap|マインドマップ/i.test(words) ? 'mindmap' : /diagram|図/i.test(words) ? 'diagram' : 'gantt');
 
 /** Split bullets into two columns of similar length (counting nested lines). */
 export function splitColumns(bullets: Bullet[]): [Bullet[], Bullet[]] {

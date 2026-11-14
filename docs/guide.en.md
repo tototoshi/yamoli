@@ -141,11 +141,10 @@ is drawn as:
 | Other fields | Small `key: value` lines in the box |
 | `layout` (on a frame, or the zoomed item) | Lines up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). Arrows between them are still drawn, but don't move them |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
-| `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are arrows or frames); `tree`: a mind map |
 
 A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name: `calls: dotted red`, `sync: both` (`solid` / `dashed` / `dotted`, `arrow` / `both` / `none`, a colour).
 
-An arrow to or from a row listed in a box is drawn to the box; a mind map (`diagram: tree`) draws every row, frames or not. Lines that would cross a box go around it. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents.
+An arrow to or from a row listed in a box is drawn to the box. Lines that would cross a box go around it. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents.
 
 You can edit the diagram where it is drawn. Each edit changes the outline's rows and fields, so the diagram and the outline always match.
 
@@ -168,7 +167,7 @@ For items with `views: slides`: the zoomed item is the deck, and each row under 
 | `layout` | slide | `center` / `two-column` / `title` |
 | `notes` | slide | Speaker notes |
 | `image` | slide | Image: a URL, or a pasted image's `files/….png` |
-| `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram). Without a link, `diagram` / `図` draws the slide's own rows as a diagram instead of bullets (`gantt` / `ガント`: a Gantt chart) |
+| `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram, `[[item]] mindmap`: its mind map). Without a link, `diagram` / `図` draws the slide's own rows as a diagram instead of bullets (`mindmap`: a mind map, `gantt` / `ガント`: a Gantt chart) |
 
 ## Search
 
@@ -193,11 +192,12 @@ Search (⌘F) finds the rows matching all the terms you write; Esc clears it.
 
 Switch with the view bar; each item remembers the view last used for it.
 
-Outline, Text, YAML and JSON work for any item. Gantt, Diagram and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `slides`, or `ガント` / `図` / `スライド`).
+Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `mindmap` / `slides`, or `ガント` / `図` / `マインドマップ` / `スライド`).
 
 - **Outline**: where every kind of editing can be done.
 - **Gantt**: the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
 - **Diagram**: the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
+- **Mind map**: the rows branching out from the zoomed item, as they are nested. No frames or arrows: every row is a node. Turned on with `views: mindmap` (`マインドマップ`). Renaming, adding and dragging rows elsewhere work as in the diagram.
 - **Slides**: the rows as a slide deck (see Slides). Turned on with `views: slides`.
 - **Text**: the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
 - **YAML / JSON**: the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.

@@ -34,6 +34,8 @@ test('a deck: title slide, one slide per item, fields as settings', () => {
   expect(d.slides[2].embedAs).toBe('gantt');
   s.setText(s.field(b, 'embed')!.id, `[[${a}]] 図`);
   expect(buildDeck(s, deck).slides[2].embedAs).toBe('diagram');
+  s.setText(s.field(b, 'embed')!.id, `[[${a}]] mindmap`);
+  expect(buildDeck(s, deck).slides[2].embedAs).toBe('mindmap');
   // Without a link, the slide's own rows: drawn, not listed.
   s.addField(a, 'embed', 'diagram');
   expect(buildDeck(s, deck).slides[1]).toMatchObject({ embed: a, embedAs: 'diagram', bullets: [] });
