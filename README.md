@@ -60,6 +60,7 @@ src/
   serialize.ts    Writing YAML / JSON / Markdown lists
   schedule.ts     Scheduling          calendar.ts  Working days, durations
   deps.ts         Dependencies        gantt.ts / GanttView.tsx
+  ganttEdit.ts    Editing the schedule from the Gantt chart (drags and typed dates → fields)
   slides.ts / SlidesView.tsx          search.ts    links.ts
   TableView.tsx   The table view (rows × fields, edited in place)
   diagram.ts / DiagramView.tsx        Diagrams

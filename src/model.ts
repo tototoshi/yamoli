@@ -418,6 +418,13 @@ export class OutlineStore {
     return f;
   }
 
+  /** Set id's field named key to value, adding the field when it has none. */
+  setField(id: string, key: string, value: string) {
+    const f = this.field(id, key);
+    if (f) this.setText(f.id, value);
+    else this.addField(id, key, value);
+  }
+
   /** Turn a row into a field (key) or back into an ordinary row (null). */
   setKey(id: string, key: string | null) {
     this.node(id).key = key;

@@ -48,10 +48,8 @@ export function tableColumns(store: OutlineStore, rows: string[]): string[] {
 
 /** Set row's text (column NAME) or its field col, adding the field when it has none. */
 export function setCell(store: OutlineStore, row: string, col: string, value: string) {
-  if (col === NAME) return store.setText(row, value);
-  const f = store.field(row, col);
-  if (f) store.setText(f.id, value);
-  else store.addField(row, col, value);
+  if (col === NAME) store.setText(row, value);
+  else store.setField(row, col, value);
 }
 
 /** Give every row a field named col (empty where it has none), so the column shows. */

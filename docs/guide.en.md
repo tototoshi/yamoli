@@ -86,6 +86,15 @@ The Gantt chart is there for items with `views: gantt` (see Views). It reads the
 
 An item with children spans the dates of its children. ★ marks the critical path (work whose delay delays the whole project). The Gantt chart draws dependency arrows and due-date lines; − / + change the width of a day, down to years and months for a long project, and **Fit** picks the widest that shows the whole schedule. **Dates** shows each row's start, end and working days in columns beside its name. The buttons above the chart save it, names, dates and legend included, as an SVG or PNG file, or copy it as an image.
 
+The schedule can be edited on the chart too. Changes are written as fields, so they are the same as editing the outline.
+
+- **Drag a bar** to move its start (it gets a `start`; an item given an `end` has that moved along). It can't go before what it depends on: it stops just after that finishes.
+- **Drag a bar's right end** to move its end. This rewrites `duration` in working days (calendar days for an item like `10cd`; an item given an `end` gets a new `end`).
+- **Click a name, start, end or days** to type in it. Dates can be just month/day, like `12/3` (this year). `0` days makes a milestone. Giving an unscheduled item a start or a number of days schedules it. Enter keeps the change, Esc drops it.
+- **›** beside a name zooms into that item.
+
+Items whose dates come from their children (summary bars) can't be edited here. While dragging, Esc puts the bar back.
+
 ## Diagrams
 
 For items with `views: diagram`, the Diagram view draws the zoomed item from its rows, for example a system's architecture:

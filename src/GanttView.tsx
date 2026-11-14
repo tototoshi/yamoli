@@ -1,6 +1,8 @@
 /*
  * Gantt chart of the zoomed item's visible rows: names on the left, an SVG
- * timeline on the right sharing the same row height. Read-only for now.
+ * timeline on the right sharing the same row height. Bars can be moved and
+ * their ends dragged, and names and dates typed in (written back as fields:
+ * ganttEdit.ts); a chart embedded in a slide is only shown.
  * The dates above stay in view while the page scrolls (a header of their
  * own, moved along with the timeline's horizontal scroll); rows are striped
  * so a name can be followed to its bar, and dependency lines stay faint
@@ -11,11 +13,13 @@
  * The whole chart, names and all, saves as an SVG or PNG image.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { shortDate, today, type Day } from './calendar';
+import { formatDate, parseDateInput, shortDate, today, type Day } from './calendar';
 import { useCtl } from './context';
 import { lang, t } from './i18n';
 import { standaloneSvg } from './exportImage';
 import { ExportTools, type Drawing } from './ExportTools';
+import { moveTo, resizeTo, setDays } from './ganttEdit';
+import { imeActive } from './RowEditor';
 import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
 import { nodeLabel } from './links';
 import type { OutlineStore } from './model';
@@ -167,6 +171,10 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   const ganttRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  /** A bar being dragged: moved whole or by its end, by delta days so far. */
+  const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'end'; from: number; delta: number } | null>(null);
+  /** A name (column -1) or date (0 start, 1 end, 2 days) being typed in. */
+  const [editing, setEditing] = useState<{ id: string; col: number } | null>(null);
   // The zoomed item itself heads the chart (its span, or its own bar).
   const isRoot = zoomId === store.rootId;
   const below = embedded ? expandedRows(store, zoomId) : ctl.visibleRows();
@@ -236,14 +244,91 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   const showDates = !embedded && ctl.prefs.ganttDates;
   const dates = (id: string) => {
     const s = schedule.byId.get(id);
-    let work = 0;
-    if (s && s.kind !== 'milestone') {
-      const c = calendarAt(store, id, ctl.jpDays);
-      for (let d = s.start; d <= s.end; d++) if (c.isWorkday(d)) work++;
-    }
+    const work = s && s.kind !== 'milestone' ? calendarAt(store, id, ctl.jpDays).workdaysBetween(s.start, s.end) : 0;
     return dateCells(s, work, now);
   };
   const dateRows = new Map(showDates ? rows.map((id) => [id, dates(id)]) : []);
+
+  // ---- editing (not in a chart embedded in a slide)
+
+  const canEdit = (id: string, col: number) => {
+    const s = schedule.byId.get(id);
+    return !embedded && (col < 0 || (s?.kind !== 'summary' && !(s?.kind === 'milestone' && col === 1)));
+  };
+  /** What a name or date cell holds when typed in. */
+  const editText = (id: string, col: number) => {
+    const s = schedule.byId.get(id);
+    if (col < 0) return store.node(id).text;
+    if (!s) return '';
+    if (col === 2) return s.kind === 'task' ? String(calendarAt(store, id, ctl.jpDays).workdaysBetween(s.start, s.end)) : '0';
+    return shortDate(col === 0 ? s.start : s.end, now);
+  };
+  const finishEdit = (id: string, col: number, text: string | null) => {
+    setEditing(null);
+    if (text === null || text === editText(id, col)) return;
+    const s = schedule.byId.get(id);
+    const cal = calendarAt(store, id, ctl.jpDays);
+    if (col < 0) {
+      store.setText(id, text);
+    } else if (col === 2) {
+      const n = Number(text.trim().replace(/\s*(d|日)$/i, ''));
+      if (!text.trim() || !Number.isInteger(n) || n < 0)
+        return ctl.showToast(t(`日数として読めません: ${text}`, `Not a number of days: ${text}`));
+      setDays(store, id, s, n, cal);
+    } else {
+      if (!text.trim()) return;
+      const d = parseDateInput(text, now);
+      if (d === null) return ctl.showToast(t(`日付として読めません: ${text}`, `Not a date: ${text}`));
+      if (col === 0) {
+        if (s) moveTo(store, id, s, d);
+        else store.setField(id, 'start', formatDate(d));
+      } else if (!s) {
+        store.setField(id, 'end', formatDate(d));
+      } else {
+        if (d < s.start) return ctl.showToast(t('開始より前には終われません', "It can't end before it starts"));
+        resizeTo(store, id, s, d, cal);
+      }
+    }
+    ctl.commit();
+  };
+  const cellInput = (id: string, col: number) => (
+    <CellInput key={col} value={editText(id, col)} onDone={(text) => finishEdit(id, col, text)} />
+  );
+
+  // The pointer is followed on the whole window until it is let go (Escape puts the bar back).
+  const startDrag = (e: PointerEvent, id: string, s: Sched) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const mode = (e.target as Element).classList.contains('bar-handle') ? 'end' : 'move';
+    const from = e.clientX;
+    const delta = (ev: PointerEvent) => Math.round((ev.clientX - from) / dw);
+    const move = (ev: PointerEvent) => setDrag({ id, mode, from, delta: delta(ev) });
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('keydown', key, true);
+      setDrag(null);
+    };
+    const up = (ev: PointerEvent) => {
+      stop();
+      const d = delta(ev);
+      if (d === 0) return;
+      if (mode === 'move') moveTo(store, id, s, s.start + d);
+      else resizeTo(store, id, s, Math.max(s.start, s.end + d), calendarAt(store, id, ctl.jpDays));
+      ctl.commit();
+    };
+    const key = (ev: KeyboardEvent) => ev.key === 'Escape' && (ev.preventDefault(), ev.stopPropagation(), stop());
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('keydown', key, true);
+    setDrag({ id, mode, from, delta: 0 });
+  };
+  /** Where a bar being dragged would go. */
+  const dragged = (s: Sched, d: NonNullable<typeof drag>): Sched =>
+    d.mode === 'move' ? { ...s, start: s.start + d.delta, end: s.end + d.delta } : { ...s, end: Math.max(s.start, s.end + d.delta) };
+
   const rowCls = (id: string) => (store.node(id).completed ? ' done' : '') + (schedule.byId.get(id)?.kind === 'summary' ? ' summary' : '');
 
   return (
@@ -406,9 +491,22 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                 >
                   {canToggle ? (ctl.isExpanded(id) ? '▾' : '▸') : ''}
                 </button>
-                <a href={ctl.hashFor(id, 'gantt')} title={nodeLabel(store, id)}>
-                  {nodeLabel(store, id)}
-                </a>
+                {embedded ? (
+                  <a href={ctl.hashFor(id, 'gantt')} title={nodeLabel(store, id)}>
+                    {nodeLabel(store, id)}
+                  </a>
+                ) : editing?.id === id && editing.col < 0 ? (
+                  cellInput(id, -1)
+                ) : (
+                  <>
+                    <span class="gantt-label" title={t('クリックで編集', 'Click to edit')} onClick={() => setEditing({ id, col: -1 })}>
+                      {nodeLabel(store, id)}
+                    </span>
+                    <a href={ctl.hashFor(id, 'gantt')} class="gantt-zoom" title={t('ズームイン', 'Zoom in')}>
+                      ›
+                    </a>
+                  </>
+                )}
               </div>
             );
           })}
@@ -419,14 +517,23 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
               {rows.map((id, i) => {
                 const s = schedule.byId.get(id);
                 const late = c === 1 && !!s && s.late > 0;
+                const edit = canEdit(id, c);
                 return (
                   <div
                     key={id}
-                    class={'gantt-date' + (i % 2 ? ' odd' : '') + (hover === id ? ' hover' : '') + rowCls(id) + (late ? ' late' : '')}
+                    class={
+                      'gantt-date' +
+                      (i % 2 ? ' odd' : '') +
+                      (hover === id ? ' hover' : '') +
+                      rowCls(id) +
+                      (late ? ' late' : '') +
+                      (edit ? ' editable' : '')
+                    }
                     style={{ height: `${ROW}px` }}
                     onMouseEnter={() => setHover(id)}
+                    onClick={() => edit && setEditing({ id, col: c })}
                   >
-                    {dateRows.get(id)![c]}
+                    {editing?.id === id && editing.col === c ? cellInput(id, c) : dateRows.get(id)![c]}
                   </div>
                 );
               })}
@@ -502,10 +609,28 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                   </text>
                 ) : null;
               }
+              const movable = !embedded && s.kind !== 'summary';
+              const d = drag?.id === id ? drag : null;
+              const shown = d ? dragged(s, d) : s;
               return (
-                <g key={id} class={store.node(id).completed ? 'done' : ''} onMouseEnter={() => setHover(id)}>
-                  <title>{nodeLabel(store, id) + '\n' + schedTooltip(s)}</title>
-                  <Bar s={s} x={x} y={y} />
+                <g
+                  key={id}
+                  class={(store.node(id).completed ? 'done' : '') + (movable ? ' movable' : '') + (d ? ' dragging' : '')}
+                  onMouseEnter={() => setHover(id)}
+                  onPointerDown={movable ? (e) => startDrag(e, id, s) : undefined}
+                >
+                  {!d && <title>{nodeLabel(store, id) + '\n' + schedTooltip(s)}</title>}
+                  <Bar s={shown} x={x} y={y} />
+                  {movable && s.kind === 'task' && (
+                    <rect x={x(shown.end + 1) - 8} y={y + ROW / 2 - 7} width={12} height={14} class="bar-handle" />
+                  )}
+                  {d && d.delta !== 0 && (
+                    <text x={x(shown.end + 1) + (shown.kind === 'milestone' ? 14 : 8)} y={y + ROW / 2 + 4} class="drag-label">
+                      {d.mode === 'move'
+                        ? shortDate(shown.start, now) + (shown.kind === 'task' ? ' – ' + shortDate(shown.end, now) : '')
+                        : '– ' + shortDate(shown.end, now)}
+                    </text>
+                  )}
                   {s.due !== undefined && <line x1={x(s.due + 1)} x2={x(s.due + 1)} y1={y + 3} y2={y + ROW - 3} class="due" />}
                   {schedule.invalid.has(id) && (
                     <text x={x(s.end + 1) + 10} y={y + ROW / 2 + 4} class="unscheduled invalid">
@@ -550,5 +675,36 @@ function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
       <rect x={x0 + 0.5} y={mid - 7} width={Math.max(x1 - x0 - 1, 2)} height={14} rx={3} class={'bar' + (s.critical ? ' critical' : '')} />
       {lateFrom !== null && <rect x={lateFrom} y={mid - 7} width={x1 - lateFrom - 0.5} height={14} rx={3} class="bar late" />}
     </>
+  );
+}
+
+/** A cell being typed in: Enter or leaving it keeps what was typed, Escape doesn't. */
+function CellInput({ value, onDone }: { value: string; onDone: (text: string | null) => void }) {
+  const [text, setText] = useState(value);
+  const input = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  const finish = (v: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(v);
+  };
+  useLayoutEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, []);
+  return (
+    <input
+      ref={input}
+      class="gantt-input"
+      value={text}
+      onInput={(e) => setText(e.currentTarget.value)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (imeActive(e)) return;
+        if (e.key === 'Enter') finish(text);
+        else if (e.key === 'Escape') finish(null);
+      }}
+      onBlur={() => finish(text)}
+    />
   );
 }

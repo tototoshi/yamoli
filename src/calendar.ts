@@ -23,6 +23,12 @@ export function parseDate(s: string | undefined): Day | null {
   return t / MS_PER_DAY;
 }
 
+/** A date as typed: 2026-12-01, 2026/12/1, or 12/1 (in now's year). */
+export function parseDateInput(s: string, now: Day): Day | null {
+  const m = s.trim().match(/^(\d{1,2})[-/](\d{1,2})$/);
+  return m ? parseDate(`${formatDate(now).slice(0, 4)}-${m[1]}-${m[2]}`) : parseDate(s);
+}
+
 export const formatDate = (d: Day) => new Date(d * MS_PER_DAY).toISOString().slice(0, 10);
 
 /** 0 = Sunday … 6 = Saturday */
@@ -131,6 +137,13 @@ export class WorkCalendar {
   nextWorkday(d: Day): Day {
     for (let i = 0; i < 3660; i++) if (this.isWorkday(d + i)) return d + i;
     return d; // no working days at all: give up rather than loop forever
+  }
+
+  /** How many working days there are from a to b, both included. */
+  workdaysBetween(a: Day, b: Day): number {
+    let n = 0;
+    for (let d = a; d <= b; d++) if (this.isWorkday(d)) n++;
+    return n;
   }
 
   /** The n-th working day counting `start` (a working day) as the first. */
