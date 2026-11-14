@@ -4,7 +4,7 @@
  * in another place. Each is written to the rows and fields the diagram is
  * drawn from (diagram.ts), so the outline stays the one source.
  */
-import { CONTAINER, DESC_KEYS, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
+import { CONTAINER, DESC_KEYS, LINE_KEYS, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
 import { DEP_KEY, wouldCycle } from './deps';
 import { addPart, addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
@@ -113,6 +113,36 @@ export function reconnect(store: OutlineStore, d: Diagram, edge: DiagramEdge, en
         store.setText(n, store.node(n).text.replaceAll(`[[${ref}]]`, `[[${target}]]`));
   }
   return moves.length > 0;
+}
+
+/** The kinds of line an arrow can be: the built-in field names, then those the zoomed item's `lines` sets. */
+export function lineKinds(store: OutlineStore, rootId: string): string[] {
+  const set = (store.field(rootId, 'lines')?.children ?? []).map((c) => store.node(c).key?.trim().toLowerCase());
+  return [...new Set([...Object.keys(LINE_KEYS), ...set.filter((k): k is string => !!k)])];
+}
+
+/** The field name an arrow is written in (its kind), from its first link. */
+export const lineKindOf = (store: OutlineStore, edge: DiagramEdge) =>
+  edge.links.map(({ field }) => store.get(field)?.key?.trim().toLowerCase()).find(Boolean);
+
+/**
+ * Make an arrow another kind of line: its links (with any words beside them)
+ * move to the field of that name on the same row. Dependencies stay.
+ */
+export function setLineKind(store: OutlineStore, edge: DiagramEdge, key: string): boolean {
+  let changed = false;
+  for (const { field, ref } of edge.links) {
+    const f = store.get(field);
+    const now = f?.key?.trim().toLowerCase();
+    if (!f || now === key || now === DEP_KEY) continue;
+    const owner = store.owner(field);
+    const parts = removeRef(store, field, ref);
+    const there = store.field(owner, key);
+    if (!there || !store.fieldTexts(there.id).some((text) => refIds(text).includes(ref)))
+      parts.forEach((part) => addPart(store, owner, key, part));
+    changed = true;
+  }
+  return changed;
 }
 
 type Pt = readonly [number, number];

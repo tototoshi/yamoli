@@ -68,7 +68,7 @@ export interface LineStyle {
 }
 
 /** Field names with a look of their own, and no label of their name. */
-const LINE_KEYS: Record<string, string> = { to: '', async: 'dashed', both: 'both', link: 'none' };
+export const LINE_KEYS: Record<string, string> = { to: '', async: 'dashed', both: 'both', link: 'none' };
 
 /** A line's look from words like `dotted both red`, on top of base. */
 export function lineStyle(words: string, base: LineStyle = { dash: 'solid', ends: 'arrow' }): LineStyle {

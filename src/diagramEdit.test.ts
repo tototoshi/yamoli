@@ -1,6 +1,21 @@
 import { expect, test } from 'vitest';
 import { buildDiagram, layout } from './diagram';
-import { boxAt, canConnect, connect, descOf, disconnect, dropAt, moveBox, reconnect, setColor, setDesc, setShape } from './diagramEdit';
+import {
+  boxAt,
+  canConnect,
+  connect,
+  descOf,
+  disconnect,
+  dropAt,
+  lineKindOf,
+  lineKinds,
+  moveBox,
+  reconnect,
+  setColor,
+  setDesc,
+  setLineKind,
+  setShape,
+} from './diagramEdit';
 import { OutlineStore } from './model';
 
 /** A zoomed item P with a box A, a frame F (lined up as `arrange` says) holding X, Y, Z, and a box B. */
@@ -188,4 +203,26 @@ test('a dependency arrow moves its `after`, unless it would go round', () => {
   // Its tail to X: B after X instead.
   expect(reconnect(s, draw().d, edge(a, b), 'from', x)).toBe(true);
   expect(s.fieldValue(b, 'after')).toBe(`[[${x}]]`);
+});
+
+test("an arrow's kind is the field it is written in: changing it moves the link, words and all", () => {
+  const { s, p, a, b, x, draw } = drawing();
+  s.addField(a, 'to', `[[${b}]] HTTPS, [[${x}]]`);
+  const lines = s.addField(p, 'lines').id;
+  s.addChild(lines, -1, 'dotted red').key = 'calls';
+  expect(lineKinds(s, p)).toEqual(['to', 'async', 'both', 'link', 'calls']);
+  const edge = () => draw().d.edges.find((e) => e.to === b)!;
+  expect(lineKindOf(s, edge())).toBe('to');
+
+  expect(setLineKind(s, edge(), 'async')).toBe(true);
+  expect(s.fieldValue(a, 'to')).toBe(`[[${x}]]`);
+  expect(s.fieldValue(a, 'async')).toBe(`[[${b}]] HTTPS`);
+  expect(edge().style.dash).toBe('dashed');
+  expect(setLineKind(s, edge(), 'async')).toBe(false);
+
+  // A dependency stays one.
+  s.addField(x, 'after', `[[${b}]]`);
+  const dep = draw().d.edges.find((e) => e.from === b && e.to === x)!;
+  expect(lineKindOf(s, dep)).toBe('after');
+  expect(setLineKind(s, dep, 'to')).toBe(false);
 });

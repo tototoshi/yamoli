@@ -4,6 +4,7 @@
  * given a shape and colour, added, moved into frames or along a row, column
  * or grid, and arrows drawn and removed (diagramEdit.ts writes the outline).
  */
+import type { ComponentChildren } from 'preact';
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import { CellInput } from './CellInput';
 import { useCtl } from './context';
@@ -36,13 +37,17 @@ import {
   descOf,
   disconnect,
   dropAt,
+  lineKindOf,
+  lineKinds,
   moveBox,
   reconnect,
   setColor,
   setDesc,
+  setLineKind,
   setShape,
   type Drop,
 } from './diagramEdit';
+import { DEP_KEY } from './deps';
 import { standaloneSvg } from './exportImage';
 import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
@@ -172,6 +177,8 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   /** The box whose description is being written. */
   const [describing, setDescribing] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** The arrow right-clicked, and where. */
+  const [edgeMenu, setEdgeMenu] = useState<{ x: number; y: number } | null>(null);
   /** An arrow being drawn from a box: where the pointer is, and the box under it. */
   const [link, setLink] = useState<{ from: string; at: Pt; to: string | null } | null>(null);
   /** An end of the selected arrow being dragged to another box: from the end that stays, where the pointer is, and the box under it. */
@@ -194,7 +201,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
     setSel(null);
   };
   useEffect(() => {
-    if (!sel || renaming || describing || menu) return;
+    if (!sel || renaming || describing || menu || edgeMenu) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as Element).closest('input, textarea, [contenteditable]')) return;
       if (e.key === 'Escape') setSel(null);
@@ -450,8 +457,20 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
                 marker-start={e.style.ends === 'both' ? `url(#${marker})` : undefined}
               />
               {editable && (
-                <path class="dg-edge-hit" d={r.d} onPointerDown={(ev) => ev.stopPropagation()} onClick={() => setSel({ edge: k })}>
-                  <title>{t('クリックで選択、Delete で削除', 'Click to select, Delete to remove')}</title>
+                <path
+                  class="dg-edge-hit"
+                  d={r.d}
+                  onPointerDown={(ev) => ev.stopPropagation()}
+                  onClick={() => setSel({ edge: k })}
+                  onContextMenu={(ev) => {
+                    ev.preventDefault();
+                    setSel({ edge: k });
+                    setEdgeMenu({ x: ev.clientX, y: ev.clientY });
+                  }}
+                >
+                  <title>
+                    {t('クリックで選択、右クリックで種類、Delete で削除', 'Click to select, right-click for its kind, Delete to remove')}
+                  </title>
                 </path>
               )}
             </g>
@@ -599,6 +618,16 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           </foreignObject>
         )}
       </svg>
+      {edgeMenu && selectedEdge && (
+        <EdgeMenu
+          edge={selectedEdge}
+          x={edgeMenu.x}
+          y={edgeMenu.y}
+          kinds={lineKinds(store, id)}
+          onClose={() => setEdgeMenu(null)}
+          onRemove={remove}
+        />
+      )}
       {menu && store.get(menu.id) && (
         <BoxMenu
           id={menu.id}
@@ -675,20 +704,6 @@ function BoxMenu(props: {
   const { id, x, y, root, holds, onClose } = props;
   const ctl = useCtl();
   const { store } = ctl;
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.querySelector('button')?.focus();
-    const away = (e: Event) => !ref.current?.contains(e.target as Node) && onClose();
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('pointerdown', away, true);
-    window.addEventListener('keydown', key);
-    window.addEventListener('scroll', onClose, true);
-    return () => {
-      window.removeEventListener('pointerdown', away, true);
-      window.removeEventListener('keydown', key);
-      window.removeEventListener('scroll', onClose, true);
-    };
-  }, []);
   const run = (fn: () => void) => () => {
     onClose();
     fn();
@@ -703,14 +718,7 @@ function BoxMenu(props: {
         : 'box';
   const color = store.fieldValue(id, 'color')?.toLowerCase();
   return (
-    <div
-      ref={ref}
-      class="item-menu dg-menu"
-      role="menu"
-      style={{ left: `${Math.min(x, window.innerWidth - 260)}px`, top: `${Math.min(y, window.innerHeight - 380)}px` }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <div class="item-menu-title">{nodeLabel(store, id)}</div>
+    <PopupMenu x={x} y={y} title={nodeLabel(store, id)} onClose={onClose}>
       <button role="menuitem" onClick={run(props.onRename)}>
         {t('名前を変更', 'Rename')}
       </button>
@@ -775,7 +783,112 @@ function BoxMenu(props: {
           </button>
         </>
       )}
+    </PopupMenu>
+  );
+}
+
+/** A menu at a point (in the window), closed by Escape, scrolling or a press elsewhere. */
+function PopupMenu({
+  x,
+  y,
+  title,
+  onClose,
+  children,
+}: {
+  x: number;
+  y: number;
+  title: string;
+  onClose: () => void;
+  children: ComponentChildren;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector('button')?.focus();
+    const away = (e: Event) => !ref.current?.contains(e.target as Node) && onClose();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('pointerdown', away, true);
+    window.addEventListener('keydown', key);
+    window.addEventListener('scroll', onClose, true);
+    return () => {
+      window.removeEventListener('pointerdown', away, true);
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('scroll', onClose, true);
+    };
+  }, []);
+  return (
+    <div
+      ref={ref}
+      class="item-menu dg-menu"
+      role="menu"
+      style={{ left: `${Math.min(x, window.innerWidth - 260)}px`, top: `${Math.min(y, window.innerHeight - 380)}px` }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div class="item-menu-title">{title}</div>
+      {children}
     </div>
+  );
+}
+
+/** Names of the kinds of line offered for an arrow; others are shown by their field name. */
+const LINE_CHOICES: Record<string, () => string> = {
+  to: () => t('矢印', 'Arrow'),
+  async: () => t('破線', 'Dashed'),
+  both: () => t('両矢印', 'Both ends'),
+  link: () => t('線のみ', 'Line only'),
+};
+
+/** An arrow's menu: its kind of line (the field it is written in), and removing it. */
+function EdgeMenu({
+  edge,
+  x,
+  y,
+  kinds,
+  onClose,
+  onRemove,
+}: {
+  edge: DiagramEdge;
+  x: number;
+  y: number;
+  kinds: string[];
+  onClose: () => void;
+  onRemove: () => void;
+}) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const current = lineKindOf(store, edge);
+  const dep = current === DEP_KEY;
+  return (
+    <PopupMenu x={x} y={y} title={`${nodeLabel(store, edge.from)} → ${nodeLabel(store, edge.to)}`} onClose={onClose}>
+      {dep ? (
+        <div class="dg-menu-note">{t('依存（after）の矢印です。種類は変えられません', 'A dependency (after); its kind stays')}</div>
+      ) : (
+        <div class="dg-menu-row" role="group" aria-label={t('線の種類', 'Kind of line')}>
+          {kinds.map((k) => (
+            <button
+              key={k}
+              class={'dg-chip' + (current === k ? ' on' : '')}
+              onClick={() => {
+                onClose();
+                if (setLineKind(store, edge, k)) ctl.commit();
+              }}
+            >
+              {LINE_CHOICES[k]?.() ?? k}
+            </button>
+          ))}
+        </div>
+      )}
+      <hr />
+      <button
+        role="menuitem"
+        class="danger"
+        onClick={() => {
+          onClose();
+          onRemove();
+        }}
+      >
+        {t('削除', 'Delete')}
+      </button>
+    </PopupMenu>
   );
 }
 
