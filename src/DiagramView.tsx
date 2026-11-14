@@ -18,6 +18,7 @@ import {
   layout,
   LABEL_SIZE,
   PAD,
+  PROCESS_PAD,
   PROP_SIZE,
   colorValue,
   CONTAINER,
@@ -157,6 +158,8 @@ const SHAPE_CHOICES: [ShapeKind | 'frame' | typeof CONTAINER, () => string][] = 
   ['db', () => t('DB', 'Database')],
   ['queue', () => t('キュー', 'Queue')],
   ['external', () => t('外部', 'External')],
+  ['process', () => t('プロセス', 'Process')],
+  ['store', () => t('データストア', 'Data store')],
   ['frame', () => t('枠', 'Frame')],
   [CONTAINER, () => t('入れ物', 'Container')],
 ];
@@ -987,7 +990,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
   const { w, h } = box;
   const style = tint(node.color);
   const actor = node.shape === 'actor';
-  const top = actor ? 36 : PAD + (node.shape === 'db' ? 12 : 0);
+  const top = actor ? 36 : PAD + (node.shape === 'db' ? 12 : node.shape === 'process' ? PROCESS_PAD : 0);
   const cx = node.shape === 'queue' ? (w - 16) / 2 : w / 2;
   // The icon goes before the label, the two centred together; an actor's icon replaces the figure.
   const iconBeside = node.icon && !actor;
@@ -1021,6 +1024,18 @@ function Shape({ node, box, on, onHover }: Drawn) {
         <>
           <rect width={w} height={h} rx={6} style={style} />
           <path class="dg-line" d={`M${w - 16},0 V${h} M${w - 10},0 V${h}`} style={style && { stroke: style.stroke }} />
+        </>
+      );
+      break;
+    case 'process':
+      outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} style={style} />;
+      break;
+    case 'store':
+      // Lines along the top and bottom, closed at the start only.
+      outline = (
+        <>
+          <rect class="dg-store-bg" width={w} height={h} style={style && { fill: style.fill }} />
+          <path d={`M${w},0 H0 V${h} H${w}`} style={{ fill: 'none', ...(style && { stroke: style.stroke }) }} />
         </>
       );
       break;

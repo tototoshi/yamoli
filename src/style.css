@@ -1013,10 +1013,12 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .diagram-hint { text-align: center; font-size: 12px; margin-top: 8px; }
 .dg-node, .dg-frame { cursor: pointer; }
 .diagram-wrap.embedded .dg-node, .diagram-wrap.embedded .dg-frame { cursor: default; }
-.dg-node rect, .dg-node > path:first-of-type { fill: var(--bg); stroke: #9aa3ae; stroke-width: 1.2; }
+.dg-node rect, .dg-node ellipse, .dg-node > path:first-of-type { fill: var(--bg); stroke: #9aa3ae; stroke-width: 1.2; }
 .dg-node rect.dashed { stroke-dasharray: 5 4; }
 .dg-node .dg-line { fill: none; stroke: #9aa3ae; stroke-width: 1.2; }
-.dg-node:hover rect, .dg-node:hover > path:first-of-type { stroke: var(--accent); }
+.dg-node:hover rect, .dg-node:hover ellipse, .dg-node:hover > path:first-of-type { stroke: var(--accent); }
+/* A data store is drawn by its lines; its box only fills. */
+.dg-node rect.dg-store-bg { stroke: none; }
 .dg-actor { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linecap: round; }
 .dg-label { text-anchor: middle; font-weight: 600; fill: var(--fg); font-size: 13px; }
 .dg-prop { text-anchor: middle; fill: var(--muted); font-size: 11px; }

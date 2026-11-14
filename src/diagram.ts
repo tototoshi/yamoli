@@ -7,7 +7,8 @@
  *   [[links]] in fields  arrows, labelled with the words after the link
  *                        (`to: [[API]] gRPC`); `after` arrows run from the
  *                        dependency to the item waiting for it
- *   shape                box / actor / db / queue / external
+ *   shape                box / actor / db / queue / external / process
+ *                        (an ellipse) / store (a data store, open at its end)
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   icon                 server, database, cloud … (icons.ts) or an emoji
  *   note / description   wrapped text under the name, in a box or a frame
@@ -35,8 +36,8 @@ import { nodeLabel, refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 import { VIEWS_KEY } from './views';
 
-export type Shape = 'box' | 'actor' | 'db' | 'queue' | 'external';
-const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external'];
+export type Shape = 'box' | 'actor' | 'db' | 'queue' | 'external' | 'process' | 'store';
+const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external', 'process', 'store'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
@@ -443,6 +444,9 @@ export const frameDesc = (n: DiagramNode, w: number, measure: Measure) => (n.des
 /** The height of a frame's head: its title, and its description under it. */
 export const frameHead = (n: DiagramNode, w: number, measure: Measure) => FRAME_HEAD + frameDesc(n, w, measure).length * PROP_LINE;
 
+/** Space above and below a process's text, in its ellipse. */
+export const PROCESS_PAD = 8;
+
 /** Size of a box (not a frame) by its contents. */
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
   const desc = descLines(n, measure);
@@ -451,6 +455,8 @@ export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: numbe
   if (n.shape === 'actor') return { w: Math.max(text + 8, 44), h: ACTOR + 6 + lines };
   const w = Math.max(Math.ceil(text) + 2 * PAD, 64);
   const h = lines + 2 * PAD + (n.shape === 'db' ? 12 : 0);
+  // An ellipse holds its text with room around it at the ends.
+  if (n.shape === 'process') return { w: Math.round(w * 1.3), h: h + 2 * PROCESS_PAD };
   return { w: n.shape === 'queue' ? w + 16 : w, h };
 }
 

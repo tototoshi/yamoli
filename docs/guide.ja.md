@@ -134,7 +134,7 @@ children:
 | `shape: frame` | 下の行を囲む枠。中の行はそれぞれ箱になる。枠線は `frame solid` / `frame none`（既定は点線） |
 | `shape: container` | 中に箱を並べる箱（入れ物）。枠と同じく下の行が箱になり、見た目は普通の箱 |
 | 属性の中の `[[リンク]]` | 矢印。リンクの後ろの言葉（なければ属性名、`to` を除く）がラベルになる。`after` の矢印は依存先から引かれる |
-| `shape` | `box` / `actor` / `db` / `queue` / `external` |
+| `shape` | `box` / `actor` / `db` / `queue` / `external` / `process`（楕円）/ `store`（データストア）。DFD なら、外部エンティティは `box`、プロセスは `process`、データストアは `store`、データフローは `to: [[箱]] 注文データ` のようなラベル付きの矢印で |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` または `#hex` |
 | `icon` | 名前の前のアイコン: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`、または絵文字。actor では人型の代わりになる |
 | `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい |

@@ -370,3 +370,17 @@ test('layout on the zoomed item lines up the top boxes, and asks for a flow', ()
   const L = layout(d);
   expect(L.boxes.get(b)!.x).toBeGreaterThan(L.boxes.get(a)!.x + L.boxes.get(a)!.w);
 });
+
+test('a process and a data store, for data flow diagrams: a process is roomier, for its ellipse', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const [a, b, c] = ['Check order', 'Check order', 'Orders'].map((x) => s.addChild(p, -1, x).id);
+  s.addField(a, 'shape', 'process');
+  s.addField(c, 'shape', 'store');
+  const d = buildDiagram(s, p);
+  expect([a, b, c].map((id) => d.nodes.get(id)!.shape)).toEqual(['process', 'box', 'store']);
+  const L = layout(d);
+  const [pa, pb] = [L.boxes.get(a)!, L.boxes.get(b)!];
+  expect(pa.w).toBeGreaterThan(pb.w);
+  expect(pa.h).toBeGreaterThan(pb.h);
+});

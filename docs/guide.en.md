@@ -134,7 +134,7 @@ is drawn as:
 | `shape: frame` | A frame around the rows under it, drawn as boxes; `frame solid` / `frame none` for its border (dashed by default) |
 | `shape: container` | A box with boxes inside: like a frame, the rows under it are boxes, but it looks like a box |
 | `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency |
-| `shape` | `box` / `actor` / `db` / `queue` / `external` |
+| `shape` | `box` / `actor` / `db` / `queue` / `external` / `process` (an ellipse) / `store` (a data store). For a data flow diagram: external entities as `box`, processes as `process`, data stores as `store`, and data flows as labelled arrows like `to: [[box]] order data` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
 | `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too |
