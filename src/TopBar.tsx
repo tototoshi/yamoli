@@ -424,6 +424,7 @@ export function ViewSwitch() {
   const ctl = useCtl();
   const label: Record<View, string> = {
     outline: t('アウトライン', 'Outline'),
+    table: t('表', 'Table'),
     gantt: t('ガント', 'Gantt'),
     diagram: t('図', 'Diagram'),
     slides: t('スライド', 'Slides'),
@@ -439,6 +440,7 @@ export function ViewSwitch() {
   );
   const off = DRAWN_VIEWS.filter((v) => !on.has(v));
   const hint: Record<DrawnView, string> = {
+    table: t('行と属性を表で編集', 'Edit rows and fields as a table'),
     gantt: t('日程をチャートで', 'The schedule as a chart'),
     diagram: t('行を箱と矢印で', 'The rows as boxes and arrows'),
     slides: t('行をスライドに', 'The rows as slides'),
@@ -485,7 +487,7 @@ export function ViewSwitch() {
 export function ViewToggles() {
   const ctl = useCtl();
   const { view, prefs } = ctl;
-  if (view !== 'outline' && view !== 'gantt' && view !== 'diagram' && view !== 'text') return null;
+  if (view !== 'outline' && view !== 'table' && view !== 'gantt' && view !== 'diagram' && view !== 'text') return null;
   return (
     <div class="view-toggles">
       {(view === 'outline' || view === 'text') && (

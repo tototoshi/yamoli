@@ -171,9 +171,10 @@ Search (⌘F) finds the rows matching all the terms you write; Esc clears it.
 
 Switch with the view bar; each item remembers the view last used for it.
 
-Outline, Text, YAML and JSON work for any item. Gantt, Diagram and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `slides`, or `ガント` / `図` / `スライド`).
+Outline, Text, YAML and JSON work for any item. Table, Gantt, Diagram and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`table` / `gantt` / `diagram` / `slides`, or `表` / `ガント` / `図` / `スライド`).
 
-- **Outline**: where all editing happens.
+- **Outline**: where every kind of editing can be done.
+- **Table**: the rows under the zoomed item, one per line, with their fields as columns, edited in place. The first column is the row's own text; typing in an empty cell adds that field. Enter moves down (adding a row after the last), Tab across. Type a name in "+ Column" in the header and press Enter to give every row that field. Blocks and fields with rows inside can't be edited in the table; click one to open it in the outline. Turned on with `views: table`.
 - **Gantt**: the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
 - **Diagram**: the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
 - **Slides**: the rows as a slide deck (see Slides). Turned on with `views: slides`.
