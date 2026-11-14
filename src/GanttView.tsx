@@ -652,6 +652,11 @@ function expandedRows(store: OutlineStore, id: string): string[] {
   return store.items(id).flatMap((c) => [c, ...(store.node(c).collapsed ? [] : expandedRows(store, c))]);
 }
 
+/** The first day of a bar past its due date (not before the bar starts), or null when it isn't late. */
+export function lateFrom(s: Sched): Day | null {
+  return s.due !== undefined && s.end > s.due ? Math.max(s.due + 1, s.start) : null;
+}
+
 function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
   const mid = y + ROW / 2;
   if (s.kind === 'milestone') {
@@ -669,11 +674,11 @@ function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
     const top = mid - 5;
     return <path d={`M${x0},${top} H${x1} V${top + 10} L${x1 - 5},${top + 5} H${x0 + 5} L${x0},${top + 10} z`} class="summary" />;
   }
-  const lateFrom = s.due !== undefined && s.end > s.due ? x(s.due + 1) : null;
+  const late = lateFrom(s);
   return (
     <>
       <rect x={x0 + 0.5} y={mid - 7} width={Math.max(x1 - x0 - 1, 2)} height={14} rx={3} class={'bar' + (s.critical ? ' critical' : '')} />
-      {lateFrom !== null && <rect x={lateFrom} y={mid - 7} width={x1 - lateFrom - 0.5} height={14} rx={3} class="bar late" />}
+      {late !== null && <rect x={x(late) + 0.5} y={mid - 7} width={Math.max(x1 - x(late) - 1, 2)} height={14} rx={3} class="bar late" />}
     </>
   );
 }
