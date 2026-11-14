@@ -29,7 +29,20 @@ import {
   type Measure,
   type Shape as ShapeKind,
 } from './diagram';
-import { boxAt, canConnect, connect, descOf, disconnect, dropAt, moveBox, setColor, setDesc, setShape, type Drop } from './diagramEdit';
+import {
+  boxAt,
+  canConnect,
+  connect,
+  descOf,
+  disconnect,
+  dropAt,
+  moveBox,
+  reconnect,
+  setColor,
+  setDesc,
+  setShape,
+  type Drop,
+} from './diagramEdit';
 import { standaloneSvg } from './exportImage';
 import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
@@ -59,7 +72,7 @@ type Pt = [number, number];
  * A curve that would cross another box goes around it instead, in a lane
  * above or below (left or right of) the boxes in the way.
  */
-function route(a: Box, b: Box, dir: Direction, others: Box[], labelWidth = 0): { d: string; mid: Pt; pts: Pt[] } {
+function route(a: Box, b: Box, dir: Direction, others: Box[], labelWidth = 0): { d: string; mid: Pt; pts: Pt[]; ends: [Pt, Pt] } {
   const apartX = b.x >= a.x + a.w ? 1 : b.x + b.w <= a.x ? -1 : 0;
   const apartY = b.y >= a.y + a.h ? 1 : b.y + b.h <= a.y ? -1 : 0;
   const horizontal = !!apartX && (dir === 'LR' || !apartY);
@@ -82,7 +95,7 @@ function route(a: Box, b: Box, dir: Direction, others: Box[], labelWidth = 0): {
   const hits = (r: Box, [x, y]: Pt) => x > r.x - 4 && x < r.x + r.w + 4 && y > r.y - 4 && y < r.y + r.h + 4;
   const samples = Array.from({ length: 24 }, (_, i) => at((i + 1) / 25));
   const inWay = boxes.filter((r) => samples.some((p) => hits(r, p)));
-  if (!inWay.length) return { d: `M${sw(p0)} C${sw(c1)} ${sw(c2)} ${sw(p3)}`, mid: sw(at(0.5)), pts: [] };
+  if (!inWay.length) return { d: `M${sw(p0)} C${sw(c1)} ${sw(c2)} ${sw(p3)}`, mid: sw(at(0.5)), pts: [], ends: [sw(p0), sw(p3)] };
 
   // A lane clear of every box between the ends, nearest to the straight line.
   const [lo, hi] = [Math.min(p0[0], p3[0]) + 16, Math.max(p0[0], p3[0]) - 16];
@@ -96,7 +109,7 @@ function route(a: Box, b: Box, dir: Direction, others: Box[], labelWidth = 0): {
   const x1 = p0[0] + s * 16;
   const x2 = p3[0] - s * 16;
   const pts: Pt[] = [p0, [x1, p0[1]], [x1, lane], [x2, lane], [x2, p3[1]], p3];
-  return { d: rounded(pts.map(sw)), mid: sw([(x1 + x2) / 2, lane]), pts: pts.map(sw) };
+  return { d: rounded(pts.map(sw)), mid: sw([(x1 + x2) / 2, lane]), pts: pts.map(sw), ends: [sw(p0), sw(p3)] };
 }
 
 /** A polyline with its corners rounded. */
@@ -161,6 +174,8 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   /** An arrow being drawn from a box: where the pointer is, and the box under it. */
   const [link, setLink] = useState<{ from: string; at: Pt; to: string | null } | null>(null);
+  /** An end of the selected arrow being dragged to another box: from the end that stays, where the pointer is, and the box under it. */
+  const [bend, setBend] = useState<{ fixed: Pt; at: Pt; to: string | null } | null>(null);
   /** A box being dragged: how far, and where it would go. */
   const [moving, setMoving] = useState<{ id: string; dx: number; dy: number; drop: Drop | null } | null>(null);
   const showCompleted = ctl.prefs.showCompleted;
@@ -318,6 +333,31 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
     setLink(at(e));
   };
 
+  // From a handle at an end of the selected arrow to the box it should join instead.
+  const startBend = (e: PointerEvent, edge: DiagramEdge, end: 'from' | 'to') => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const fixed = routes.get(edge)!.ends[end === 'to' ? 0 : 1];
+    const stays = end === 'to' ? edge.from : edge.to;
+    const at = (ev: PointerEvent) => {
+      const p = toDrawing(ev);
+      return { fixed, at: p, to: boxAt(L, p, (n) => n === edge[end] || canConnect(d, stays, n)) };
+    };
+    follow(
+      (ev) => setBend(at(ev)),
+      (ev) => {
+        setBend(null);
+        const to = at(ev).to;
+        if (!to || !reconnect(store, d, edge, end, to)) return;
+        ctl.commit();
+        setSel(null);
+      },
+      () => setBend(null)
+    );
+    setBend(at(e));
+  };
+
   const rename = (nid: string, text: string | null) => {
     setRenaming(null);
     if (text === null || !text.trim() || text === store.node(nid).text) return;
@@ -343,7 +383,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
 
   /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
   const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
-  const dotFor = editable && !link && !moving && !renaming && !describing && hover !== null && hover !== id ? hover : null;
+  const dotFor = editable && !link && !bend && !moving && !renaming && !describing && hover !== null && hover !== id ? hover : null;
   const linkFrom = link && L.boxes.get(link.from);
   const movingBox = moving && L.boxes.get(moving.id);
   const dropHolder = moving?.drop && moving.drop.parent !== id ? L.boxes.get(moving.drop.parent) : undefined;
@@ -461,6 +501,31 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
             <circle r={8} />
             <text y={4}>×</text>
           </g>
+        )}
+        {selectedEdge &&
+          !bend &&
+          (['from', 'to'] as const).map((end) => {
+            const [cx, cy] = routes.get(selectedEdge)!.ends[end === 'from' ? 0 : 1];
+            return (
+              <circle key={end} class="dg-link-dot dg-end" cx={cx} cy={cy} r={5} onPointerDown={(ev) => startBend(ev, selectedEdge, end)}>
+                <title>{t('ドラッグして、つなぐ箱を変える', 'Drag to join another box')}</title>
+              </circle>
+            );
+          })}
+        {bend && (
+          <>
+            {bend.to && (
+              <rect
+                class="dg-drop"
+                x={L.boxes.get(bend.to)!.x - 4}
+                y={L.boxes.get(bend.to)!.y - 4}
+                width={L.boxes.get(bend.to)!.w + 8}
+                height={L.boxes.get(bend.to)!.h + 8}
+                rx={9}
+              />
+            )}
+            <line class="dg-link-line" x1={bend.fixed[0]} y1={bend.fixed[1]} x2={bend.at[0]} y2={bend.at[1]} />
+          </>
         )}
         {dotFor && L.boxes.has(dotFor) && (
           <circle

@@ -5,7 +5,8 @@
  * drawn from (diagram.ts), so the outline stays the one source.
  */
 import { CONTAINER, DESC_KEYS, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
-import { addRef, refIds, removeRef } from './links';
+import { DEP_KEY, wouldCycle } from './deps';
+import { addPart, addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
 
 /** Make id a box of a shape (`box` takes the field away), a frame or a container. */
@@ -74,6 +75,44 @@ export function connect(store: OutlineStore, from: string, to: string) {
 /** Take out the links an arrow is drawn from. */
 export function disconnect(store: OutlineStore, edge: DiagramEdge) {
   for (const { field, ref } of edge.links) removeRef(store, field, ref);
+}
+
+/**
+ * Move one end of an arrow to another box. Where that end is the row the link
+ * is written on, the link (with any words beside it) moves to the same field
+ * of the new box; where it is the row linked to, the link points to the new
+ * box instead. False when nothing changes, or a dependency would go round.
+ */
+export function reconnect(store: OutlineStore, d: Diagram, edge: DiagramEdge, end: 'from' | 'to', target: string): boolean {
+  if (edge[end] === target) return false;
+  const drawnAs = (row: string) => {
+    for (let n: string | undefined = row; n; n = store.parentOf(n)) if (d.nodes.has(n)) return n;
+    return null;
+  };
+  const moves = edge.links
+    .filter(({ field }) => store.get(field))
+    .map(({ field, ref }) => {
+      const owner = store.owner(field);
+      const key = store.node(field).key!;
+      return { field, ref, key, onOwner: drawnAs(owner) === edge[end], owner };
+    });
+  for (const m of moves) {
+    if (m.key !== DEP_KEY) continue;
+    const [id, dep] = m.onOwner ? [target, m.ref] : [m.owner, target];
+    if (id === dep || wouldCycle(store, id, dep)) return false;
+  }
+  // A link already there isn't written twice: the old one just goes.
+  const links = (field: string | undefined, to: string) => !!field && store.fieldTexts(field).some((text) => refIds(text).includes(to));
+  for (const { field, ref, key, onOwner } of moves) {
+    if (onOwner) {
+      const parts = removeRef(store, field, ref);
+      if (!links(store.field(target, key)?.id, ref)) parts.forEach((part) => addPart(store, target, key, part));
+    } else if (links(field, target)) removeRef(store, field, ref);
+    else
+      for (const n of [field, ...store.node(field).children])
+        store.setText(n, store.node(n).text.replaceAll(`[[${ref}]]`, `[[${target}]]`));
+  }
+  return moves.length > 0;
 }
 
 type Pt = readonly [number, number];

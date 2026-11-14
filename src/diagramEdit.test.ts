@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { buildDiagram, layout } from './diagram';
-import { boxAt, canConnect, connect, descOf, disconnect, dropAt, moveBox, setColor, setDesc, setShape } from './diagramEdit';
+import { boxAt, canConnect, connect, descOf, disconnect, dropAt, moveBox, reconnect, setColor, setDesc, setShape } from './diagramEdit';
 import { OutlineStore } from './model';
 
 /** A zoomed item P with a box A, a frame F (lined up as `arrange` says) holding X, Y, Z, and a box B. */
@@ -155,4 +155,37 @@ test('a description is written to the field it is read from, else a note; lines 
   setDesc(s, b, 'new');
   expect(s.fieldValue(b, 'description')).toBe('new');
   expect(s.field(b, 'note')).toBeFalsy();
+});
+
+test('an arrow is joined to another box: the link points there, or moves there with its words', () => {
+  const { s, a, b, x, y, draw } = drawing();
+  s.addField(a, 'to', `[[${b}]] HTTPS`);
+  const edge = (from: string, to: string) => draw().d.edges.find((e) => e.from === from && e.to === to)!;
+
+  // The head: the link now points to X, words and all.
+  expect(reconnect(s, draw().d, edge(a, b), 'to', x)).toBe(true);
+  expect(s.fieldValue(a, 'to')).toBe(`[[${x}]] HTTPS`);
+  // The tail: the link moves to Y's `to`, and A is left without one.
+  expect(reconnect(s, draw().d, edge(a, x), 'from', y)).toBe(true);
+  expect(s.field(a, 'to')).toBeFalsy();
+  expect(s.fieldValue(y, 'to')).toBe(`[[${x}]] HTTPS`);
+  // Onto a box already linked: the old link goes rather than doubling.
+  s.addField(b, 'to', `[[${x}]], [[${a}]]`);
+  expect(reconnect(s, draw().d, edge(b, a), 'to', x)).toBe(true);
+  expect(s.fieldValue(b, 'to')).toBe(`[[${x}]]`);
+  // Where it is: nothing to do.
+  expect(reconnect(s, draw().d, edge(b, x), 'to', x)).toBe(false);
+});
+
+test('a dependency arrow moves its `after`, unless it would go round', () => {
+  const { s, a, b, x, draw } = drawing();
+  s.addField(b, 'after', `[[${a}]]`); // A → B
+  s.addField(a, 'after', `[[${x}]]`); // X → A
+  const edge = (from: string, to: string) => draw().d.edges.find((e) => e.from === from && e.to === to)!;
+  // Its head to X: X after A, which is after X.
+  expect(reconnect(s, draw().d, edge(a, b), 'to', x)).toBe(false);
+  expect(s.fieldValue(b, 'after')).toBe(`[[${a}]]`);
+  // Its tail to X: B after X instead.
+  expect(reconnect(s, draw().d, edge(a, b), 'from', x)).toBe(true);
+  expect(s.fieldValue(b, 'after')).toBe(`[[${x}]]`);
 });

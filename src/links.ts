@@ -15,7 +15,11 @@ export function refIds(text: string): string[] {
 
 /** Add a link to ref to id's field named key: inline after the others, or as a row when the field is a list. */
 export function addRef(store: OutlineStore, id: string, key: string, ref: string) {
-  const link = `[[${ref}]]`;
+  addPart(store, id, key, `[[${ref}]]`);
+}
+
+/** Add text to id's field named key: after the others, or as a row when the field is a list. */
+export function addPart(store: OutlineStore, id: string, key: string, link: string) {
   const f = store.field(id, key);
   if (!f) store.addField(id, key, link);
   else if (f.children.length) store.addChild(f.id, -1, link);
@@ -24,15 +28,17 @@ export function addRef(store: OutlineStore, id: string, key: string, ref: string
 
 /**
  * Take the links to ref out of a field (each comma-separated part holding one,
- * and rows of a list left with nothing), and the field itself once it is empty.
+ * and rows of a list left with nothing), and the field itself once it is
+ * empty. Returns the parts taken out.
  */
-export function removeRef(store: OutlineStore, fieldId: string, ref: string) {
-  if (!store.get(fieldId)) return;
+export function removeRef(store: OutlineStore, fieldId: string, ref: string): string[] {
+  if (!store.get(fieldId)) return [];
+  const taken: string[] = [];
   const without = (text: string) =>
     text
       .split(',')
-      .filter((part) => !refIds(part).includes(ref))
       .map((part) => part.trim())
+      .filter((part) => !(refIds(part).includes(ref) && taken.push(part)))
       .filter(Boolean)
       .join(', ');
   const f = store.node(fieldId);
@@ -44,6 +50,7 @@ export function removeRef(store: OutlineStore, fieldId: string, ref: string) {
     else store.remove(c);
   }
   if (!f.text.trim() && !f.children.length) store.remove(fieldId);
+  return taken;
 }
 
 export interface Backlink {
