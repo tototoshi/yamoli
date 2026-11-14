@@ -1134,6 +1134,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   text-align: center;
   outline: none;
 }
+.dg-describe { height: 80px; padding: 4px 6px; resize: none; font: inherit; font-size: 12px; font-weight: 400; line-height: 1.4; text-align: left; }
 .dg-menu { min-width: 240px; }
 .dg-menu-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; }
 .item-menu .dg-chip { display: inline-block; width: auto; padding: 3px 8px; border: 1px solid var(--faint); border-radius: 12px; font-size: 12px; }

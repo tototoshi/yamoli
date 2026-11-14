@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { buildDiagram, layout } from './diagram';
-import { boxAt, canConnect, connect, disconnect, dropAt, moveBox, setColor, setShape } from './diagramEdit';
+import { boxAt, canConnect, connect, descOf, disconnect, dropAt, moveBox, setColor, setDesc, setShape } from './diagramEdit';
 import { OutlineStore } from './model';
 
 /** A zoomed item P with a box A, a frame F (lined up as `arrange` says) holding X, Y, Z, and a box B. */
@@ -139,4 +139,20 @@ test('a box dropped on the middle of a plain box goes inside it, which becomes a
   // Moved out again: a box once more.
   expect(moveBox(s, a, { parent: p, before: null })).toBe(true);
   expect(s.field(b, 'shape')).toBeFalsy();
+});
+
+test('a description is written to the field it is read from, else a note; lines make a text block', () => {
+  const { s, a, b } = drawing();
+  setDesc(s, a, 'Sends mail');
+  expect(s.fieldValue(a, 'note')).toBe('Sends mail');
+  setDesc(s, a, 'Sends mail\nat night');
+  expect(s.field(a, 'note')).toMatchObject({ format: 'text', text: 'Sends mail\nat night' });
+  expect(descOf(s, a)).toBe('Sends mail\nat night');
+  setDesc(s, a, '  ');
+  expect(s.field(a, 'note')).toBeFalsy();
+
+  s.addField(b, 'description', 'old');
+  setDesc(s, b, 'new');
+  expect(s.fieldValue(b, 'description')).toBe('new');
+  expect(s.field(b, 'note')).toBeFalsy();
 });

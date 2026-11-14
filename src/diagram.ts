@@ -142,7 +142,7 @@ export const colorValue = (v: string | undefined) =>
   v ? (COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined)) : undefined;
 
 /** Fields whose text describes the row, shown as text rather than `key: value`. */
-const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
+export const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
 
 /** A field's text as one plain line: Markdown marks and line breaks dropped. */
 const plain = (texts: string[]) =>

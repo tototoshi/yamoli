@@ -4,7 +4,7 @@
  * in another place. Each is written to the rows and fields the diagram is
  * drawn from (diagram.ts), so the outline stays the one source.
  */
-import { CONTAINER, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
+import { CONTAINER, DESC_KEYS, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
 import { addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
 
@@ -21,6 +21,47 @@ export function setColor(store: OutlineStore, id: string, color: string | null) 
   const f = store.field(id, 'color');
   if (color) store.setField(id, 'color', color);
   else if (f) store.remove(f.id);
+}
+
+/** The field a box's description is read from (`note`, `description`, …), if it has one. */
+const descField = (store: OutlineStore, id: string) =>
+  store
+    .node(id)
+    .children.map((c) => store.node(c))
+    .find((f) => f.key && DESC_KEYS.has(f.key.trim().toLowerCase()));
+
+/** A box's description as text to edit: a block's text, or a field's lines. */
+export function descOf(store: OutlineStore, id: string): string {
+  const f = descField(store, id);
+  if (!f) return '';
+  return f.format !== null
+    ? f.text
+    : store
+        .fieldTexts(f.id)
+        .filter((x) => x.trim())
+        .join('\n');
+}
+
+/**
+ * Write a box's description into the field it is read from, else a new
+ * `note`: one line as its value, more as a text block. Empty takes it away.
+ */
+export function setDesc(store: OutlineStore, id: string, text: string) {
+  const value = text.trim();
+  const f = descField(store, id);
+  if (!value) {
+    if (f) store.remove(f.id);
+    return;
+  }
+  const lines = value.includes('\n');
+  if (!f) {
+    if (lines) store.addBlock(id, 'note', 'text', value);
+    else store.addField(id, 'note', value);
+    return;
+  }
+  for (const c of [...f.children]) store.remove(c);
+  store.setText(f.id, value);
+  if (lines && f.format === null) store.setFormat(f.id, 'text');
 }
 
 /** An arrow from one row to another: a link in the `to` field of the first, unless one is already there. */

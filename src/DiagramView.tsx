@@ -29,7 +29,7 @@ import {
   type Measure,
   type Shape as ShapeKind,
 } from './diagram';
-import { boxAt, canConnect, connect, disconnect, dropAt, moveBox, setColor, setShape, type Drop } from './diagramEdit';
+import { boxAt, canConnect, connect, descOf, disconnect, dropAt, moveBox, setColor, setDesc, setShape, type Drop } from './diagramEdit';
 import { standaloneSvg } from './exportImage';
 import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
@@ -156,6 +156,8 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   /** The box or arrow clicked, which Delete removes (and Enter renames, for a box). */
   const [sel, setSel] = useState<{ box: string } | { edge: string } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  /** The box whose description is being written. */
+  const [describing, setDescribing] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   /** An arrow being drawn from a box: where the pointer is, and the box under it. */
   const [link, setLink] = useState<{ from: string; at: Pt; to: string | null } | null>(null);
@@ -177,7 +179,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
     setSel(null);
   };
   useEffect(() => {
-    if (!sel || renaming || menu) return;
+    if (!sel || renaming || describing || menu) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as Element).closest('input, textarea, [contenteditable]')) return;
       if (e.key === 'Escape') setSel(null);
@@ -322,6 +324,12 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
     store.setText(nid, text.trim());
     ctl.commit();
   };
+  const describe = (nid: string, text: string | null) => {
+    setDescribing(null);
+    if (text === null || text.trim() === descOf(store, nid).trim()) return;
+    setDesc(store, nid, text);
+    ctl.commit();
+  };
   /** A new box under parent (before another, or last), named at once. */
   function addBox(parent: string, before: string | null = null) {
     const kids = store.node(parent).children;
@@ -335,7 +343,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
 
   /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
   const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
-  const dotFor = editable && !link && !moving && !renaming && hover !== null && hover !== id ? hover : null;
+  const dotFor = editable && !link && !moving && !renaming && !describing && hover !== null && hover !== id ? hover : null;
   const linkFrom = link && L.boxes.get(link.from);
   const movingBox = moving && L.boxes.get(moving.id);
   const dropHolder = moving?.drop && moving.drop.parent !== id ? L.boxes.get(moving.drop.parent) : undefined;
@@ -353,6 +361,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
     : undefined;
   const sb = selectedBox ? L.boxes.get(selectedBox) : undefined;
   const renamed = renaming ? L.boxes.get(renaming) : undefined;
+  const described = describing ? L.boxes.get(describing) : undefined;
 
   return (
     <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
@@ -506,6 +515,24 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
             <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
           </foreignObject>
         )}
+        {/* Under a box's name: in a frame, below its title; else over the box from its name down. */}
+        {describing && described && (
+          <foreignObject
+            x={described.frame ? described.x + 6 : described.x + described.w / 2 - Math.max(described.w, 240) / 2}
+            y={described.frame ? described.y + 24 : described.y + described.h / 2 - 8}
+            width={Math.max(described.frame ? 280 : described.w, 240)}
+            height={84}
+          >
+            <CellInput
+              key={describing}
+              class="dg-rename dg-describe"
+              lines
+              placeholder={t('説明（Shift+Enter で改行）', 'Description (Shift+Enter for a new line)')}
+              value={descOf(store, describing)}
+              onDone={(text) => describe(describing, text)}
+            />
+          </foreignObject>
+        )}
       </svg>
       {menu && store.get(menu.id) && (
         <BoxMenu
@@ -516,6 +543,7 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           holds={holdsBoxes(menu.id)}
           onClose={() => setMenu(null)}
           onRename={() => setRenaming(menu.id)}
+          onDescribe={() => setDescribing(menu.id)}
           onAddInside={() => {
             if (d.kind === 'flow' && !d.nodes.get(menu.id)!.isFrame) setShape(store, menu.id, CONTAINER);
             addBox(menu.id);
@@ -575,6 +603,7 @@ function BoxMenu(props: {
   holds: boolean;
   onClose: () => void;
   onRename: () => void;
+  onDescribe: () => void;
   onAddInside: () => void;
   onAddAfter: () => void;
 }) {
@@ -619,6 +648,9 @@ function BoxMenu(props: {
       <div class="item-menu-title">{nodeLabel(store, id)}</div>
       <button role="menuitem" onClick={run(props.onRename)}>
         {t('名前を変更', 'Rename')}
+      </button>
+      <button role="menuitem" onClick={run(props.onDescribe)}>
+        {t('説明を編集', 'Edit the description')}
       </button>
       <div class="dg-menu-row" role="group" aria-label={t('形', 'Shape')}>
         {SHAPE_CHOICES.map(([s, label]) => (
