@@ -133,13 +133,14 @@ is drawn as:
 | A row | A box, listing the rows under it (`• …`) |
 | `shape: frame` | A frame around the rows under it, drawn as boxes; `frame solid` / `frame none` for its border (dashed by default) |
 | `shape: container` | A box with boxes inside: like a frame, the rows under it are boxes, but it looks like a box |
+| `shape: row` / `column` / `grid` | A frame lining up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). A border word can follow: `row none` (no border), `grid 3 solid`. Arrows between them are still drawn, but don't move them |
 | `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency |
 | `shape` | `box` / `actor` / `db` / `queue` / `external` / `process` (an ellipse) / `store` (a data store). For a data flow diagram: external entities as `box`, processes as `process`, data stores as `store`, and data flows as labelled arrows like `to: [[box]] order data` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
 | `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too |
 | Other fields | Small `key: value` lines in the box |
-| `layout` (on a frame, or the zoomed item) | Lines up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). Arrows between them are still drawn, but don't move them |
+| `layout` (on the zoomed item) | Lines up the outermost boxes, with the same words as `shape: row` and the rest. On a frame or a container it wins over its `shape` |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
 
 A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name: `calls: dotted red`, `sync: both` (`solid` / `dashed` / `dotted`, `arrow` / `both` / `none`, a colour).
@@ -153,7 +154,7 @@ You can edit the diagram where it is drawn. Each edit changes the outline's rows
 - **Shape and colour**: right-click a box and pick them from the menu (they become the `shape` and `color` fields). The same menu adds a box inside (a plain box becomes a container) or after the box, opens the row in the outline, or deletes it.
 - **New boxes**: **+ Add a box** at the top left of the diagram.
 - **Arrows**: hover over a box and drag from the dot that appears to another box (this adds `to: [[box]]`). Click an arrow and press × or Delete to remove it. Double-click an arrow (or select it and press Enter) to write its label: the words beside its link (dependency arrows have none). Right-click an arrow to pick its kind of line (arrow, dashed, both ends, line only, or a name set in `lines`): the link moves to the field of that name, `to` / `async` / `both` / `link` or yours (`after` dependencies stay). Drag a dot at either end of a selected arrow to another box to join it there instead (moving the head changes where the link points; moving the tail moves the field holding the link to that box. `after` dependencies work the same, but not into a loop).
-- **Moving**: drag a box onto another frame to move it inside. Dropped on the middle of a plain box, it goes inside and that box becomes a container (`shape: container`); dropped on its edge, it goes before it. A container left empty is a plain box again. In a frame with a `layout`, where you drop it sets its place in the order. Press Esc during a drag to cancel.
+- **Moving**: drag a box onto another frame to move it inside. Dropped on the middle of a plain box, it goes inside and that box becomes a container (`shape: container`); dropped on its edge, it goes before it. A container left empty is a plain box again. In a frame lining up its boxes (`row` and the rest), where you drop it sets its place in the order. Press Esc during a drag to cancel.
 - Delete removes the selected box (⌘Z brings it back).
 - ⌘C copies the selected box with the rows in it (⌘X cuts it), and ⌘V pastes right after the selected box (or last, with none selected). Arrows among the boxes copied together join the copies; arrows out of them stay as they were. Text pasted from elsewhere becomes a box a line. The same goes for mind maps.
 

@@ -4,7 +4,7 @@
  * in another place. Each is written to the rows and fields the diagram is
  * drawn from (diagram.ts), so the outline stays the one source.
  */
-import { CONTAINER, DESC_KEYS, LINE_KEYS, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
+import { CONTAINER, DESC_KEYS, LINE_KEYS, type Arrange, type Diagram, type DiagramEdge, type Layout, type Shape } from './diagram';
 import { DEP_KEY, wouldCycle } from './deps';
 import { addPart, addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
@@ -30,7 +30,10 @@ export function neighbour(d: Diagram, id: string, key: string): string | null {
 }
 
 /** Make id a box of a shape (`box` takes the field away), a frame or a container. */
-export function setShape(store: OutlineStore, id: string, shape: Shape | 'frame' | typeof CONTAINER) {
+/** What a box's menu sets its `shape` to: a shape, a frame, a container, or a frame lining up its boxes. */
+export type ShapeChoice = Shape | 'frame' | typeof CONTAINER | Arrange['kind'];
+
+export function setShape(store: OutlineStore, id: string, shape: ShapeChoice) {
   const f = store.field(id, 'shape');
   if (shape === 'box') {
     if (f) store.remove(f.id);

@@ -108,7 +108,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '**書き方**\n\n' +
         '- 行が箱。`to: [[API]] gRPC` のように属性に書いたリンクが矢印で、後ろの語がラベル\n' +
         '- `shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（枠でも入れ物でもない行の下の行は、箱の中に箇条書き）\n' +
-        '- 枠に `layout: row`（横一列）/ `column`（縦一列）/ `grid`（格子）で、中の箱をアウトラインの順に並べる\n' +
+        '- `shape: row`（横一列）/ `column`（縦一列）/ `grid`（格子）の行は、中の箱をアウトラインの順に並べる枠\n' +
         '- `shape`（actor / db / queue / external / process / store）・`color`・`icon` で見た目、`note` で説明\n' +
         '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。`direction: TB` で縦向き\n\n' +
         '**図の上での編集**\n\n' +
@@ -119,7 +119,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '**Writing it**\n\n' +
         '- Each row is a box. A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
         '- A row with `shape: frame` is a frame around the rows under it; `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
-        '- `layout: row` / `column` / `grid` on a frame lines up the boxes in it in outline order\n' +
+        '- A row with `shape: row` / `column` / `grid` is a frame lining up the boxes in it in outline order\n' +
         '- `shape` (actor / db / queue / external / process / store), `color` and `icon` for the look, `note` for a description\n' +
         '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines. `direction: TB` draws it top to bottom\n\n' +
         '**Editing on the diagram**\n\n' +
@@ -136,7 +136,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   const vpc = add(sys.id, 'AWS VPC', { shape: 'frame solid', icon: 'cloud' });
   const pub = add(vpc, t('パブリック', 'Public'), { shape: 'frame' });
   const alb = add(pub, t('ロードバランサー', 'Load balancer'));
-  const app = add(vpc, t('アプリ', 'App'), { shape: 'frame', layout: 'row' });
+  const app = add(vpc, t('アプリ', 'App'), { shape: 'row' });
   const web = add(app, 'Web', { icon: 'browser', tech: 'Next.js' });
   // A box holding boxes: the API's parts.
   const api = add(app, 'API', {
@@ -152,7 +152,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
     note: t('メール送信や集計など、時間のかかる処理', 'Slow work: sending email, totals'),
     tech: 'Go',
   });
-  const data = add(vpc, t('データ', 'Data'), { shape: 'frame', layout: 'column', note: t('毎晩バックアップ', 'Backed up nightly') });
+  const data = add(vpc, t('データ', 'Data'), { shape: 'column', note: t('毎晩バックアップ', 'Backed up nightly') });
   const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
   const cache = add(data, t('キャッシュ', 'Cache'), { shape: 'db', tech: 'Redis' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });

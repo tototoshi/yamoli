@@ -26,9 +26,11 @@
  * an arrow to or from a row listed in a box is the box's. The mind map view
  * draws a tree: the item and all its rows as a mind map.
  *
- * In a flow, `layout` on a frame (or the zoomed item) lines up the boxes in it
- * in outline order instead of along their arrows: `row` (横) across, `column`
- * (縦) down, `grid` (格子) in rows of a few, `grid 3` of three.
+ * In a flow, `shape: row` makes a frame that lines up the boxes in it in
+ * outline order instead of along their arrows: `row` (横) across, `column`
+ * (縦) down, `grid` (格子) in rows of a few, `grid 3` of three. With a border
+ * word too: `row none`, `grid 3 solid`. `layout` with the same words does it
+ * for the zoomed item (or a frame).
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
@@ -53,6 +55,12 @@ export function arrangeOf(value: string | undefined): Arrange | undefined {
   if (word === 'column' || word === '縦') return { kind: 'column' };
   if (word === 'grid' || word === '格子') return { kind: 'grid', columns: Math.max(0, Math.floor(Number(n) || 0)) };
   return undefined;
+}
+
+/** How `shape` words line up a frame's boxes (`row`, `grid 3 solid`), if they do. */
+function arrangeIn(shape: string[]): Arrange | undefined {
+  const i = shape.findIndex((w) => arrangeOf(w));
+  return i < 0 ? undefined : arrangeOf(shape.slice(i).join(' '));
 }
 
 /** A frame's border: `box` is a container, drawn like a box with boxes inside (`shape: container`). */
@@ -179,8 +187,9 @@ export function buildDiagram(
       if (store.fieldTexts(c).some((t) => refIds(t).length)) continue; // drawn as arrows
       props.push(clip(f.children.length ? `${key}: …` : `${key}: ${f.text.trim()}`));
     }
-    // `frame`, `frame solid`; a border style alone (`solid`) also means a frame, and `container` a box holding boxes.
+    // `frame`, `frame solid`; a border style alone (`solid`) or a way to line up (`row`) also means a frame, and `container` a box holding boxes.
     const shape = (store.fieldValue(id, 'shape') ?? '').toLowerCase().split(/\s+/);
+    const arranged = arrangeIn(shape);
     const border = shape.includes(CONTAINER)
       ? 'box'
       : (shape.find((w) => FRAME_STYLES.includes(w as FrameStyle)) as FrameStyle | undefined);
@@ -188,14 +197,14 @@ export function buildDiagram(
       id,
       label: nodeLabel(store, id),
       shape: SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
-      isFrame: shape.includes('frame') || !!border,
+      isFrame: shape.includes('frame') || !!border || !!arranged,
       frame: border ?? 'dashed',
       color: colorValue(store.fieldValue(id, 'color')),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       desc,
       props,
       children,
-      arrange: arrangeOf(store.fieldValue(id, 'layout')),
+      arrange: arrangeOf(store.fieldValue(id, 'layout')) ?? arranged,
       done: store.node(id).completed,
     });
     children.forEach((c) => add(c));

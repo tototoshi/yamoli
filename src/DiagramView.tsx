@@ -29,7 +29,7 @@ import {
   type Direction,
   type Layout,
   type Measure,
-  type Shape as ShapeKind,
+  arrangeOf,
 } from './diagram';
 import {
   boxAt,
@@ -49,6 +49,7 @@ import {
   setLabel,
   setLineKind,
   setShape,
+  type ShapeChoice,
   type Drop,
 } from './diagramEdit';
 import { DEP_KEY } from './deps';
@@ -188,7 +189,7 @@ function TypeIn({ class: cls, onKey, onDone }: { class: string; onKey: (e: Keybo
 const EMBED_GROW = 2;
 
 /** Shapes and colours offered in a box's menu. */
-const SHAPE_CHOICES: [ShapeKind | 'frame' | typeof CONTAINER, () => string][] = [
+const SHAPE_CHOICES: [ShapeChoice, () => string][] = [
   ['box', () => t('箱', 'Box')],
   ['actor', () => t('人', 'Actor')],
   ['db', () => t('DB', 'Database')],
@@ -198,6 +199,9 @@ const SHAPE_CHOICES: [ShapeKind | 'frame' | typeof CONTAINER, () => string][] = 
   ['store', () => t('データストア', 'Data store')],
   ['frame', () => t('枠', 'Frame')],
   [CONTAINER, () => t('入れ物', 'Container')],
+  ['row', () => t('横並び', 'Row')],
+  ['column', () => t('縦並び', 'Column')],
+  ['grid', () => t('格子', 'Grid')],
 ];
 const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
 
@@ -791,8 +795,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
                 'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · ⌘C / ⌘V copy and paste · Delete removes · direction: TB on this item to grow down'
               )
             : t(
-                'クリックで選択 ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
-                'Click to select · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
+                'クリックで選択 ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ shape: row / column / grid で並べる、この項目に direction: TB',
+                'Click to select · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · shape: row / column / grid lines boxes up, direction: TB on this item'
               )}
         </p>
       )}
@@ -864,11 +868,8 @@ function BoxMenu(props: {
   const shapeWords = (store.fieldValue(id, 'shape') ?? '').toLowerCase().split(/\s+/);
   const shape = shapeWords.includes(CONTAINER)
     ? CONTAINER
-    : shapeWords.includes('frame')
-      ? 'frame'
-      : SHAPE_CHOICES.some(([s]) => s === shapeWords[0])
-        ? shapeWords[0]
-        : 'box';
+    : (shapeWords.map((w) => arrangeOf(w)?.kind).find(Boolean) ??
+      (shapeWords.includes('frame') ? 'frame' : SHAPE_CHOICES.some(([s]) => s === shapeWords[0]) ? shapeWords[0] : 'box'));
   const color = store.fieldValue(id, 'color')?.toLowerCase();
   return (
     <PopupMenu x={x} y={y} onClose={onClose} onCancel={props.onClose}>
