@@ -1,5 +1,15 @@
 import { expect, test } from 'vitest';
-import { blockers, dependencies, dependents, depStatus, findCycles, missingDependencies } from './deps';
+import {
+  addDependency,
+  blockers,
+  dependencies,
+  dependents,
+  depStatus,
+  findCycles,
+  missingDependencies,
+  removeDependency,
+  wouldCycle,
+} from './deps';
 import { OutlineStore } from './model';
 
 function project() {
@@ -54,4 +64,38 @@ test('links in `after` to deleted items are reported, not silently ignored', () 
   expect(dependencies(s, api.id)).toEqual([]);
   expect(missingDependencies(s, api.id)).toEqual([design.id]);
   expect(missingDependencies(s, release.id)).toEqual([]);
+});
+
+test('a dependency is added to `after` and taken out again, inline or in a list', () => {
+  const s = OutlineStore.create();
+  const [a, b, c, x] = ['a', 'b', 'c', 'x'].map((t) => s.addChild(s.rootId, -1, t).id);
+  addDependency(s, x, a);
+  expect(s.fieldValue(x, 'after')).toBe(`[[${a}]]`);
+  addDependency(s, x, b);
+  addDependency(s, x, b); // once
+  expect(s.fieldValue(x, 'after')).toBe(`[[${a}]], [[${b}]]`);
+  s.setText(s.field(x, 'after')!.id, `[[${a}]] once approved, [[${b}]]`);
+  removeDependency(s, x, a);
+  expect(s.fieldValue(x, 'after')).toBe(`[[${b}]]`);
+  removeDependency(s, x, b);
+  expect(s.field(x, 'after')).toBeUndefined(); // nothing left
+
+  const list = s.addField(c, 'after');
+  s.addChild(list.id, -1, `[[${a}]]`);
+  addDependency(s, c, b);
+  expect(s.node(list.id).children.map((r) => s.node(r).text)).toEqual([`[[${a}]]`, `[[${b}]]`]);
+  removeDependency(s, c, a);
+  expect(dependencies(s, c)).toEqual([b]);
+  removeDependency(s, c, b);
+  expect(s.field(c, 'after')).toBeUndefined();
+});
+
+test('a dependency that would close a cycle is told apart', () => {
+  const s = OutlineStore.create();
+  const [a, b, c] = ['a', 'b', 'c'].map((t) => s.addChild(s.rootId, -1, t).id);
+  addDependency(s, b, a);
+  addDependency(s, c, b);
+  expect(wouldCycle(s, a, c)).toBe(true); // c waits for b, which waits for a
+  expect(wouldCycle(s, c, a)).toBe(false);
+  expect(wouldCycle(s, a, a)).toBe(true);
 });

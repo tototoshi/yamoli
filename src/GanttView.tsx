@@ -2,7 +2,9 @@
  * Gantt chart of the zoomed item's visible rows: names on the left, an SVG
  * timeline on the right sharing the same row height. Bars can be moved and
  * their ends dragged, and names and dates typed in (written back as fields:
- * ganttEdit.ts); a chart embedded in a slide is only shown.
+ * ganttEdit.ts). A dependency is drawn from the dot after a bar to another
+ * row, and an arrow clicked can be deleted (deps.ts). A chart embedded in a
+ * slide is only shown.
  * The dates above stay in view while the page scrolls (a header of their
  * own, moved along with the timeline's horizontal scroll); rows are striped
  * so a name can be followed to its bar, and dependency lines stay faint
@@ -20,6 +22,7 @@ import { standaloneSvg } from './exportImage';
 import { ExportTools, type Drawing } from './ExportTools';
 import { moveTo, resizeTo, setDays } from './ganttEdit';
 import { imeActive } from './RowEditor';
+import { addDependency, dependencies, removeDependency, wouldCycle } from './deps';
 import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
 import { nodeLabel } from './links';
 import type { OutlineStore } from './model';
@@ -123,7 +126,7 @@ function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): D
       copy.setAttribute('x', String(left));
       copy.setAttribute('y', String(y));
       copy.setAttribute('width', String(chartW));
-      copy.querySelectorAll('.row-hover').forEach((el) => el.remove());
+      copy.querySelectorAll('.row-hover, .dep-hit, .dep-handle, .dep-delete').forEach((el) => el.remove());
       copy.querySelectorAll('.dep').forEach((el) => el.classList.remove('near', 'far'));
       // Marker ids of their own, so the copy's arrows don't point at the page's.
       copy.querySelectorAll('marker').forEach((m) => (m.id = 'x-' + m.id));
@@ -175,6 +178,31 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'end'; from: number; delta: number } | null>(null);
   /** A name (column -1) or date (0 start, 1 end, 2 days) being typed in. */
   const [editing, setEditing] = useState<{ id: string; col: number } | null>(null);
+  /** A dependency being drawn from a bar: where the pointer is, and the row under it. */
+  const [link, setLink] = useState<{ from: string; px: number; py: number; to: string | null } | null>(null);
+  /** The arrow clicked (`from>to`), which Delete or its × removes. */
+  const [picked, setPicked] = useState<string | null>(null);
+
+  const unlink = (key: string) => {
+    const [from, to] = key.split('>');
+    setPicked(null);
+    if (!store.get(to) || !dependencies(store, to).includes(from)) return;
+    removeDependency(store, to, from);
+    ctl.commit();
+  };
+  useEffect(() => {
+    if (!picked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as Element).closest('input, textarea, [contenteditable]')) return;
+      if (e.key === 'Escape') setPicked(null);
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        unlink(picked);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [picked]);
   // The zoomed item itself heads the chart (its span, or its own bar).
   const isRoot = zoomId === store.rootId;
   const below = embedded ? expandedRows(store, zoomId) : ctl.visibleRows();
@@ -325,6 +353,71 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
     window.addEventListener('keydown', key, true);
     setDrag({ id, mode, from, delta: 0 });
   };
+  /** Why from can't be made a dependency of to, or null when it can. */
+  const linkProblem = (from: string, to: string) =>
+    store.isAncestor(from, to) || store.isAncestor(to, from)
+      ? t('親子の項目の間には依存を付けられません', "An item and one inside it can't depend on each other")
+      : wouldCycle(store, to, from)
+        ? t('依存が循環してしまいます', 'That would make a cycle')
+        : null;
+  // Drawn from the dot after a bar to the row it is let go on, which then waits for the bar.
+  const startLink = (e: PointerEvent, from: string) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const svg = (e.currentTarget as SVGElement).ownerSVGElement!;
+    const at = (ev: PointerEvent) => {
+      const r = svg.getBoundingClientRect();
+      const [px, py] = [ev.clientX - r.left, ev.clientY - r.top];
+      const row = rows[Math.floor(py / ROW)];
+      return { from, px, py, to: row && row !== from && schedule.byId.has(row) ? row : null };
+    };
+    const move = (ev: PointerEvent) => setLink(at(ev));
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('keydown', key, true);
+      setLink(null);
+    };
+    const up = (ev: PointerEvent) => {
+      stop();
+      const { to } = at(ev);
+      if (!to || dependencies(store, to).includes(from)) return;
+      const problem = linkProblem(from, to);
+      if (problem) return ctl.showToast(problem);
+      addDependency(store, to, from);
+      ctl.commit();
+    };
+    const key = (ev: KeyboardEvent) => ev.key === 'Escape' && (ev.preventDefault(), ev.stopPropagation(), stop());
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('keydown', key, true);
+    setPicked(null);
+    setLink(at(e));
+  };
+  /** Where arrows leave a bar: its end, or a milestone's right point. */
+  const barEnd = (s: Sched) => (s.kind === 'milestone' ? x(s.start) + 6 : x(s.end + 1));
+
+  const arrows = dependencyLinks(store, rows, schedule).map((l) => {
+    const a = schedule.byId.get(l.from)!;
+    const b = schedule.byId.get(l.to)!;
+    const x1 = barEnd(a);
+    const x2 = b.kind === 'milestone' ? x(b.start) - 6 : x(b.start);
+    const y1 = rowY(index.get(l.from)!) + ROW / 2;
+    const y2 = rowY(index.get(l.to)!) + ROW / 2;
+    const d =
+      x2 - x1 >= 12
+        ? `M${x1},${y1} H${x1 + 6} V${y2} H${x2}`
+        : `M${x1},${y1} h6 V${y2 + (y2 > y1 ? -ROW / 2 : ROW / 2)} H${x2 - 8} V${y2} H${x2}`;
+    const key = l.from + '>' + l.to;
+    const near = hover !== null && (l.from === hover || l.to === hover);
+    return { ...l, key, d, near, picked: picked === key, mid: [x1 + 6, (y1 + y2) / 2] as const };
+  });
+  const pickedArrow = arrows.find((a) => a.picked);
+  const linkFrom = link && schedule.byId.get(link.from);
+
   /** Where a bar being dragged would go. */
   const dragged = (s: Sched, d: NonNullable<typeof drag>): Sched =>
     d.mode === 'move' ? { ...s, start: s.start + d.delta, end: s.end + d.delta } : { ...s, end: Math.max(s.start, s.end + d.delta) };
@@ -540,7 +633,12 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
             </div>
           ))}
         <div class="gantt-chart" ref={chartRef} onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}>
-          <svg width={width} height={height} class="gantt-svg">
+          <svg
+            width={width}
+            height={height}
+            class="gantt-svg"
+            onPointerDown={(e) => picked && !(e.target as Element).closest('.dep-hit, .dep-delete') && setPicked(null)}
+          >
             <defs>
               <marker id="gantt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
                 <path d="M0,0 L8,4 L0,8 z" class="arrow-head" />
@@ -572,29 +670,27 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
             ))}
 
             {/* dependency arrows, under the bars */}
-            {dependencyLinks(store, rows, schedule)
-              .map((l) => ({ ...l, near: hover !== null && (l.from === hover || l.to === hover) }))
-              .sort((a, b) => Number(a.near) - Number(b.near)) // the hovered row's on top
-              .map((l) => {
-                const a = schedule.byId.get(l.from)!;
-                const b = schedule.byId.get(l.to)!;
-                const x1 = a.kind === 'milestone' ? x(a.start) + 6 : x(a.end + 1);
-                const x2 = b.kind === 'milestone' ? x(b.start) - 6 : x(b.start);
-                const y1 = rowY(index.get(l.from)!) + ROW / 2;
-                const y2 = rowY(index.get(l.to)!) + ROW / 2;
-                const d =
-                  x2 - x1 >= 12
-                    ? `M${x1},${y1} H${x1 + 6} V${y2} H${x2}`
-                    : `M${x1},${y1} h6 V${y2 + (y2 > y1 ? -ROW / 2 : ROW / 2)} H${x2 - 8} V${y2} H${x2}`;
-                return (
+            {arrows
+              .sort((a, b) => Number(a.near || a.picked) - Number(b.near || b.picked)) // the hovered row's on top
+              .map((l) => (
+                <g key={l.key}>
                   <path
-                    key={l.from + '>' + l.to}
-                    d={d}
-                    class={'dep' + (l.critical ? ' critical' : '') + (l.near ? ' near' : hover !== null ? ' far' : '')}
+                    d={l.d}
+                    class={
+                      'dep' + (l.critical ? ' critical' : '') + (l.picked ? ' picked' : l.near ? ' near' : hover !== null ? ' far' : '')
+                    }
                     marker-end={`url(#${l.critical ? 'gantt-arrow-crit' : 'gantt-arrow'})`}
                   />
-                );
-              })}
+                  {!embedded && (
+                    <path d={l.d} class="dep-hit" onClick={() => setPicked(l.key)}>
+                      <title>
+                        {`${nodeLabel(store, l.from)} → ${nodeLabel(store, l.to)}\n` +
+                          t('クリックで選択、Delete で削除', 'Click to select, Delete to remove')}
+                      </title>
+                    </path>
+                  )}
+                </g>
+              ))}
 
             {/* bars */}
             {rows.map((id, i) => {
@@ -640,6 +736,44 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                 </g>
               );
             })}
+
+            {/* drawing dependencies: the dot after the hovered bar, the line being drawn, the arrow picked */}
+            {!embedded && !drag && !link && hover !== null && schedule.byId.has(hover) && index.has(hover) && (
+              <circle
+                cx={barEnd(schedule.byId.get(hover)!) + 10}
+                cy={rowY(index.get(hover)!) + ROW / 2}
+                r={4.5}
+                class="dep-handle"
+                onPointerDown={(e) => startLink(e, hover)}
+              >
+                <title>{t('ドラッグして、この後に始める行へ', 'Drag to a row that should start after this')}</title>
+              </circle>
+            )}
+            {link && linkFrom && (
+              <>
+                {link.to && (
+                  <rect
+                    x={0}
+                    y={rowY(index.get(link.to)!)}
+                    width={width}
+                    height={ROW}
+                    class={'link-target' + (linkProblem(link.from, link.to) ? ' bad' : '')}
+                  />
+                )}
+                <line x1={barEnd(linkFrom) + 10} y1={rowY(index.get(link.from)!) + ROW / 2} x2={link.px} y2={link.py} class="link-line" />
+              </>
+            )}
+            {pickedArrow && (
+              <g
+                class="dep-delete"
+                transform={`translate(${pickedArrow.mid[0]},${pickedArrow.mid[1]})`}
+                onClick={() => unlink(pickedArrow.key)}
+              >
+                <title>{t('この依存を削除', 'Remove this dependency')}</title>
+                <circle r={8} />
+                <text y={4}>×</text>
+              </g>
+            )}
           </svg>
         </div>
       </div>

@@ -1115,3 +1115,15 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-svg g.dragging .bar, .gantt-svg g.dragging .milestone { opacity: 0.75; }
 .gantt-svg .bar-handle { fill: transparent; cursor: ew-resize; }
 .gantt-svg .drag-label { font-size: 11px; fill: var(--fg); pointer-events: none; }
+
+/* Drawing and removing dependencies on the Gantt chart. */
+.gantt-svg .dep-hit { fill: none; stroke: transparent; stroke-width: 10; pointer-events: stroke; cursor: pointer; }
+.gantt-svg .dep.picked { stroke: var(--accent); stroke-width: 2.2; opacity: 1; }
+.gantt-svg .dep-delete { cursor: pointer; }
+.gantt-svg .dep-delete circle { fill: var(--bg); stroke: var(--danger); stroke-width: 1.5; }
+.gantt-svg .dep-delete text { fill: var(--danger); font-size: 13px; font-weight: 600; text-anchor: middle; }
+.gantt-svg .dep-handle { fill: var(--bg); stroke: var(--accent); stroke-width: 1.5; cursor: crosshair; touch-action: none; }
+.gantt-svg .dep-handle:hover { fill: var(--accent); }
+.gantt-svg .link-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.gantt-svg .link-target { fill: var(--accent); opacity: 0.12; pointer-events: none; }
+.gantt-svg .link-target.bad { fill: var(--danger); }

@@ -24,6 +24,51 @@ export function dependencies(store: OutlineStore, id: string): string[] {
   return [...out];
 }
 
+/** Make id wait for dep: a link to it added to id's `after` (inline, or as a row when it is a list). */
+export function addDependency(store: OutlineStore, id: string, dep: string) {
+  if (dependencies(store, id).includes(dep)) return;
+  const link = `[[${dep}]]`;
+  const f = store.field(id, DEP_KEY);
+  if (!f) store.addField(id, DEP_KEY, link);
+  else if (f.children.length) store.addChild(f.id, -1, link);
+  else store.setText(f.id, f.text.trim() ? `${f.text.trim()}, ${link}` : link);
+}
+
+/** Stop id waiting for dep: the links to it taken out of id's `after`, and the field once nothing is left. */
+export function removeDependency(store: OutlineStore, id: string, dep: string) {
+  const f = store.field(id, DEP_KEY);
+  if (!f) return;
+  const without = (text: string) =>
+    text
+      .split(',')
+      .filter((part) => !refIds(part).includes(dep))
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(', ');
+  store.setText(f.id, without(f.text));
+  for (const c of [...f.children]) {
+    const text = store.node(c).text;
+    if (!refIds(text).includes(dep)) continue;
+    if (without(text)) store.setText(c, without(text));
+    else store.remove(c);
+  }
+  if (!f.text.trim() && !f.children.length) store.remove(f.id);
+}
+
+/** Whether making id wait for dep would close a cycle (dep already waits for id, however indirectly). */
+export function wouldCycle(store: OutlineStore, id: string, dep: string): boolean {
+  const seen = new Set<string>();
+  const stack = [dep];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n === id) return true;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    stack.push(...dependencies(store, n));
+  }
+  return false;
+}
+
 /** Links in id's `after` to items that no longer exist (deleted since), which hold nothing up. */
 export function missingDependencies(store: OutlineStore, id: string): string[] {
   const f = store.field(id, DEP_KEY);

@@ -90,6 +90,8 @@ The schedule can be edited on the chart too. Changes are written as fields, so t
 - **Drag a bar** to move its start (it gets a `start`; an item given an `end` has that moved along). It can't go before what it depends on: it stops just after that finishes.
 - **Drag a bar's right end** to move its end. This rewrites `duration` in working days (calendar days for an item like `10cd`; an item given an `end` gets a new `end`).
 - **Click a name, start, end or days** to type in it. Dates can be just month/day, like `12/3` (this year). `0` days makes a milestone. Giving an unscheduled item a start or a number of days schedules it. Enter keeps the change, Esc drops it.
+- **Add a dependency**: point at a bar and a small dot appears after it. Drag from the dot to the row that should start after it, and the dependency goes into that row's `after`. A dependency that would make a cycle, or one between an item and something inside it, isn't added.
+- **Remove a dependency**: click an arrow to select it, then press Delete (or click the × on it). It comes out of the row's `after`.
 - **›** beside a name zooms into that item.
 
 Items whose dates come from their children (summary bars) can't be edited here. While dragging, Esc puts the bar back.
