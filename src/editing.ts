@@ -5,7 +5,7 @@
  */
 import { formatDate, today } from './calendar';
 import { DEP_KEY } from './deps';
-import { addDiagramSample, addGuideSlides, addScheduleSample } from './sample';
+import { addDfdSample, addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } from './sample';
 import { t } from './i18n';
 import { keyCandidates, linkCandidates, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED } from './fields';
@@ -463,6 +463,20 @@ export class Editing extends ViewState {
     const id = addDiagramSample(this.store, this.store.rootId);
     this.commit(null);
     location.hash = this.hashFor(id, 'diagram');
+  }
+
+  /** Add the sample data flow diagram and open it in the Diagram view. */
+  addDfdSample() {
+    const id = addDfdSample(this.store, this.store.rootId);
+    this.commit(null);
+    location.hash = this.hashFor(id, 'diagram');
+  }
+
+  /** Add the sample mind map and open it in the Mind map view. */
+  addMindMapSample() {
+    const id = addMindMapSample(this.store, this.store.rootId);
+    this.commit(null);
+    location.hash = this.hashFor(id, 'mindmap');
   }
 
   /** Add the usage guide deck and open it as slides. */

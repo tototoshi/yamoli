@@ -209,6 +209,20 @@ function MoreMenu() {
               </button>
               <button
                 role="menuitem"
+                title={t('注文処理のデータフロー図の例（図ビュー）', 'An order process as a data flow diagram, in the Diagram view')}
+                onClick={run(() => ctl.addDfdSample())}
+              >
+                {t('DFD のサンプルを追加', 'Add the data flow sample')}
+              </button>
+              <button
+                role="menuitem"
+                title={t('論点の整理の例（マインドマップビュー）', 'Sorting out questions, in the Mind map view')}
+                onClick={run(() => ctl.addMindMapSample())}
+              >
+                {t('マインドマップのサンプルを追加', 'Add the mind map sample')}
+              </button>
+              <button
+                role="menuitem"
                 title={t('このアプリの使い方（スライドの例）', 'How to use this app (as slides)')}
                 onClick={run(() => ctl.addGuide())}
               >

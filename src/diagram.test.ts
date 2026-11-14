@@ -125,31 +125,44 @@ test('a loop of arrows still gets a layout', () => {
   expect(L.boxes.get(a)!.x).toBeLessThan(L.boxes.get(b)!.x);
 });
 
-test('the architecture sample draws as a flow, and the guide embeds it and the project', async () => {
-  const { addDiagramSample, addGuideSlides, addScheduleSample } = await import('./sample');
+test('the samples draw without overlaps, and the guide embeds them and its own rows', async () => {
+  const { addDfdSample, addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } = await import('./sample');
   const { buildDeck } = await import('./slides');
   const s = OutlineStore.create();
   // The diagram sample comes first, so the guide must not take it for the project.
   const sys = addDiagramSample(s, s.rootId);
   const proj = addScheduleSample(s, s.rootId);
-  const d = buildDiagram(s, sys);
-  expect(d.kind).toBe('flow');
-  expect(d.edges.length).toBe(10);
-  expect(d.edges.every((e) => d.nodes.has(e.from) && d.nodes.has(e.to))).toBe(true);
-  const L = layout(d);
-  for (const n of d.nodes.values()) {
-    const kids = n.children.map((c) => L.boxes.get(c)!);
-    kids.forEach((a, i) => kids.slice(i + 1).forEach((b) => expect(overlap(a, b)).toBe(false)));
-  }
+  const dfd = addDfdSample(s, s.rootId);
+  const map = addMindMapSample(s, s.rootId);
+  const drawn = (id: string, kind: 'flow' | 'tree' = 'flow') => {
+    const d = buildDiagram(s, id, { kind });
+    expect(d.edges.every((e) => d.nodes.has(e.from) && d.nodes.has(e.to))).toBe(true);
+    const L = layout(d);
+    for (const n of [...d.nodes.values(), { children: d.top }]) {
+      const kids = n.children.map((c) => L.boxes.get(c)!);
+      kids.forEach((a, i) => kids.slice(i + 1).forEach((b) => expect(overlap(a, b)).toBe(false)));
+    }
+    return d;
+  };
+  expect(drawn(sys).edges.length).toBe(11);
+  const flows = drawn(dfd);
+  expect(flows.edges.length).toBe(7);
+  expect([...flows.nodes.values()].map((n) => n.shape).sort()).toEqual(
+    ['box', 'box', 'process', 'process', 'process', 'store', 'store'].sort()
+  );
+  expect(drawn(map, 'tree').top.length).toBe(1);
 
   const deck = addGuideSlides(s, s.rootId);
-  const embeds = buildDeck(s, deck)
-    .slides.filter((x) => x.embed)
-    .map((x) => [x.embed, x.embedAs]);
-  expect(embeds).toEqual([
+  const slides = buildDeck(s, deck).slides.filter((x) => x.embed);
+  expect(slides.map((x) => [x.embed, x.embedAs])).toEqual([
     [proj, 'gantt'],
     [sys, 'diagram'],
+    [map, 'mindmap'],
+    [slides[3].id, 'diagram'],
   ]);
+  // No sample was added twice.
+  expect(s.items(s.rootId).length).toBe(5);
+  expect(drawn(slides[3].id).edges.length).toBe(2);
 });
 
 test('a line looks as its field name says, and `lines` on the zoomed item says more', () => {

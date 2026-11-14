@@ -210,4 +210,4 @@ When saving to a file, the contents before each day's first save, and before any
 
 The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it (without the images and files). When saving to a file it also exports a **backup (ZIP)** of the outline with the images and files it uses; **Restore from a backup** takes either (a ZIP's images and files go back into `files/`).
 
-**Clean up unused files** deletes images and files that neither the outline nor any backup in `backups/` uses, added over a week ago. It says how many and how large before it does. It also adds the usage-guide slides and the samples (a scheduled project, a system architecture) again.
+**Clean up unused files** deletes images and files that neither the outline nor any backup in `backups/` uses, added over a week ago. It says how many and how large before it does. It also adds the usage-guide slides and the samples (a scheduled project, a system architecture, a data flow diagram, a mind map) again.

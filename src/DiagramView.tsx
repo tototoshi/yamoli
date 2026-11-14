@@ -527,7 +527,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
         width={embedded ? '100%' : W}
         height={embedded ? '100%' : H}
         // Embedded, it fills the space it is given, though a small drawing grows no more than so much.
-        style={embedded ? { maxWidth: `${W * EMBED_GROW}px`, maxHeight: `${H * EMBED_GROW}px` } : undefined}
+        style={embedded ? { maxWidth: `min(100%, ${W * EMBED_GROW}px)`, maxHeight: `min(100%, ${H * EMBED_GROW}px)` } : undefined}
         onMouseLeave={() => setHover(null)}
         onPointerDown={(e) => e.target === e.currentTarget && setSel(null)}
       >

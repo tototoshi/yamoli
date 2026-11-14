@@ -1,7 +1,7 @@
 import { OutlineStore } from './model';
 import type { View } from './views';
 import { lang, t, type Lang } from './i18n';
-import { addDiagramSample, addGuideSlides, addScheduleSample } from './sample';
+import { addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } from './sample';
 
 const STORAGE_KEY = 'yamoli:v1';
 const PREFS_KEY = 'yamoli:prefs';
@@ -367,6 +367,7 @@ function seed(): OutlineStore {
 
   const sample = addScheduleSample(s, r);
   s.setCollapsed(addDiagramSample(s, r), true);
+  s.setCollapsed(addMindMapSample(s, r), true);
   s.setCollapsed(addGuideSlides(s, r, sample), true);
 
   const shop = s.addChild(r, -1, t('買い物リスト', 'Shopping list'));

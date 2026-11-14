@@ -1,9 +1,9 @@
 /*
  * Sample content, written in the current UI language: a small project broken
  * down like a WBS (phases > work packages > tasks) that shows dependencies
- * and scheduling at work, a system's architecture drawn as a diagram, and a
- * slide deck explaining the app. Dates are
- * relative to today so the samples never go stale.
+ * and scheduling at work, a system's architecture and a data flow diagram
+ * drawn as diagrams, a mind map, and a slide deck explaining the app. Dates
+ * are relative to today so the samples never go stale.
  */
 import { formatDate, today, weekday, type Day } from './calendar';
 import { lang, t } from './i18n';
@@ -11,9 +11,16 @@ import type { OutlineStore } from './model';
 
 const SAMPLE_PREFIXES = ['サンプル: ', 'Sample: '];
 
-/** A sample under parentId, told apart by a field only it has (`start`, `direction`). */
-const findSample = (s: OutlineStore, parentId: string, field: string) =>
-  s.items(parentId).find((id) => SAMPLE_PREFIXES.some((p) => s.node(id).text.startsWith(p)) && s.field(id, field));
+/** A sample under parentId, told apart by a field only it has (`start`, `direction`), or by its value (`views: mindmap`). */
+const findSample = (s: OutlineStore, parentId: string, field: string, value?: string) =>
+  s
+    .items(parentId)
+    .find(
+      (id) =>
+        SAMPLE_PREFIXES.some((p) => s.node(id).text.startsWith(p)) &&
+        s.field(id, field) &&
+        (value === undefined || s.fieldValue(id, field) === value)
+    );
 
 /** Append the sample project under parentId and return its id. */
 export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = today()): string {
@@ -77,6 +84,16 @@ export function addScheduleSample(s: OutlineStore, parentId: string, now: Day = 
   return proj.id;
 }
 
+/** Rows with fields under parent, for the samples. */
+function adder(s: OutlineStore) {
+  return (parent: string, text: string, attrs: Record<string, string> = {}) => {
+    const n = s.addChild(parent, -1, text);
+    for (const [k, v] of Object.entries(attrs)) s.addField(n.id, k, v);
+    return n.id;
+  };
+}
+const to = (id: string, label = '') => `[[${id}]]` + (label && ' ' + label);
+
 /** Append a web service's architecture under parentId, to be seen in the Diagram view, and return its id. */
 export function addDiagramSample(s: OutlineStore, parentId: string): string {
   const sys = s.addChild(parentId, -1, t('サンプル: システム構成', 'Sample: System architecture'));
@@ -87,30 +104,31 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
     'note',
     'markdown',
     t(
-      '「図」に切り替えると構成図になります。\n\n' +
-        '- 行が箱、`shape: frame` の行が子の行を囲む枠（枠でない行の子は箱の中に並ぶ）\n' +
-        '- `to: [[API]] gRPC` のように属性に書いたリンクが矢印、後ろの語がラベル\n' +
-        '- `shape` で形（actor / db / queue / external、枠の線は frame solid / frame none）、`color` で色、`icon` でアイコン\n' +
-        '- `async:` に書いたリンクは点線、`both:` は両向き、`link:` は矢印なし\n' +
-        '- `note:` に書いた説明は箱（枠なら名前の下）に文章で表示\n' +
+      '「図」に切り替えると構成図になります。図の上でもそのまま編集できます。\n\n' +
+        '**書き方**\n\n' +
+        '- 行が箱。`to: [[API]] gRPC` のように属性に書いたリンクが矢印で、後ろの語がラベル\n' +
+        '- `shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（枠でも入れ物でもない行の下の行は、箱の中に箇条書き）\n' +
         '- 枠に `layout: row`（横一列）/ `column`（縦一列）/ `grid`（格子）で、中の箱をアウトラインの順に並べる\n' +
-        '- `direction: TB` で縦向き。箱をクリックするとその行を編集',
-      'Switch to “Diagram” to see it drawn.\n\n' +
-        '- Each row is a box; a row with `shape: frame` is a frame around the rows under it (other rows list theirs in the box)\n' +
-        '- A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
-        '- `shape` picks the shape (actor / db / queue / external; frame solid / frame none for a frame’s border), `color` the colour, `icon` an icon\n' +
-        '- Links under `async:` are dashed, under `both:` two-way, under `link:` without arrows\n' +
-        '- A `note:` shows in the box (under a frame’s name) as text\n' +
+        '- `shape`（actor / db / queue / external / process / store）・`color`・`icon` で見た目、`note` で説明\n' +
+        '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。`direction: TB` で縦向き\n\n' +
+        '**図の上での編集**\n\n' +
+        '- 箱を選んでそのまま入力すると名前が変わる。右クリックで名前・説明・形・色\n' +
+        '- 箱の端の丸から別の箱へドラッグで矢印。矢印を選ぶと両端の丸でつなぎ変え、右クリックで種類やラベル\n' +
+        '- 箱を枠や箱の上にドラッグすると中へ移る。Delete で削除、⌘Z で元に戻す',
+      'Switch to “Diagram” to see it drawn. You can edit it there too.\n\n' +
+        '**Writing it**\n\n' +
+        '- Each row is a box. A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
+        '- A row with `shape: frame` is a frame around the rows under it; `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
         '- `layout: row` / `column` / `grid` on a frame lines up the boxes in it in outline order\n' +
-        '- `direction: TB` draws it top to bottom. Click a box to edit its row'
+        '- `shape` (actor / db / queue / external / process / store), `color` and `icon` for the look, `note` for a description\n' +
+        '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines. `direction: TB` draws it top to bottom\n\n' +
+        '**Editing on the diagram**\n\n' +
+        '- Select a box and type to rename it; right-click for its name, description, shape and colour\n' +
+        '- Drag from the dot on a box to another for an arrow. A selected arrow’s end dots join it elsewhere; right-click it for its kind and label\n' +
+        '- Drag a box onto a frame or a box to move it inside. Delete removes, ⌘Z undoes'
     )
   );
-  const add = (parent: string, text: string, attrs: Record<string, string> = {}) => {
-    const n = s.addChild(parent, -1, text);
-    for (const [k, v] of Object.entries(attrs)) s.addField(n.id, k, v);
-    return n.id;
-  };
-  const to = (id: string, label = '') => `[[${id}]]` + (label && ' ' + label);
+  const add = adder(s);
 
   // Rows first, arrows after: an arrow needs the id of the row it points at.
   const user = add(sys.id, t('ユーザー', 'User'), { shape: 'actor' });
@@ -118,21 +136,25 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   const vpc = add(sys.id, 'AWS VPC', { shape: 'frame solid', icon: 'cloud' });
   const pub = add(vpc, t('パブリック', 'Public'), { shape: 'frame' });
   const alb = add(pub, t('ロードバランサー', 'Load balancer'));
-  const app = add(vpc, t('アプリ', 'App'), { shape: 'frame' });
+  const app = add(vpc, t('アプリ', 'App'), { shape: 'frame', layout: 'row' });
   const web = add(app, 'Web', { icon: 'browser', tech: 'Next.js' });
+  // A box holding boxes: the API's parts.
   const api = add(app, 'API', {
+    shape: 'container',
     icon: 'code',
-    note: t('会員・注文・在庫を扱うバックエンド', 'The back end for members, orders and stock'),
-    tech: 'Go',
-    replicas: '3',
+    note: t('Go、3 台構成', 'Go, three instances'),
   });
+  const members = add(api, t('会員', 'Members'));
+  const orders = add(api, t('注文', 'Orders'));
+  const stock = add(api, t('在庫', 'Stock'));
   const worker = add(app, t('ワーカー', 'Worker'), {
     icon: 'gear',
     note: t('メール送信や集計など、時間のかかる処理', 'Slow work: sending email, totals'),
     tech: 'Go',
   });
-  const data = add(vpc, t('データ', 'Data'), { shape: 'frame', note: t('毎晩バックアップ', 'Backed up nightly') });
+  const data = add(vpc, t('データ', 'Data'), { shape: 'frame', layout: 'column', note: t('毎晩バックアップ', 'Backed up nightly') });
   const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
+  const cache = add(data, t('キャッシュ', 'Cache'), { shape: 'db', tech: 'Redis' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
   const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });
   const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', icon: 'mail', tech: 'SendGrid' });
@@ -141,12 +163,86 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   s.addField(cdn, 'to', to(alb));
   s.addField(alb, 'to', to(web));
   s.addField(web, 'to', to(api, 'gRPC'));
-  s.addField(api, 'to', [to(db, 'SQL'), to(pay, 'HTTPS')].join(', '));
+  s.addField(members, 'to', to(db));
+  s.addField(orders, 'to', [to(db, 'SQL'), to(pay)].join(', '));
+  s.addField(stock, 'to', to(cache));
   // `async` lines are dashed.
-  s.addField(api, 'async', to(queue, t('投入', 'enqueue')));
+  s.addField(orders, 'async', to(queue, t('投入', 'enqueue')));
   s.addField(worker, 'async', to(queue, t('取得', 'poll')));
-  s.addField(worker, 'to', [to(db), to(mail, 'API')].join(', '));
+  s.addField(worker, 'to', to(mail, 'API'));
   return sys.id;
+}
+
+/** Append an order process as a data flow diagram under parentId, in the Diagram view, and return its id. */
+export function addDfdSample(s: OutlineStore, parentId: string): string {
+  const dfd = s.addChild(parentId, -1, t('サンプル: 注文処理の DFD', 'Sample: Order handling, as a data flow diagram'));
+  s.addField(dfd.id, 'views', 'diagram');
+  s.addBlock(
+    dfd.id,
+    'note',
+    'markdown',
+    t(
+      '「図」に切り替えるとデータフロー図になります。\n\n' +
+        '- 外部エンティティはふつうの箱、プロセスは `shape: process`（楕円）、データストアは `shape: store`（2 本線）\n' +
+        '- データフローは `to: [[1.0 注文受付]] 注文` のような矢印。後ろの語がデータの名前\n' +
+        '- 矢印を選んでそのまま入力すると、データの名前を書き換えられる',
+      'Switch to “Diagram” to see it as a data flow diagram.\n\n' +
+        '- External entities are plain boxes, processes `shape: process` (ellipses), data stores `shape: store` (two lines)\n' +
+        '- Data flows are arrows like `to: [[1.0 Take orders]] order`, the words after the link naming the data\n' +
+        '- Select an arrow and type to rename its data'
+    )
+  );
+  const add = adder(s);
+  const customer = add(dfd.id, t('顧客', 'Customer'));
+  const take = add(dfd.id, t('1.0 注文受付', '1.0 Take orders'), { shape: 'process' });
+  const orders = add(dfd.id, t('D1 注文', 'D1 Orders'), { shape: 'store' });
+  const allocate = add(dfd.id, t('2.0 在庫引当', '2.0 Allocate stock'), { shape: 'process' });
+  const stock = add(dfd.id, t('D2 在庫', 'D2 Stock'), { shape: 'store' });
+  const ship = add(dfd.id, t('3.0 出荷指示', '3.0 Order shipping'), { shape: 'process' });
+  const warehouse = add(dfd.id, t('倉庫', 'Warehouse'));
+
+  s.addField(customer, 'to', to(take, t('注文', 'order')));
+  s.addField(take, 'to', to(orders, t('注文データ', 'order details')));
+  s.addField(orders, 'to', to(allocate, t('未引当の注文', 'open orders')));
+  s.addField(allocate, 'to', to(ship, t('引当済みの注文', 'allocated orders')));
+  // Read and written both ways: one two-headed line.
+  s.addField(allocate, 'both', to(stock, t('在庫数', 'stock levels')));
+  s.addField(ship, 'to', [to(warehouse, t('出荷指示', 'shipping order')), to(customer, t('出荷通知', 'shipping notice'))].join(', '));
+  return dfd.id;
+}
+
+/** Append the questions of a redesign as a mind map under parentId, in the Mind map view, and return its id. */
+export function addMindMapSample(s: OutlineStore, parentId: string): string {
+  const map = s.addChild(parentId, -1, t('サンプル: リニューアルの論点', 'Sample: Redesign, the questions'));
+  s.addField(map.id, 'views', 'mindmap');
+  // No note block here: the root is drawn, and a note would fill its box. The view's hint line tells the keys.
+  const tree: [string, (string | [string, string[]])[]][] = [
+    [t('目的', 'Goals'), [t('問い合わせを減らす', 'Fewer support requests'), t('スマホで使いやすく', 'Easy on phones')]],
+    [
+      t('課題', 'Problems'),
+      [
+        [t('表示が遅い', 'Slow pages'), [t('画像が重い', 'Heavy images'), t('サーバーが 1 台', 'A single server')]],
+        t('情報が探しにくい', 'Hard to find things'),
+      ],
+    ],
+    [
+      t('打ち手', 'Ideas'),
+      [t('CDN と画像の最適化', 'A CDN, lighter images'), t('情報設計の見直し', 'Rework the information architecture')],
+    ],
+    [
+      t('リスク', 'Risks'),
+      [t('公開日がずれる', 'The launch slips'), t('URL が変わり検索順位が落ちる', 'Changed URLs lose search ranking')],
+    ],
+  ];
+  for (const [branch, leaves] of tree) {
+    const b = s.addChild(map.id, -1, branch).id;
+    for (const leaf of leaves) {
+      const [text, under] = typeof leaf === 'string' ? [leaf, []] : leaf;
+      const l = s.addChild(b, -1, text).id;
+      for (const u of under) s.addChild(l, -1, u);
+    }
+  }
+  return map.id;
 }
 
 /**
@@ -158,6 +254,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
 export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: string): string {
   const project = projectId ?? findSample(s, parentId, 'start') ?? addScheduleSample(s, parentId);
   const system = findSample(s, parentId, 'direction') ?? addDiagramSample(s, parentId);
+  const map = findSample(s, parentId, 'views', 'mindmap') ?? addMindMapSample(s, parentId);
 
   const deck = s.addChild(parentId, -1, t('Yamoli の使い方', 'Using Yamoli'));
   s.addField(deck.id, 'views', 'slides');
@@ -166,8 +263,8 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
     deck.id,
     'notes',
     t(
-      '「スライド」表示で開くとプレゼンになります。← → でページ送り、F で全画面。',
-      'Open it in the “Slides” view to present. ← → to page through, F for full screen.'
+      '「スライド」表示で開くとプレゼンになります。← → でページ送り、F で全画面、PDF ボタンで書き出し。',
+      'Open it in the “Slides” view to present. ← → to page through, F for full screen, the PDF button to export.'
     )
   );
 
@@ -198,7 +295,10 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
         t('● を右クリックで項目メニュー', 'Right-click a ● for the item menu'),
         [t('複製・削除・リンクをコピー・完了など', 'Duplicate, delete, copy link, complete …')],
       ],
-      t('⌘/Ctrl+F で検索、⌘/Ctrl+Z で元に戻す', '⌘/Ctrl+F to search, ⌘/Ctrl+Z to undo'),
+      [
+        t('⌘/Ctrl+F で検索、⌘/Ctrl+Z で元に戻す', '⌘/Ctrl+F to search, ⌘/Ctrl+Z to undo'),
+        [t('`status:進行中`、`is:late` / `is:done` で属性や状態も', '`status:active`, `is:late` / `is:done` for fields and states')],
+      ],
     ]
   );
 
@@ -280,25 +380,83 @@ export function addGuideSlides(s: OutlineStore, parentId: string, projectId?: st
     ]
   );
 
+  slide(t('図の上で編集', 'Editing on the diagram'), {}, [
+    [
+      t('箱を選んでそのまま入力すると名前が変わる', 'Select a box and type to rename it'),
+      [t('右クリックで名前・説明・形・色', 'Right-click for its name, description, shape and colour')],
+    ],
+    [
+      t('箱の端の丸から別の箱へドラッグで矢印', 'Drag from the dot on a box to another for an arrow'),
+      [
+        t('矢印を選んで入力でラベル、両端の丸でつなぎ変え', 'Select an arrow and type its label; its end dots join it elsewhere'),
+        t('右クリックで実線・破線・両矢印・線だけ', 'Right-click for solid, dashed, two-way or a plain line'),
+      ],
+    ],
+    t('箱を枠や箱の上にドラッグすると中へ移る', 'Drag a box onto a frame or a box to move it inside'),
+    t('`shape: process` と `shape: store` で DFD も', '`shape: process` and `shape: store` for data flow diagrams'),
+  ]);
+
+  slide(
+    t('マインドマップ', 'Mind maps'),
+    {
+      embed: `[[${map}]] mindmap`,
+      notes: t(
+        '行の入れ子をそのまま枝分かれで描きます。マインドマップのビューでは Tab で子、Enter で次の行を足せます。',
+        'The nested rows, drawn as branches. In the Mind map view, Tab adds a row under, Enter one after.'
+      ),
+    },
+    [
+      t(
+        'Tab で子、Enter で次、矢印キーで移動 — 「マインドマップ」ビューで開く',
+        'Tab for a child, Enter for the next, arrows to move — open the Mind map view'
+      ),
+    ]
+  );
+
+  // With no link, `embed: diagram` draws the slide's own rows.
+  const flow = slide(
+    t('スライドの中で図を描く', 'Diagrams drawn on the slide'),
+    {
+      embed: 'diagram',
+      notes: t(
+        '`embed: diagram` だけ書くと、スライドの下の行がそのまま図になります。',
+        'Write just `embed: diagram`, and the rows under the slide are drawn as the diagram.'
+      ),
+    },
+    [
+      t('アウトラインで書く', 'Write it as an outline'),
+      t('図やガントで見る', 'See it as a diagram or a chart'),
+      t('スライドで見せる', 'Show it as slides'),
+    ]
+  );
+  const [write, see, show] = s.items(flow);
+  s.addField(write, 'to', `[[${see}]]`);
+  s.addField(see, 'to', `[[${show}]]`);
+  s.addField(show, 'shape', 'actor');
+
   slide(t('ビュー', 'Views'), { layout: 'two-column' }, [
     [t('アウトライン', 'Outline'), [t('すべての編集はここで', 'Where all editing happens')]],
     [t('ガント', 'Gantt'), [t('日程を線表で', 'The schedule as a chart'), t('日付の列幅は切り替え可能', 'Adjustable day width')]],
-    [t('図', 'Diagram'), [t('構成図・フロー図・マインドマップ', 'Architecture, flows, mind maps')]],
+    [t('図', 'Diagram'), [t('構成図・フロー図・DFD', 'Architecture, flows, data flow diagrams')]],
+    [t('マインドマップ', 'Mind map'), [t('入れ子を枝分かれで', 'Nesting as branches')]],
     [
       t('スライド', 'Slides'),
-      [t('項目 = デッキ、子 = 1 枚ずつ', 'An item is a deck, each row under it a slide'), '`layout` / `notes` / `image` / `theme`'],
+      [
+        t('項目 = デッキ、子 = 1 枚ずつ', 'An item is a deck, each row under it a slide'),
+        '`layout` / `notes` / `image` / `theme` / `embed`',
+        t('PDF ボタンで全ページを書き出し', 'The PDF button exports every slide'),
+      ],
     ],
     ['YAML / JSON', [t('ズームした項目をデータとして', 'The zoomed item as data')]],
     [
       t('ビューを有効に', 'Turning views on'),
       [
-        t('ガント・図・スライドは `views` 属性のある木だけ', 'Gantt, Diagram and Slides only where a `views` field is'),
+        t(
+          'ガント・図・マインドマップ・スライドは `views` 属性のある木だけ',
+          'Gantt, Diagram, Mind map and Slides only where a `views` field is'
+        ),
         t('表示バーの + から追加', 'Add one from the + in the view bar'),
       ],
-    ],
-    [
-      t('検索', 'Search'),
-      [t('`status:進行中`、`budget.amount:1200000`', '`status:active`, `budget.amount:1200000`'), '`is:late` / `is:critical` / `is:done`'],
     ],
   ]);
 

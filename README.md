@@ -13,7 +13,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-On first launch the outline comes with a usage-guide slide deck, a sample project showing scheduling and a sample system architecture for the Diagram view, written in the interface language. Both can be added again at any time from the **⋯** menu at the top right.
+On first launch the outline comes with a usage-guide slide deck, a sample project showing scheduling, a sample system architecture for the Diagram view and a sample mind map, written in the interface language. They, and a sample data flow diagram, can be added at any time from the **⋯** menu at the top right.
 
 | Command | What it does |
 | --- | --- |
