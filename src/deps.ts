@@ -8,7 +8,7 @@
  * The dependency graph is a DAG unless someone writes a cycle; items on a
  * cycle are reported so the UI can warn about them.
  */
-import { refIds } from './links';
+import { addRef, refIds, removeRef } from './links';
 import type { OutlineStore } from './model';
 
 export const DEP_KEY = 'after';
@@ -26,33 +26,13 @@ export function dependencies(store: OutlineStore, id: string): string[] {
 
 /** Make id wait for dep: a link to it added to id's `after` (inline, or as a row when it is a list). */
 export function addDependency(store: OutlineStore, id: string, dep: string) {
-  if (dependencies(store, id).includes(dep)) return;
-  const link = `[[${dep}]]`;
-  const f = store.field(id, DEP_KEY);
-  if (!f) store.addField(id, DEP_KEY, link);
-  else if (f.children.length) store.addChild(f.id, -1, link);
-  else store.setText(f.id, f.text.trim() ? `${f.text.trim()}, ${link}` : link);
+  if (!dependencies(store, id).includes(dep)) addRef(store, id, DEP_KEY, dep);
 }
 
 /** Stop id waiting for dep: the links to it taken out of id's `after`, and the field once nothing is left. */
 export function removeDependency(store: OutlineStore, id: string, dep: string) {
   const f = store.field(id, DEP_KEY);
-  if (!f) return;
-  const without = (text: string) =>
-    text
-      .split(',')
-      .filter((part) => !refIds(part).includes(dep))
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join(', ');
-  store.setText(f.id, without(f.text));
-  for (const c of [...f.children]) {
-    const text = store.node(c).text;
-    if (!refIds(text).includes(dep)) continue;
-    if (without(text)) store.setText(c, without(text));
-    else store.remove(c);
-  }
-  if (!f.text.trim() && !f.children.length) store.remove(f.id);
+  if (f) removeRef(store, f.id, dep);
 }
 
 /** Whether making id wait for dep would close a cycle (dep already waits for id, however indirectly). */

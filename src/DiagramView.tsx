@@ -1,9 +1,11 @@
 /*
  * The zoomed item drawn as a diagram (see diagram.ts for how rows, fields and
- * links become boxes, frames and arrows). Clicking a box edits its row in the
- * outline.
+ * links become boxes, frames and arrows), and edited there: boxes renamed,
+ * given a shape and colour, added, moved into frames or along a row, column
+ * or grid, and arrows drawn and removed (diagramEdit.ts writes the outline).
  */
-import { useId, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import { CellInput } from './CellInput';
 import { useCtl } from './context';
 import {
   buildDiagram,
@@ -16,15 +18,22 @@ import {
   LABEL_SIZE,
   PAD,
   PROP_SIZE,
+  colorValue,
   type Box,
+  type Diagram,
+  type DiagramEdge,
   type DiagramNode,
   type Direction,
+  type Layout,
   type Measure,
+  type Shape as ShapeKind,
 } from './diagram';
+import { boxAt, canConnect, connect, disconnect, dropAt, moveBox, setColor, setShape, type Drop } from './diagramEdit';
 import { standaloneSvg } from './exportImage';
 import { ExportTools } from './ExportTools';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
+import { nodeLabel } from './links';
 
 const M = 16; // margin around the drawing
 
@@ -118,9 +127,22 @@ function branch(a: Box, b: Box, dir: Direction): string {
   return `M${p0} C${p0[0]},${my} ${p3[0]},${my} ${p3}`;
 }
 
+/** Shapes and colours offered in a box's menu. */
+const SHAPE_CHOICES: [ShapeKind | 'frame', () => string][] = [
+  ['box', () => t('箱', 'Box')],
+  ['actor', () => t('人', 'Actor')],
+  ['db', () => t('DB', 'Database')],
+  ['queue', () => t('キュー', 'Queue')],
+  ['external', () => t('外部', 'External')],
+  ['frame', () => t('枠', 'Frame')],
+];
+const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
+
+const edgeKey = (e: DiagramEdge) => `${e.from}>${e.to}>${e.label}>${e.style.dash}${e.style.ends}`;
+
 /**
  * The diagram for the zoomed item, or (embedded, e.g. in a slide) for rootId,
- * without the hints and not clickable.
+ * without the hints and not editable.
  */
 export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: boolean }) {
   const ctl = useCtl();
@@ -129,31 +151,65 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   const marker = 'dg-arrow' + useId().replace(/\W/g, '');
   const [hover, setHover] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  /** The box or arrow clicked, which Delete removes (and Enter renames, for a box). */
+  const [sel, setSel] = useState<{ box: string } | { edge: string } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** An arrow being drawn from a box: where the pointer is, and the box under it. */
+  const [link, setLink] = useState<{ from: string; at: Pt; to: string | null } | null>(null);
+  /** A box being dragged: how far, and where it would go. */
+  const [moving, setMoving] = useState<{ id: string; dx: number; dy: number; drop: Drop | null } | null>(null);
   const showCompleted = ctl.prefs.showCompleted;
   // Built anew on each render: the store changes in place, and laying out a page of boxes is quick.
   const d = buildDiagram(store, id, { showCompleted });
   const L = layout(d, measure);
+  const editable = !embedded;
+
+  const selectedEdge = sel && 'edge' in sel ? d.edges.find((e) => edgeKey(e) === sel.edge) : undefined;
+  const selectedBox = sel && 'box' in sel && L.boxes.has(sel.box) ? sel.box : null;
+  const remove = () => {
+    if (selectedEdge) {
+      disconnect(store, selectedEdge);
+      ctl.commit();
+    } else if (selectedBox && selectedBox !== ctl.zoomId) ctl.deleteItem(selectedBox);
+    setSel(null);
+  };
+  useEffect(() => {
+    if (!sel || renaming || menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as Element).closest('input, textarea, [contenteditable]')) return;
+      if (e.key === 'Escape') setSel(null);
+      else if (e.key === 'Delete' || e.key === 'Backspace') remove();
+      else if (e.key === 'Enter' && selectedBox) setRenaming(selectedBox);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   if (!d.nodes.size) {
     return (
-      <p class="diagram-empty">
-        {lang() === 'en' ? (
-          <>
-            Nothing to draw yet. Each row becomes a box, rows under a row a frame around them, and a link in a field (
-            <code>to: [[API]] gRPC</code>) an arrow.
-          </>
-        ) : (
-          <>
-            まだ描くものがありません。行が箱に、子を持つ行がそれを囲む枠に、属性に書いたリンク（
-            <code>to: [[API]] gRPC</code>）が矢印になります。
-          </>
-        )}
-      </p>
+      <div class="diagram-wrap">
+        <p class="diagram-empty">
+          {lang() === 'en' ? (
+            <>
+              Nothing to draw yet. Each row becomes a box, rows under a row a frame around them, and a link in a field (
+              <code>to: [[API]] gRPC</code>) an arrow.
+            </>
+          ) : (
+            <>
+              まだ描くものがありません。行が箱に、子を持つ行がそれを囲む枠に、属性に書いたリンク（
+              <code>to: [[API]] gRPC</code>）が矢印になります。
+            </>
+          )}
+        </p>
+        {editable && <AddBox onAdd={() => addBox(id)} />}
+      </div>
     );
   }
 
   const near = (e: { from: string; to: string }) => hover !== null && (e.from === hover || e.to === hover);
-  const open = (nid: string) => !embedded && ctl.openRow(nid);
   // A frame's description is in the way of lines too (its title alone has room above the contents),
   // except of lines to that frame.
   const heads = new Map<string, Box>();
@@ -179,33 +235,161 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
   const W = x1 - x0 + 2 * M;
   const H = y1 - y0 + 2 * M;
 
+  // ---- editing
+
+  /** A pointer position in the drawing's coordinates. */
+  const toDrawing = (ev: { clientX: number; clientY: number }): Pt => {
+    const m = svgRef.current!.getScreenCTM()!.inverse();
+    const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m);
+    return [p.x, p.y];
+  };
+  /** Follow the pointer on the whole window until it is let go; Escape gives up. */
+  const follow = (move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void, cancel: () => void) => {
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('keydown', key, true);
+    };
+    const onUp = (ev: PointerEvent) => (stop(), up(ev));
+    const onCancel = () => (stop(), cancel());
+    const key = (ev: KeyboardEvent) => ev.key === 'Escape' && (ev.preventDefault(), ev.stopPropagation(), onCancel());
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('keydown', key, true);
+  };
+
+  // A press on a box selects it; dragged, it moves the box into a frame or elsewhere in its row, column or grid.
+  const pressBox = (e: PointerEvent, nid: string) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const start = toDrawing(e);
+    let dragging = false;
+    const at = (ev: PointerEvent) => {
+      const p = toDrawing(ev);
+      return { p, dx: p[0] - start[0], dy: p[1] - start[1] };
+    };
+    follow(
+      (ev) => {
+        const { p, dx, dy } = at(ev);
+        if (!dragging && Math.hypot(dx, dy) < 5) return;
+        if (nid === id) return; // the item a mind map grows from stays put
+        dragging = true;
+        setMoving({ id: nid, dx, dy, drop: dropAt(d, L, id, nid, p) });
+      },
+      (ev) => {
+        setMoving(null);
+        if (!dragging) return setSel({ box: nid });
+        const drop = dropAt(d, L, id, nid, at(ev).p);
+        if (drop && moveBox(store, nid, drop)) ctl.commit();
+        setSel({ box: nid });
+      },
+      () => setMoving(null)
+    );
+  };
+
+  // From the dot on a box to the box the pointer is let go on, which the first then points to.
+  const startLink = (e: PointerEvent, from: string) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const target = (p: Pt) => boxAt(L, p, (n) => canConnect(d, from, n));
+    const at = (ev: PointerEvent) => {
+      const p = toDrawing(ev);
+      return { from, at: p, to: target(p) };
+    };
+    follow(
+      (ev) => setLink(at(ev)),
+      (ev) => {
+        setLink(null);
+        const to = at(ev).to;
+        if (!to) return;
+        connect(store, from, to);
+        ctl.commit();
+      },
+      () => setLink(null)
+    );
+    setSel(null);
+    setLink(at(e));
+  };
+
+  const rename = (nid: string, text: string | null) => {
+    setRenaming(null);
+    if (text === null || !text.trim() || text === store.node(nid).text) return;
+    store.setText(nid, text.trim());
+    ctl.commit();
+  };
+  /** A new box under parent (before another, or last), named at once. */
+  function addBox(parent: string, before: string | null = null) {
+    const kids = store.node(parent).children;
+    const n = store.addChild(parent, before ? kids.indexOf(before) : -1, t('新しい箱', 'New box'));
+    ctl.commit();
+    setSel({ box: n.id });
+    setRenaming(n.id);
+  }
+  const holdsBoxes = (nid: string) => d.kind === 'tree' || d.nodes.get(nid)!.isFrame;
+
+  /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
+  const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
+  const dotFor = editable && !link && !moving && !renaming && hover !== null && hover !== id ? hover : null;
+  const linkFrom = link && L.boxes.get(link.from);
+  const movingBox = moving && L.boxes.get(moving.id);
+  const dropHolder = moving?.drop && moving.drop.parent !== id ? L.boxes.get(moving.drop.parent) : undefined;
+
+  const handlers = editable
+    ? {
+        press: pressBox,
+        rename: (nid: string) => (setSel({ box: nid }), setRenaming(nid)),
+        menu: (e: MouseEvent, nid: string) => {
+          e.preventDefault();
+          setSel({ box: nid });
+          setMenu({ id: nid, x: e.clientX, y: e.clientY });
+        },
+      }
+    : undefined;
+  const sb = selectedBox ? L.boxes.get(selectedBox) : undefined;
+  const renamed = renaming ? L.boxes.get(renaming) : undefined;
+
   return (
     <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
       {!embedded && (
-        <ExportTools
-          class="diagram-tools"
-          drawing={() => ({ svg: standaloneSvg(svgRef.current!), width: W, height: H })}
-          name={store.get(id) && id !== store.rootId ? store.node(id).text : 'Home'}
-        />
+        <div class="diagram-tools">
+          <AddBox onAdd={() => addBox(id)} />
+          <ExportTools
+            class="diagram-export"
+            drawing={() => ({ svg: standaloneSvg(svgRef.current!), width: W, height: H })}
+            name={store.get(id) && id !== store.rootId ? store.node(id).text : 'Home'}
+          />
+        </div>
       )}
-      <svg ref={svgRef} class="diagram" viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`} width={W} height={H} onMouseLeave={() => setHover(null)}>
+      <svg
+        ref={svgRef}
+        class={'diagram' + (editable ? ' editable' : '')}
+        viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`}
+        width={W}
+        height={H}
+        onMouseLeave={() => setHover(null)}
+        onPointerDown={(e) => e.target === e.currentTarget && setSel(null)}
+      >
         <defs>
           <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
             <path d="M0,1 L10,5 L0,9 z" fill="context-stroke" />
           </marker>
         </defs>
         {[...L.boxes].map(([nid, b]) =>
-          b.frame ? <Frame key={nid} node={d.nodes.get(nid)!} box={b} onOpen={open} onHover={setHover} /> : null
+          b.frame ? <Frame key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={setHover} /> : null
         )}
         {L.branches.map(([a, b]) => (
           <path key={a + '>' + b} class="dg-branch" d={branch(L.boxes.get(a)!, L.boxes.get(b)!, d.direction)} />
         ))}
         {d.edges.map((e) => {
           const r = routes.get(e)!;
+          const k = edgeKey(e);
           return (
             <g
-              key={e.from + '>' + e.to + '>' + e.label}
-              class={'dg-edge ' + e.style.dash + (near(e) ? ' near' : '')}
+              key={k}
+              class={'dg-edge ' + e.style.dash + (near(e) ? ' near' : '') + (selectedEdge === e ? ' selected' : '')}
               style={e.style.color ? `--edge: ${e.style.color}` : undefined}
             >
               <path
@@ -213,11 +397,16 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
                 marker-end={e.style.ends !== 'none' ? `url(#${marker})` : undefined}
                 marker-start={e.style.ends === 'both' ? `url(#${marker})` : undefined}
               />
+              {editable && (
+                <path class="dg-edge-hit" d={r.d} onPointerDown={(ev) => ev.stopPropagation()} onClick={() => setSel({ edge: k })}>
+                  <title>{t('クリックで選択、Delete で削除', 'Click to select, Delete to remove')}</title>
+                </path>
+              )}
             </g>
           );
         })}
         {[...L.boxes].map(([nid, b]) =>
-          b.frame ? null : <Shape key={nid} node={d.nodes.get(nid)!} box={b} onOpen={open} onHover={setHover} />
+          b.frame ? null : <Shape key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={setHover} />
         )}
         {/* Titles and labels over the lines, so a line passing behind one keeps it readable. */}
         {[...L.boxes].map(([nid, b]) => {
@@ -244,16 +433,238 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
           const nth = d.edges
             .filter((o) => o.label && ((o.from === e.from && o.to === e.to) || (o.from === e.to && o.to === e.from)))
             .indexOf(e);
-          return <EdgeLabel key={e.from + '>' + e.to + '>' + e.label} text={e.label} at={[mid[0], mid[1] + nth * 18]} near={near(e)} />;
+          return <EdgeLabel key={edgeKey(e)} text={e.label} at={[mid[0], mid[1] + nth * 18]} near={near(e)} />;
         })}
+
+        {/* editing: the selection, the dot to draw arrows from, an arrow or a box being dragged */}
+        {sb && !moving && <rect class="dg-selected" x={sb.x - 4} y={sb.y - 4} width={sb.w + 8} height={sb.h + 8} rx={9} />}
+        {selectedEdge && (
+          <g
+            class="dg-delete"
+            transform={`translate(${routes.get(selectedEdge)!.mid[0]},${routes.get(selectedEdge)!.mid[1] - (selectedEdge.label ? 20 : 0)})`}
+            onPointerDown={(ev) => ev.stopPropagation()}
+            onClick={remove}
+          >
+            <title>{t('この矢印を削除', 'Remove this arrow')}</title>
+            <circle r={8} />
+            <text y={4}>×</text>
+          </g>
+        )}
+        {dotFor && L.boxes.has(dotFor) && (
+          <circle
+            class="dg-link-dot"
+            cx={dotAt(L.boxes.get(dotFor)!)[0]}
+            cy={dotAt(L.boxes.get(dotFor)!)[1]}
+            r={5}
+            onMouseEnter={() => setHover(dotFor)}
+            onPointerDown={(e) => startLink(e, dotFor)}
+          >
+            <title>{t('ドラッグして、矢印を引く先の箱へ', 'Drag to the box the arrow should point to')}</title>
+          </circle>
+        )}
+        {link && linkFrom && (
+          <>
+            {link.to && (
+              <rect
+                class="dg-drop"
+                x={L.boxes.get(link.to)!.x - 4}
+                y={L.boxes.get(link.to)!.y - 4}
+                width={L.boxes.get(link.to)!.w + 8}
+                height={L.boxes.get(link.to)!.h + 8}
+                rx={9}
+              />
+            )}
+            <line class="dg-link-line" x1={dotAt(linkFrom)[0]} y1={dotAt(linkFrom)[1]} x2={link.at[0]} y2={link.at[1]} />
+          </>
+        )}
+        {moving && movingBox && (
+          <>
+            {dropHolder && (
+              <rect class="dg-drop" x={dropHolder.x - 4} y={dropHolder.y - 4} width={dropHolder.w + 8} height={dropHolder.h + 8} rx={10} />
+            )}
+            <DropMark d={d} L={L} drop={moving.drop} />
+            <rect
+              class="dg-ghost"
+              x={movingBox.x + moving.dx}
+              y={movingBox.y + moving.dy}
+              width={movingBox.w}
+              height={movingBox.h}
+              rx={6}
+            />
+          </>
+        )}
+        {renaming && renamed && (
+          <foreignObject
+            x={renamed.frame ? renamed.x + 6 : renamed.x + renamed.w / 2 - Math.max(renamed.w, 140) / 2}
+            y={renamed.frame ? renamed.y + 3 : renamed.y + renamed.h / 2 - 14}
+            width={Math.max(renamed.frame ? 200 : renamed.w, 140)}
+            height={28}
+          >
+            <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
+          </foreignObject>
+        )}
       </svg>
+      {menu && store.get(menu.id) && (
+        <BoxMenu
+          id={menu.id}
+          x={menu.x}
+          y={menu.y}
+          root={id}
+          holds={holdsBoxes(menu.id)}
+          onClose={() => setMenu(null)}
+          onRename={() => setRenaming(menu.id)}
+          onAddInside={() => addBox(menu.id)}
+          onAddAfter={() => {
+            const parent = store.parentOf(menu.id)!;
+            const kids = store.node(parent).children;
+            addBox(parent, kids[kids.indexOf(menu.id) + 1] ?? null);
+          }}
+        />
+      )}
       {!embedded && (
         <p class="diagram-hint">
           {t(
-            '箱をクリックで編集 ・ この項目に direction: TB で縦向き、diagram: tree / flow で描き方を指定 ・ 枠に layout: row / column / grid で中の並べ方を指定',
-            'Click a box to edit it · On this item, direction: TB draws top to bottom, diagram: tree / flow picks the layout · On a frame, layout: row / column / grid lines up what is in it'
+            'クリックで選択 ・ ダブルクリックか Enter で名前を変更 ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ Delete で削除 ・ 枠に layout: row / column / grid、この項目に direction: TB',
+            'Click to select · Double-click or Enter to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Delete removes · layout: row / column / grid on a frame, direction: TB on this item'
           )}
         </p>
+      )}
+    </div>
+  );
+}
+
+function AddBox({ onAdd }: { onAdd: () => void }) {
+  return (
+    <button class="mini dg-add" onClick={onAdd}>
+      {t('+ 箱を追加', '+ Add a box')}
+    </button>
+  );
+}
+
+/** Where a dragged box would go in a row, column or grid: a bar before the box it would come before (or after the last). */
+function DropMark({ d, L, drop }: { d: Diagram; L: Layout; drop: Drop | null }) {
+  if (!drop) return null;
+  const n = d.nodes.get(drop.parent);
+  const arrange = n ? n.arrange : d.arrange;
+  if (!arrange) return null;
+  const kids = n ? n.children : d.top;
+  const ref = drop.before ?? kids[kids.length - 1];
+  const b = ref && L.boxes.get(ref);
+  if (!b) return null;
+  const after = drop.before === null;
+  if (arrange.kind === 'column') {
+    const y = after ? b.y + b.h + 20 : b.y - 20;
+    return <line class="dg-drop-mark" x1={b.x - 6} x2={b.x + b.w + 6} y1={y} y2={y} />;
+  }
+  const x = after ? b.x + b.w + 20 : b.x - 20;
+  return <line class="dg-drop-mark" x1={x} x2={x} y1={b.y - 6} y2={b.y + b.h + 6} />;
+}
+
+/** A box's menu: its name, shape and colour, boxes added beside or in it, and removing it. */
+function BoxMenu(props: {
+  id: string;
+  x: number;
+  y: number;
+  root: string;
+  holds: boolean;
+  onClose: () => void;
+  onRename: () => void;
+  onAddInside: () => void;
+  onAddAfter: () => void;
+}) {
+  const { id, x, y, root, holds, onClose } = props;
+  const ctl = useCtl();
+  const { store } = ctl;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector('button')?.focus();
+    const away = (e: Event) => !ref.current?.contains(e.target as Node) && onClose();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('pointerdown', away, true);
+    window.addEventListener('keydown', key);
+    window.addEventListener('scroll', onClose, true);
+    return () => {
+      window.removeEventListener('pointerdown', away, true);
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('scroll', onClose, true);
+    };
+  }, []);
+  const run = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+  const shapeWords = (store.fieldValue(id, 'shape') ?? '').toLowerCase().split(/\s+/);
+  const shape = shapeWords.includes('frame') ? 'frame' : SHAPE_CHOICES.some(([s]) => s === shapeWords[0]) ? shapeWords[0] : 'box';
+  const color = store.fieldValue(id, 'color')?.toLowerCase();
+  return (
+    <div
+      ref={ref}
+      class="item-menu dg-menu"
+      role="menu"
+      style={{ left: `${Math.min(x, window.innerWidth - 260)}px`, top: `${Math.min(y, window.innerHeight - 380)}px` }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div class="item-menu-title">{nodeLabel(store, id)}</div>
+      <button role="menuitem" onClick={run(props.onRename)}>
+        {t('名前を変更', 'Rename')}
+      </button>
+      <div class="dg-menu-row" role="group" aria-label={t('形', 'Shape')}>
+        {SHAPE_CHOICES.map(([s, label]) => (
+          <button
+            key={s}
+            class={'dg-chip' + (shape === s ? ' on' : '')}
+            onClick={run(() => {
+              setShape(store, id, s);
+              ctl.commit();
+            })}
+          >
+            {label()}
+          </button>
+        ))}
+      </div>
+      <div class="dg-menu-row" role="group" aria-label={t('色', 'Colour')}>
+        <button
+          class={'dg-swatch none' + (!color ? ' on' : '')}
+          title={t('色なし', 'No colour')}
+          onClick={run(() => {
+            setColor(store, id, null);
+            ctl.commit();
+          })}
+        />
+        {COLOR_CHOICES.map((c) => (
+          <button
+            key={c}
+            class={'dg-swatch' + (color === c ? ' on' : '')}
+            title={c}
+            style={{ background: colorValue(c) }}
+            onClick={run(() => {
+              setColor(store, id, c);
+              ctl.commit();
+            })}
+          />
+        ))}
+      </div>
+      <hr />
+      {holds && (
+        <button role="menuitem" onClick={run(props.onAddInside)}>
+          {t('中に箱を追加', 'Add a box inside')}
+        </button>
+      )}
+      {id !== root && (
+        <button role="menuitem" onClick={run(props.onAddAfter)}>
+          {t('後ろに箱を追加', 'Add a box after it')}
+        </button>
+      )}
+      <button role="menuitem" onClick={run(() => ctl.openRow(id))}>
+        {t('アウトラインで開く', 'Open in the outline')}
+      </button>
+      {id !== root && (
+        <>
+          <hr />
+          <button role="menuitem" class="danger" onClick={run(() => ctl.deleteItem(id))}>
+            {t('削除', 'Delete')}
+          </button>
+        </>
       )}
     </div>
   );
@@ -262,7 +673,12 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
 interface Drawn {
   node: DiagramNode;
   box: Box;
-  onOpen: (id: string) => void;
+  /** What pressing, double-clicking and right-clicking it do, when the diagram can be edited. */
+  on?: {
+    press: (e: PointerEvent, id: string) => void;
+    rename: (id: string) => void;
+    menu: (e: MouseEvent, id: string) => void;
+  };
   onHover: (id: string | null) => void;
 }
 
@@ -290,16 +706,15 @@ function Icon({ value, x, y, size, color }: { value: string; x: number; y: numbe
   );
 }
 
-function Frame({ node, box, onOpen, onHover }: Drawn) {
+function Frame({ node, box, on, onHover }: Drawn) {
   return (
     <g
       class={'dg-frame ' + node.frame + (node.done ? ' done' : '')}
       transform={`translate(${box.x},${box.y})`}
       onMouseEnter={() => onHover(node.id)}
-      onClick={(e) => {
-        e.stopPropagation();
-        onOpen(node.id);
-      }}
+      onPointerDown={on && ((e) => on.press(e, node.id))}
+      onDblClick={on && (() => on.rename(node.id))}
+      onContextMenu={on && ((e) => on.menu(e, node.id))}
     >
       <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
       <rect width={box.w} height={box.h} rx={8} style={node.frame === 'none' ? undefined : tint(node.color, 6)} />
@@ -307,7 +722,7 @@ function Frame({ node, box, onOpen, onHover }: Drawn) {
   );
 }
 
-function Shape({ node, box, onOpen, onHover }: Drawn) {
+function Shape({ node, box, on, onHover }: Drawn) {
   const { w, h } = box;
   const style = tint(node.color);
   const actor = node.shape === 'actor';
@@ -356,7 +771,9 @@ function Shape({ node, box, onOpen, onHover }: Drawn) {
       class={'dg-node' + (node.done ? ' done' : '')}
       transform={`translate(${box.x},${box.y})`}
       onMouseEnter={() => onHover(node.id)}
-      onClick={() => onOpen(node.id)}
+      onPointerDown={on && ((e) => on.press(e, node.id))}
+      onDblClick={on && (() => on.rename(node.id))}
+      onContextMenu={on && ((e) => on.menu(e, node.id))}
     >
       <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
       {outline}

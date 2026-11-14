@@ -13,6 +13,39 @@ export function refIds(text: string): string[] {
   return [...text.matchAll(REF_RE)].map((m) => m[1]);
 }
 
+/** Add a link to ref to id's field named key: inline after the others, or as a row when the field is a list. */
+export function addRef(store: OutlineStore, id: string, key: string, ref: string) {
+  const link = `[[${ref}]]`;
+  const f = store.field(id, key);
+  if (!f) store.addField(id, key, link);
+  else if (f.children.length) store.addChild(f.id, -1, link);
+  else store.setText(f.id, f.text.trim() ? `${f.text.trim()}, ${link}` : link);
+}
+
+/**
+ * Take the links to ref out of a field (each comma-separated part holding one,
+ * and rows of a list left with nothing), and the field itself once it is empty.
+ */
+export function removeRef(store: OutlineStore, fieldId: string, ref: string) {
+  if (!store.get(fieldId)) return;
+  const without = (text: string) =>
+    text
+      .split(',')
+      .filter((part) => !refIds(part).includes(ref))
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(', ');
+  const f = store.node(fieldId);
+  store.setText(fieldId, without(f.text));
+  for (const c of [...f.children]) {
+    const text = store.node(c).text;
+    if (!refIds(text).includes(ref)) continue;
+    if (without(text)) store.setText(c, without(text));
+    else store.remove(c);
+  }
+  if (!f.text.trim() && !f.children.length) store.remove(fieldId);
+}
+
 export interface Backlink {
   nodeId: string;
   /** Field the link appears in (on nodeId), or null when it is in the row text. */

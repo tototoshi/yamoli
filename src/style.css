@@ -1100,3 +1100,41 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-svg .link-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 .gantt-svg .link-target { fill: var(--accent); opacity: 0.12; pointer-events: none; }
 .gantt-svg .link-target.bad { fill: var(--danger); }
+
+/* Editing the diagram: the selection, arrows drawn and picked, boxes dragged, names typed, the box menu. */
+.diagram-tools .dg-add { margin-right: auto; }
+.diagram-export { display: flex; gap: 6px; }
+.diagram.editable .dg-node, .diagram.editable .dg-frame { cursor: grab; touch-action: none; }
+.dg-selected { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
+.dg-edge .dg-edge-hit { stroke: transparent; stroke-width: 12; stroke-dasharray: none; pointer-events: stroke; cursor: pointer; }
+.dg-edge.selected path:not(.dg-edge-hit) { stroke: var(--accent); stroke-width: 2.4; }
+.dg-delete { cursor: pointer; }
+.dg-delete circle { fill: var(--bg); stroke: var(--danger); stroke-width: 1.5; }
+.dg-delete text { fill: var(--danger); font-size: 13px; font-weight: 600; text-anchor: middle; }
+.dg-link-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 1.5; cursor: crosshair; touch-action: none; }
+.dg-link-dot:hover { fill: var(--accent); }
+.dg-link-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.dg-drop { fill: color-mix(in srgb, var(--accent) 8%, transparent); stroke: var(--accent); stroke-width: 1.5; pointer-events: none; }
+.dg-drop-mark { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; pointer-events: none; }
+.dg-ghost { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.dg-rename {
+  box-sizing: border-box;
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+}
+.dg-menu { min-width: 240px; }
+.dg-menu-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; }
+.item-menu .dg-chip { display: inline-block; width: auto; padding: 3px 8px; border: 1px solid var(--faint); border-radius: 12px; font-size: 12px; }
+.item-menu .dg-chip.on { border-color: var(--accent); background: var(--attr-bg); color: var(--attr-fg); }
+.item-menu .dg-swatch { display: inline-block; width: 20px; height: 20px; padding: 0; border: 2px solid transparent; border-radius: 50%; }
+.item-menu .dg-swatch.none { background: linear-gradient(135deg, var(--bg) 45%, var(--danger) 45%, var(--danger) 55%, var(--bg) 55%); border-color: var(--faint); }
+.item-menu .dg-swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }

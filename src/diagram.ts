@@ -76,7 +76,7 @@ export function lineStyle(words: string, base: LineStyle = { dash: 'solid', ends
     .filter(Boolean)) {
     if (w === 'solid' || w === 'dashed' || w === 'dotted') out.dash = w;
     else if (w === 'arrow' || w === 'both' || w === 'none') out.ends = w;
-    else if (colorOf(w)) out.color = colorOf(w);
+    else if (colorValue(w)) out.color = colorValue(w);
   }
   return out;
 }
@@ -108,6 +108,8 @@ export interface DiagramEdge {
   to: string;
   label: string;
   style: LineStyle;
+  /** Where the arrow is written: the links (to ref) in these fields, which removing it takes out. */
+  links: { field: string; ref: string }[];
 }
 
 export interface Diagram {
@@ -132,7 +134,9 @@ const COLORS: Record<string, string> = {
   grey: '#7d848e',
 };
 
-const colorOf = (v: string | undefined) => (v ? (COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined)) : undefined);
+/** A colour word (`blue`) or `#hex` as the colour drawn; undefined for anything else. */
+export const colorValue = (v: string | undefined) =>
+  v ? (COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined)) : undefined;
 
 /** Fields whose text describes the row, shown as text rather than `key: value`. */
 const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
@@ -176,7 +180,7 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
       shape: SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
       isFrame: shape.includes('frame') || !!border,
       frame: border ?? 'dashed',
-      color: colorOf(store.fieldValue(id, 'color')),
+      color: colorValue(store.fieldValue(id, 'color')),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       desc,
       props,
@@ -204,14 +208,18 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
   const look = (key: string) => looks.get(key) ?? lineStyle('');
 
   const edges: DiagramEdge[] = [];
-  const seen = new Set<string>();
-  const push = (from: string | null, to: string | null, label: string, style: LineStyle) => {
+  const seen = new Map<string, DiagramEdge>();
+  const push = (from: string | null, to: string | null, label: string, style: LineStyle, link: { field: string; ref: string }) => {
+    if (!from || !to || from === to) return;
     const k = `${from}>${to}>${label}`;
-    if (from && to && from !== to && !seen.has(k)) edges.push({ from, to, label, style });
-    seen.add(k);
+    const e = seen.get(k);
+    if (e) return void e.links.push(link);
+    seen.set(k, { from, to, label, style, links: [link] });
+    edges.push(seen.get(k)!);
   };
   for (const id of nodes.keys()) {
-    for (const dep of dependencies(store, id)) push(drawn(dep), id, '', look(DEP_KEY));
+    const after = store.field(id, DEP_KEY)?.id;
+    for (const dep of dependencies(store, id)) push(drawn(dep), id, '', look(DEP_KEY), { field: after!, ref: dep });
     for (const c of store.node(id).children) {
       const key = store.node(c).key?.trim().toLowerCase();
       if (!key || key === DEP_KEY) continue;
@@ -220,7 +228,7 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
           const ref = refIds(part)[0];
           if (!ref || !store.get(ref)) continue;
           const words = part.replace(/\[\[[^\]]*\]\]/g, '').trim();
-          push(id, drawn(ref), words || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), look(key));
+          push(id, drawn(ref), words || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), look(key), { field: c, ref });
         }
       }
     }
@@ -278,8 +286,12 @@ function listInBoxes(nodes: Map<string, DiagramNode>, top: string[], edges: Diag
     if (from === to) continue;
     const k = `${from}>${to}>${JSON.stringify(e.style)}`;
     const m = merged.get(k);
-    if (!m) merged.set(k, { ...e, from, to });
-    else if (e.label && !m.label.split(', ').includes(e.label)) m.label = m.label ? `${m.label}, ${e.label}` : e.label;
+    if (!m) {
+      merged.set(k, { ...e, from, to, links: [...e.links] });
+      continue;
+    }
+    m.links.push(...e.links);
+    if (e.label && !m.label.split(', ').includes(e.label)) m.label = m.label ? `${m.label}, ${e.label}` : e.label;
   }
   return [...merged.values()];
 }

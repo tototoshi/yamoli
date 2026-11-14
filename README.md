@@ -63,6 +63,8 @@ src/
   ganttEdit.ts    Editing the schedule from the Gantt chart (drags and typed dates → fields)
   slides.ts / SlidesView.tsx          search.ts    links.ts
   diagram.ts / DiagramView.tsx        Diagrams
+  diagramEdit.ts  Editing the outline from the diagram (shapes, arrows, moves)
+  CellInput.tsx   The in-place text input of the Gantt chart and diagram
   i18n.ts         The interface language: t('日本語', 'English')
   formats.ts      Showing blocks (Markdown, CSV, code, text, images, files)
   files.ts        Adding images and files (upload) and their URLs

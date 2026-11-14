@@ -21,7 +21,7 @@ import { lang, t } from './i18n';
 import { standaloneSvg } from './exportImage';
 import { ExportTools, type Drawing } from './ExportTools';
 import { moveTo, resizeTo, setDays } from './ganttEdit';
-import { imeActive } from './RowEditor';
+import { CellInput } from './CellInput';
 import { addDependency, dependencies, removeDependency, wouldCycle } from './deps';
 import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
 import { nodeLabel } from './links';
@@ -814,36 +814,5 @@ function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
       <rect x={x0 + 0.5} y={mid - 7} width={Math.max(x1 - x0 - 1, 2)} height={14} rx={3} class={'bar' + (s.critical ? ' critical' : '')} />
       {late !== null && <rect x={x(late) + 0.5} y={mid - 7} width={Math.max(x1 - x(late) - 1, 2)} height={14} rx={3} class="bar late" />}
     </>
-  );
-}
-
-/** A cell being typed in: Enter or leaving it keeps what was typed, Escape doesn't. */
-function CellInput({ value, onDone }: { value: string; onDone: (text: string | null) => void }) {
-  const [text, setText] = useState(value);
-  const input = useRef<HTMLInputElement>(null);
-  const done = useRef(false);
-  const finish = (v: string | null) => {
-    if (done.current) return;
-    done.current = true;
-    onDone(v);
-  };
-  useLayoutEffect(() => {
-    input.current?.focus();
-    input.current?.select();
-  }, []);
-  return (
-    <input
-      ref={input}
-      class="gantt-input"
-      value={text}
-      onInput={(e) => setText(e.currentTarget.value)}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (imeActive(e)) return;
-        if (e.key === 'Enter') finish(text);
-        else if (e.key === 'Escape') finish(null);
-      }}
-      onBlur={() => finish(text)}
-    />
   );
 }

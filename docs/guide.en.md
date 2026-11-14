@@ -144,7 +144,16 @@ is drawn as:
 
 A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name: `calls: dotted red`, `sync: both` (`solid` / `dashed` / `dotted`, `arrow` / `both` / `none`, a colour).
 
-An arrow to or from a row listed in a box is drawn to the box; a mind map (`diagram: tree`) draws every row, frames or not. Lines that would cross a box go around it. Clicking a box edits its row. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents.
+An arrow to or from a row listed in a box is drawn to the box; a mind map (`diagram: tree`) draws every row, frames or not. Lines that would cross a box go around it. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents.
+
+You can edit the diagram where it is drawn. Each edit changes the outline's rows and fields, so the diagram and the outline always match.
+
+- **Names**: double-click a box (or select it and press Enter) to rename it.
+- **Shape and colour**: right-click a box and pick them from the menu (they become the `shape` and `color` fields). The same menu adds a box inside a frame or after the box, opens the row in the outline, or deletes it.
+- **New boxes**: **+ Add a box** at the top left of the diagram.
+- **Arrows**: hover over a box and drag from the dot that appears to another box (this adds `to: [[box]]`). Click an arrow and press × or Delete to remove it.
+- **Moving**: drag a box onto another frame to move it inside. In a frame with a `layout`, where you drop it sets its place in the order. Press Esc during a drag to cancel.
+- Delete removes the selected box (⌘Z brings it back).
 
 ## Slides
 
