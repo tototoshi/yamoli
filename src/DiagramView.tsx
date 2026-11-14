@@ -250,8 +250,8 @@ export function DiagramView({ rootId, embedded }: { rootId?: string; embedded?: 
       {!embedded && (
         <p class="diagram-hint">
           {t(
-            '箱をクリックで編集 ・ この項目に direction: TB で縦向き、diagram: tree / flow で描き方を指定',
-            'Click a box to edit it · On this item, direction: TB draws top to bottom, diagram: tree / flow picks the layout'
+            '箱をクリックで編集 ・ この項目に direction: TB で縦向き、diagram: tree / flow で描き方を指定 ・ 枠に layout: row / column / grid で中の並べ方を指定',
+            'Click a box to edit it · On this item, direction: TB draws top to bottom, diagram: tree / flow picks the layout · On a frame, layout: row / column / grid lines up what is in it'
           )}
         </p>
       )}

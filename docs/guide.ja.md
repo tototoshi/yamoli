@@ -138,6 +138,7 @@ children:
 | `icon` | 名前の前のアイコン: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`、または絵文字。actor では人型の代わりになる |
 | `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい |
 | その他の属性 | 箱の中の小さな `key: value` の行 |
+| `layout`（枠か、ズームした項目に） | 中の箱を矢印に関係なく、アウトラインの順に並べる。`row` / `横`: 横一列、`column` / `縦`: 縦一列、`grid` / `格子`: 格子状に折り返す（`grid 3` で3列。省略するとほぼ正方形になる列数）。中の矢印は線を引くだけで、並びには使わない |
 | `direction`（ズームした項目に） | `LR`（左から右、既定）/ `TB`（上から下） |
 | `diagram`（ズームした項目に） | `flow`: 矢印に沿って並べる（矢印か枠があるときの既定）、`tree`: マインドマップ |
 

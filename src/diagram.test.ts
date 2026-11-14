@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDiagram, descLines, estimate, frameDesc, layout, wrap, type Box } from './diagram';
+import { arrangeOf, buildDiagram, descLines, estimate, frameDesc, layout, wrap, type Box } from './diagram';
 import { OutlineStore } from './model';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
@@ -310,4 +310,66 @@ test('the lines of a description come out about even', () => {
   const lengths = lines.map((l) => [...l].length);
   expect(lines.join('')).toBe('メール送信や集計など、時間のかかる処理');
   expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(4);
+});
+
+test('a layout value: row, column or grid (with columns), in English or Japanese', () => {
+  expect(arrangeOf('row')).toEqual({ kind: 'row' });
+  expect(arrangeOf('縦')).toEqual({ kind: 'column' });
+  expect(arrangeOf('Grid 3')).toEqual({ kind: 'grid', columns: 3 });
+  expect(arrangeOf('格子')).toEqual({ kind: 'grid', columns: 0 });
+  expect(arrangeOf('center')).toBeUndefined(); // a slide's layout
+  expect(arrangeOf(undefined)).toBeUndefined();
+});
+
+/** A frame holding boxes a…f, the last arrow-linked back to the first, laid out as `layout` says. */
+function lined(value: string, direction?: string) {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  if (direction) s.addField(p, 'direction', direction);
+  const frame = s.addChild(p, -1, 'Frame').id;
+  s.addField(frame, 'shape', 'frame');
+  s.addField(frame, 'layout', value);
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f'].map((t) => s.addChild(frame, -1, t).id);
+  s.addField(ids[5], 'to', `[[${ids[0]}]]`); // arrows don't reorder lined-up boxes
+  const L = layout(buildDiagram(s, p));
+  return { boxes: ids.map((id) => L.boxes.get(id)!), frame: L.boxes.get(frame)! };
+}
+const centre = (b: Box) => [b.x + b.w / 2, b.y + b.h / 2];
+
+test('layout lines up the boxes in a frame in outline order, whatever the direction', () => {
+  for (const dir of [undefined, 'TB']) {
+    const row = lined('row', dir);
+    row.boxes.slice(1).forEach((b, i) => {
+      expect(b.x).toBeGreaterThan(row.boxes[i].x + row.boxes[i].w); // left to right
+      expect(centre(b)[1]).toBe(centre(row.boxes[0])[1]); // on one line
+    });
+    const column = lined('column', dir);
+    column.boxes.slice(1).forEach((b, i) => {
+      expect(b.y).toBeGreaterThan(column.boxes[i].y + column.boxes[i].h); // top to bottom
+      expect(centre(b)[0]).toBe(centre(column.boxes[0])[0]);
+    });
+    for (const { boxes, frame } of [row, column]) for (const b of boxes) expect(inside(b, frame)).toBe(true);
+  }
+});
+
+test('a grid wraps into rows: as square as it gets, or the columns asked for', () => {
+  const xs = (bs: Box[]) => new Set(bs.map((b) => centre(b)[0])).size;
+  const ys = (bs: Box[]) => new Set(bs.map((b) => centre(b)[1])).size;
+  const auto = lined('grid').boxes; // 6 boxes: 3 across, 2 down
+  expect([xs(auto), ys(auto)]).toEqual([3, 2]);
+  expect(auto[3].y).toBeGreaterThan(auto[0].y + auto[0].h); // the 4th starts the next row
+  const two = lined('grid 2').boxes;
+  expect([xs(two), ys(two)]).toEqual([2, 3]);
+  for (const bs of [auto, two]) bs.forEach((a, i) => bs.slice(i + 1).forEach((b) => expect(overlap(a, b)).toBe(false)));
+});
+
+test('layout on the zoomed item lines up the top boxes, and asks for a flow', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  s.addField(p, 'layout', 'row'); // left to right, boxes without arrows would go down the page
+  const [a, b] = ['a', 'b'].map((t) => s.addChild(p, -1, t).id);
+  const d = buildDiagram(s, p);
+  expect(d.kind).toBe('flow');
+  const L = layout(d);
+  expect(L.boxes.get(b)!.x).toBeGreaterThan(L.boxes.get(a)!.x + L.boxes.get(a)!.w);
 });

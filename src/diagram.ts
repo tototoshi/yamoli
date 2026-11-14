@@ -25,6 +25,10 @@
  * arrows come from, frames laid out inside out; an arrow to or from a row
  * listed in a box is the box's. A tree (the default without arrows or
  * frames) draws the item and all its rows as a mind map.
+ *
+ * In a flow, `layout` on a frame (or the zoomed item) lines up the boxes in it
+ * in outline order instead of along their arrows: `row` (横) across, `column`
+ * (縦) down, `grid` (格子) in rows of a few, `grid 3` of three.
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
@@ -37,7 +41,19 @@ const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
-const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'diagram', 'lines', 'completed', DEP_KEY, VIEWS_KEY]);
+const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'diagram', 'lines', 'layout', 'completed', DEP_KEY, VIEWS_KEY]);
+
+/** How the boxes in a frame are lined up: in a row, a column, or a grid of `columns` across (0: as square as it gets). */
+export type Arrange = { kind: 'row' } | { kind: 'column' } | { kind: 'grid'; columns: number };
+
+/** A `layout` value: `row` / `横`, `column` / `縦`, `grid` / `格子` with a number of columns or not; else undefined. */
+export function arrangeOf(value: string | undefined): Arrange | undefined {
+  const [word = '', n] = (value ?? '').trim().toLowerCase().split(/\s+/);
+  if (word === 'row' || word === '横') return { kind: 'row' };
+  if (word === 'column' || word === '縦') return { kind: 'column' };
+  if (word === 'grid' || word === '格子') return { kind: 'grid', columns: Math.max(0, Math.floor(Number(n) || 0)) };
+  return undefined;
+}
 
 export type FrameStyle = 'dashed' | 'solid' | 'none';
 const FRAME_STYLES: FrameStyle[] = ['dashed', 'solid', 'none'];
@@ -82,6 +98,8 @@ export interface DiagramNode {
   props: string[];
   /** Rows drawn inside this one (a frame), in outline order. */
   children: string[];
+  /** How the rows inside a frame are lined up, when `layout` says. */
+  arrange?: Arrange;
   done: boolean;
 }
 
@@ -99,6 +117,8 @@ export interface Diagram {
   edges: DiagramEdge[];
   direction: Direction;
   kind: 'flow' | 'tree';
+  /** How the top-level boxes are lined up (the zoomed item's `layout`). */
+  arrange?: Arrange;
 }
 
 const COLORS: Record<string, string> = {
@@ -161,6 +181,7 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
       desc,
       props,
       children,
+      arrange: arrangeOf(store.fieldValue(id, 'layout')),
       done: store.node(id).completed,
     });
     children.forEach((c) => add(c));
@@ -207,15 +228,16 @@ export function buildDiagram(store: OutlineStore, rootId: string, { showComplete
 
   const dir = store.fieldValue(rootId, 'direction')?.toUpperCase();
   const asked = store.fieldValue(rootId, 'diagram')?.toLowerCase();
-  // Arrows or frames ask for a flow; without either, it is a mind map.
+  const arrange = arrangeOf(store.fieldValue(rootId, 'layout'));
+  // Arrows, frames or a layout ask for a flow; without any, it is a mind map.
   const framed = [...nodes.values()].some((n) => n.isFrame);
-  const kind = asked === 'tree' || asked === 'flow' ? asked : edges.length || framed ? 'flow' : 'tree';
+  const kind = asked === 'tree' || asked === 'flow' ? asked : edges.length || framed || arrange ? 'flow' : 'tree';
   // A mind map grows from the zoomed item itself.
   if (kind === 'tree' && rootId !== store.rootId) {
     add(rootId, top);
     top = [rootId];
   }
-  if (kind === 'flow') return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind };
+  if (kind === 'flow') return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind, arrange };
   return { nodes, top, edges, direction: dir === 'TB' ? 'TB' : 'LR', kind };
 }
 
@@ -299,6 +321,8 @@ const FRAME_HEAD = 24;
 const FRAME_PAD = 14;
 const RANK_GAP = 56;
 const ORDER_GAP = 18;
+/** Between boxes lined up by `layout`, with room for arrows between them. */
+const ARRANGE_GAP = 40;
 const ACTOR = 30;
 /** Room inside a frame with nothing in it yet. */
 const EMPTY = { rs: 80, os: 24 };
@@ -463,12 +487,13 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
     return null;
   };
 
-  const place = (units: string[]): { rs: number; os: number } => {
+  const place = (units: string[], arrange?: Arrange): { rs: number; os: number } => {
     for (const u of units) {
       const n = nodes.get(u)!;
-      if (n.isFrame) size.set(u, framed(n.children.length ? place(n.children) : EMPTY, n));
+      if (n.isFrame) size.set(u, framed(n.children.length ? place(n.children, n.arrange) : EMPTY, n));
       else size.set(u, extents(boxSize(n, measure), dir));
     }
+    if (arrange) return lineUp(units, arrange);
     const set = new Set(units);
     const succ = new Map(units.map((u) => [u, [] as string[]]));
     const pred = new Map(units.map((u) => [u, [] as string[]]));
@@ -512,6 +537,39 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
     return { rs: Math.max(...filled.map((layer, i) => rankStart[i] + Math.max(...layer.map((u) => size.get(u)!.rs)))), os: widest };
   };
 
+  /**
+   * Units in outline order in a row, a column or a grid (rows of `columns`,
+   * each in a cell as wide as its column's widest and as high as its row's
+   * highest, centred there), whatever the direction of the arrows.
+   */
+  const lineUp = (units: string[], arrange: Arrange): { rs: number; os: number } => {
+    const wh = (u: string) => {
+      const s = size.get(u)!;
+      return dir === 'LR' ? { w: s.rs, h: s.os } : { w: s.os, h: s.rs };
+    };
+    const n = units.length;
+    const cols = arrange.kind === 'row' ? n : arrange.kind === 'column' ? 1 : Math.min(n, arrange.columns || Math.ceil(Math.sqrt(n)));
+    const colW: number[] = [];
+    const rowH: number[] = [];
+    units.forEach((u, i) => {
+      const { w, h } = wh(u);
+      colW[i % cols] = Math.max(colW[i % cols] ?? 0, w);
+      rowH[Math.floor(i / cols)] = Math.max(rowH[Math.floor(i / cols)] ?? 0, h);
+    });
+    const starts = (sizes: number[]) => sizes.map((_, i) => sizes.slice(0, i).reduce((s, x) => s + x + ARRANGE_GAP, 0));
+    const [colX, rowY] = [starts(colW), starts(rowH)];
+    units.forEach((u, i) => {
+      const [c, r] = [i % cols, Math.floor(i / cols)];
+      const { w, h } = wh(u);
+      const x = colX[c] + (colW[c] - w) / 2;
+      const y = rowY[r] + (rowH[r] - h) / 2;
+      local.set(u, { ...size.get(u)!, ...(dir === 'LR' ? { r: x, o: y } : { r: y, o: x }) });
+    });
+    const total = (sizes: number[]) => sizes.reduce((s, x) => s + x, 0) + ARRANGE_GAP * Math.max(0, sizes.length - 1);
+    const [w, h] = [total(colW), total(rowH)];
+    return dir === 'LR' ? { rs: w, os: h } : { rs: h, os: w };
+  };
+
   /** A frame's size around its contents (the title and description sit on top, whatever the direction). */
   const framed = (inner: { rs: number; os: number }, n: DiagramNode) => {
     // At least as wide as the description would be in a box; wider contents give it more room.
@@ -521,7 +579,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
     return extents({ w, h }, dir);
   };
 
-  place(d.top);
+  place(d.top, d.arrange);
 
   // Local -> absolute, from the top down. Contents of a frame start below its title.
   const placed = new Map<string, Placed>();

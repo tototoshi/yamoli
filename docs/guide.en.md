@@ -138,6 +138,7 @@ is drawn as:
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
 | `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too |
 | Other fields | Small `key: value` lines in the box |
+| `layout` (on a frame, or the zoomed item) | Lines up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). Arrows between them are still drawn, but don't move them |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
 | `diagram` (on the zoomed item) | `flow`: boxes follow the arrows (default when there are arrows or frames); `tree`: a mind map |
 
