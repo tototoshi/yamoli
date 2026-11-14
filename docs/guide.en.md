@@ -190,7 +190,7 @@ Search (⌘F) finds the rows matching all the terms you write; Esc clears it.
 
 ## Views
 
-Switch with the view bar; each item remembers the view last used for it.
+Switch with the view bar; each item remembers the view last used for it (except slides, which are for presenting: an item never opens as slides by itself).
 
 Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `mindmap` / `slides`, or `ガント` / `図` / `マインドマップ` / `スライド`).
 

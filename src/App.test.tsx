@@ -127,3 +127,33 @@ test('Gantt, Diagram and Slides show only where a views field turns them on', as
   expect(on()).toBe('Outline');
   expect(views()).toEqual(['Outline', 'Text', 'YAML', 'JSON']);
 });
+
+test('an item opens the way it was last viewed, but not as slides', async () => {
+  setLang('en');
+  let deck = '';
+  const root = await mount((s) => {
+    deck = s.addChild(s.rootId, -1, 'Talk').id;
+    s.addField(deck, 'views', 'gantt, slides');
+    s.addChild(deck, -1, 'Intro');
+  });
+  const on = () => root.querySelector('.view-switch button.on')?.textContent;
+  const settle = () => act(() => new Promise((r) => setTimeout(r, 0)));
+  const open = async (hash: string) => {
+    await act(() => {
+      location.hash = hash;
+    });
+    await settle();
+  };
+
+  await open(`#/${deck}?view=gantt`);
+  await open('#/');
+  await open(`#/${deck}`);
+  expect(on()).toBe('Gantt');
+
+  // Shown as slides, it still opens as the Gantt chart next time.
+  await open(`#/${deck}?view=slides`);
+  expect(on()).toBe('Slides');
+  await open('#/');
+  await open(`#/${deck}`);
+  expect(on()).toBe('Gantt');
+});

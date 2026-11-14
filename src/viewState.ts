@@ -429,7 +429,8 @@ export class ViewState {
 
   /**
    * Take the zoomed item and view from the URL (#/id?view=gantt). Without a
-   * view, an item opens the way it was last viewed.
+   * view, an item opens the way it was last viewed (slides aside: they are for
+   * showing, so an item doesn't open as them by itself).
    */
   private readHash() {
     // The usage guide: the outline stays as it was underneath.
@@ -448,7 +449,7 @@ export class ViewState {
       this.rememberView();
     } else {
       const remembered = this.prefs.views[this.zoomId];
-      this.view = remembered && this.canShow(remembered) ? remembered : 'outline';
+      this.view = remembered && remembered !== 'slides' && this.canShow(remembered) ? remembered : 'outline';
       if (this.view !== 'outline' || asked)
         window.history.replaceState(null, '', this.hashFor(this.zoomId, this.view === 'outline' ? undefined : this.view));
     }
@@ -467,6 +468,7 @@ export class ViewState {
   }
 
   private rememberView() {
+    if (this.view === 'slides') return; // the view before them stays the one remembered
     const current = this.prefs.views[this.zoomId] ?? 'outline';
     if (current === this.view) return;
     const views = Object.fromEntries(Object.entries(this.prefs.views).filter(([id]) => this.store.get(id)));
