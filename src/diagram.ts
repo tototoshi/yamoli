@@ -767,11 +767,47 @@ function orderLayers(layers: string[][], succ: Map<string, string[]>, pred: Map<
     layer.sort((a, b) => key.get(a)! - key.get(b)! || pos.get(a)! - pos.get(b)!);
     layer.forEach((u, i) => pos.set(u, i));
   };
-  for (let i = 0; i < 4; i++) {
+  /** How many arrows between neighbouring layers cross, in the order they are in now. */
+  const crossings = () => {
+    let n = 0;
+    for (let l = 0; l + 1 < layers.length; l++) {
+      const next = new Set(layers[l + 1]);
+      const pairs: [number, number][] = [];
+      for (const u of layers[l]) {
+        for (const v of [...succ.get(u)!, ...pred.get(u)!]) if (next.has(v)) pairs.push([pos.get(u)!, pos.get(v)!]);
+      }
+      for (let i = 0; i < pairs.length; i++)
+        for (let j = i + 1; j < pairs.length; j++) if ((pairs[i][0] - pairs[j][0]) * (pairs[i][1] - pairs[j][1]) < 0) n++;
+    }
+    return n;
+  };
+  // Sweeps by the neighbours' average place, keeping the order with the fewest crossings seen.
+  let best = layers.map((l) => [...l]);
+  let fewest = crossings();
+  for (let i = 0; i < 4 && fewest > 0; i++) {
     for (let l = 1; l < layers.length; l++) sweep(layers[l], pred);
     for (let l = layers.length - 2; l >= 0; l--) sweep(layers[l], succ);
+    const n = crossings();
+    if (n < fewest) [best, fewest] = [layers.map((l) => [...l]), n];
   }
+  best.forEach((l, i) => (layers[i] = l));
   index();
+  // Then neighbours swapped, wherever that crosses fewer.
+  for (let changed = fewest > 0; changed; ) {
+    changed = false;
+    for (const layer of layers) {
+      for (let i = 0; i + 1 < layer.length; i++) {
+        [layer[i], layer[i + 1]] = [layer[i + 1], layer[i]];
+        index();
+        const n = crossings();
+        if (n < fewest) [fewest, changed] = [n, true];
+        else {
+          [layer[i], layer[i + 1]] = [layer[i + 1], layer[i]];
+          index();
+        }
+      }
+    }
+  }
 }
 
 /** Tree: the zoomed item's rows as a mind map, each row beside (or below) the one it is under. */
