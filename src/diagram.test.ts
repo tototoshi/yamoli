@@ -16,6 +16,7 @@ import {
   type Box,
 } from './diagram';
 import { OutlineStore } from './model';
+import { colorValue } from './colors';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
 function system() {
@@ -605,4 +606,21 @@ test('a colour inside bold is drawn bold in the colour', () => {
   const { text, marks } = unmark('a **[hot]{red}** day');
   expect(text).toBe('a hot day');
   expect(markedLines(text, [text], marks)[0][1]).toEqual({ text: 'hot', kinds: ['strong'], color: '#d9534f' });
+});
+
+test("an arrow's label is drawn with its marks, and a colour in it is not taken for the arrow's look", () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const [a, b, c] = ['A', 'B', 'C'].map((n) => s.addChild(p, -1, n).id);
+  s.addField(a, 'to', `[[${b}]] **SQL** [read]{red} {dashed}`);
+  s.addField(a, 'link', `[[${c}]] \`gRPC\``);
+  const d = buildDiagram(s, p);
+  const ab = d.edges.find((e) => e.to === b)!;
+  expect(ab.label).toBe('SQL read');
+  expect(ab.look).toBe('dashed');
+  expect(ab.labelMarks).toEqual([
+    { from: 0, to: 3, kind: 'strong' },
+    { from: 4, to: 8, kind: 'color', color: colorValue('red') },
+  ]);
+  expect(d.edges.find((e) => e.to === c)!.labelMarks).toEqual([{ from: 0, to: 4, kind: 'code' }]);
 });

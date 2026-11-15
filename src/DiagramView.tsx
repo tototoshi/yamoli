@@ -1811,6 +1811,8 @@ function EdgeMenu({
   const dep = current === DEP_KEY;
   // The label, typed here and written when the menu closes (unless by Escape, or to delete the arrow).
   const [text, setText] = useState(() => labelOf(store, edge));
+  const field = useRef<HTMLInputElement>(null);
+  const marks = useMarkKeys((ed) => (setText(ed.text), reselect(field.current, ed)));
   const close = () => {
     onClose();
     if (onLabel && text.trim() !== labelOf(store, edge)) onLabel(text);
@@ -1818,14 +1820,19 @@ function EdgeMenu({
   return (
     <PopupMenu x={x} y={y} title={`${nodeLabel(store, edge.from)} → ${nodeLabel(store, edge.to)}`} onClose={close} onCancel={onClose}>
       {onLabel && (
-        <input
-          class="dg-menu-input"
-          aria-label={t('ラベル', 'Label')}
-          placeholder={t('ラベル', 'Label')}
-          value={text}
-          onInput={(e) => setText(e.currentTarget.value)}
-          onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && (e.preventDefault(), close())}
-        />
+        <div class="dg-menu-field">
+          <input
+            ref={field}
+            class="dg-menu-input"
+            aria-label={t('ラベル', 'Label')}
+            placeholder={t('ラベル', 'Label')}
+            value={text}
+            onInput={(e) => setText(e.currentTarget.value)}
+            onBlur={marks.close}
+            onKeyDown={(e) => !marks.onKeyDown(e) && !imeActive(e) && e.key === 'Enter' && (e.preventDefault(), close())}
+          />
+          {marks.bubble}
+        </div>
       )}
       {dep ? (
         <div class="dg-menu-note">{t('依存（after）の矢印です。種類は変えられません', 'A dependency (after); its kind stays')}</div>
@@ -2151,7 +2158,9 @@ function EdgeLabel({ edge, text, at, near }: { edge: DiagramEdge; text: string; 
   return (
     <g class={'dg-edge-label' + (near ? ' near' : '')} data-from={edge.from} data-to={edge.to} transform={`translate(${at[0]},${at[1]})`}>
       <rect x={-w / 2} y={-8} width={w} height={16} rx={4} />
-      <text y={4}>{text}</text>
+      <text y={4}>
+        <Runs runs={markedLines(text, [text], edge.labelMarks)[0]} />
+      </text>
     </g>
   );
 }

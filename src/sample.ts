@@ -211,7 +211,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   s.addField(alb, 'to', to(web, '{blue}'));
   s.addField(web, 'to', to(api, 'gRPC {blue}'));
   s.addField(members, 'to', to(db));
-  s.addField(orders, 'to', [to(db, 'SQL'), to(pay, t('決済 {purple}', 'charge {purple}'))].join(', '));
+  s.addField(orders, 'to', [to(db, '**SQL**'), to(pay, t('決済 {purple}', 'charge {purple}'))].join(', '));
   s.addField(stock, 'to', to(cache));
   s.addField(search, 'to', to(index));
   // `async` lines are dashed.
@@ -222,7 +222,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   s.addField(remark, 'to', to(queue));
   // Lines of a kind set under `lines`.
   s.addField(watch, 'metrics', to(app));
-  s.addField(staff, 'to', to(watch, t('アラート', 'alerts')));
+  s.addField(staff, 'to', to(watch, t('[アラート]{red}', '[alerts]{red}')));
   s.addField(batch, 'link', to(worker, t('移行', 'moved to')));
   return sys.id;
 }

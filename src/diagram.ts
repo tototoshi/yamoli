@@ -137,7 +137,7 @@ export function splitSides(words: string): { label: string; sides: Sides; look?:
   let sides: Sides = {};
   let look = '';
   const label = words
-    .replace(/\{([^{}]*)\}/g, (_, w: string) => {
+    .replace(/(?<!\])\{([^{}]*)\}/g, (_, w: string) => {
       look = [look, w.trim()].filter(Boolean).join(' ');
       return ' ';
     })
@@ -269,6 +269,8 @@ export interface DiagramEdge {
   from: string;
   to: string;
   label: string;
+  /** Where its label is bold, italic …, if anywhere. */
+  labelMarks?: Mark[];
   style: LineStyle;
   /** The sides of its boxes it is pinned to (`下@上` beside its link); else the sides facing each other. */
   sides: Sides;
@@ -473,13 +475,23 @@ export function buildDiagram(
     style: LineStyle,
     link: { field: string; ref: string },
     sides: Sides = {},
-    own?: string
+    own?: string,
+    marks: Mark[] = []
   ) => {
     if (!from || !to || from === to) return;
     const k = `${from}>${to}>${label}`;
     const e = seen.get(k);
     if (e) return void e.links.push(link);
-    seen.set(k, { from, to, label, style: own ? lineStyle(own, style) : style, sides, ...(own && { look: own }), links: [link] });
+    seen.set(k, {
+      from,
+      to,
+      label,
+      style: own ? lineStyle(own, style) : style,
+      sides,
+      ...(own && { look: own }),
+      ...(marks.length && { labelMarks: marks }),
+      links: [link],
+    });
     edges.push(seen.get(k)!);
   };
   for (const id of nodes.keys()) {
@@ -494,8 +506,9 @@ export function buildDiagram(
           if (!ref || !store.get(ref)) continue;
           const { label, sides, look: own } = splitSides(part.replace(/\[\[[^\]]*\]\]/g, ''));
           const to = drawn(ref);
-          const named = label || (key in LINE_KEYS ? '' : store.node(c).key!.trim());
-          push(id, to, named, lookOf(key, id, to), { field: c, ref }, sides, own);
+          const shown = unmark(label);
+          const named = shown.text || (key in LINE_KEYS ? '' : store.node(c).key!.trim());
+          push(id, to, named, lookOf(key, id, to), { field: c, ref }, sides, own, shown.marks);
         }
       }
     }
@@ -558,7 +571,11 @@ function listInBoxes(nodes: Map<string, DiagramNode>, top: string[], edges: Diag
       continue;
     }
     m.links.push(...e.links);
-    if (e.label && !m.label.split(', ').includes(e.label)) m.label = m.label ? `${m.label}, ${e.label}` : e.label;
+    if (!e.label || m.label.split(', ').includes(e.label)) continue;
+    const at = m.label ? m.label.length + 2 : 0;
+    m.label = m.label ? `${m.label}, ${e.label}` : e.label;
+    const marks = [...(m.labelMarks ?? []), ...(e.labelMarks ?? []).map((k) => ({ ...k, from: k.from + at, to: k.to + at }))];
+    if (marks.length) m.labelMarks = marks;
   }
   return [...merged.values()];
 }
