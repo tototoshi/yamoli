@@ -7,6 +7,7 @@
 import {
   BORDER_KEYS,
   BORDER_WORDS,
+  colorValue,
   CONTAINER,
   DESC_KEYS,
   LINE_KEYS,
@@ -169,16 +170,17 @@ const SIDE_WORD: Record<Side, [string, string]> = {
 const sideWord = (side: Side | undefined) => (side ? SIDE_WORD[side][lang() === 'ja' ? 0 : 1] : '');
 
 /** Write each of an arrow's link parts anew from its label and sides, as change gives them. A dependency has none. */
-function rewrite(store: OutlineStore, edge: DiagramEdge, change: (label: string, sides: Sides) => [string, Sides]): boolean {
+type Written = ReturnType<typeof splitSides>;
+
+function rewrite(store: OutlineStore, edge: DiagramEdge, change: (written: Written) => Written): boolean {
   let changed = false;
   for (const { field, ref } of edge.links) {
     if (!store.get(field) || store.node(field).key?.trim().toLowerCase() === DEP_KEY) continue;
     for (const { n, parts, i } of [...linkParts(store, field, ref)]) {
       const lead = parts[i].match(/^\s*/)![0];
-      const written = splitSides(parts[i].replace(LINK_RE, ''));
-      const [label, sides] = change(written.label, written.sides);
+      const { label, sides, look } = change(splitSides(parts[i].replace(LINK_RE, '')));
       const pinned = sides.from || sides.to ? `${sideWord(sides.from)}@${sideWord(sides.to)}` : '';
-      parts[i] = lead + [parts[i].match(LINK_RE)!.join(' '), label, pinned].filter(Boolean).join(' ');
+      parts[i] = lead + [parts[i].match(LINK_RE)!.join(' '), label, pinned, look && `{${look}}`].filter(Boolean).join(' ');
       const next = parts.join(',');
       if (next === store.node(n).text) continue;
       store.setText(n, next);
@@ -190,11 +192,11 @@ function rewrite(store: OutlineStore, edge: DiagramEdge, change: (label: string,
 
 /** Pin one end of an arrow to a side of its box, or (null) let it face the other box again. */
 export function setSide(store: OutlineStore, edge: DiagramEdge, end: 'from' | 'to', side: Side | null): boolean {
-  return rewrite(store, edge, (label, sides) => {
-    const next = { ...sides };
-    if (side) next[end] = side;
-    else delete next[end];
-    return [label, next];
+  return rewrite(store, edge, (w) => {
+    const sides = { ...w.sides };
+    if (side) sides[end] = side;
+    else delete sides[end];
+    return { ...w, sides };
   });
 }
 
@@ -207,8 +209,25 @@ export function setLabel(store: OutlineStore, edge: DiagramEdge, text: string): 
     .replace(/\s*,\s*/g, '、')
     .replace(/\s+/g, ' ')
     .trim();
-  return rewrite(store, edge, (_, sides) => [words, sides]);
+  return rewrite(store, edge, (w) => ({ ...w, label: words }));
 }
+
+/** Give one arrow a colour of its own (`{red}` beside its link), or (null) its kind's again; its other look words stay. */
+export function setLineColor(store: OutlineStore, edge: DiagramEdge, color: string | null): boolean {
+  return rewrite(store, edge, (w) => {
+    const look = [...(w.look ?? '').split(/\s+/).filter((x) => x && !colorValue(x)), ...(color ? [color] : [])].join(' ');
+    const { look: _, ...rest } = w;
+    return look ? { ...rest, look } : rest;
+  });
+}
+
+/** The colour word an arrow is given beside its link, if any. */
+export const lineColorOf = (edge: DiagramEdge) =>
+  edge.look
+    ?.split(/\s+/)
+    .reverse()
+    .find((x) => colorValue(x))
+    ?.toLowerCase();
 
 /** Take out the links an arrow is drawn from. */
 export function disconnect(store: OutlineStore, edge: DiagramEdge) {

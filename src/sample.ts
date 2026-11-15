@@ -119,7 +119,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- `shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（枠でも入れ物でもない行の下の行は、箱の中に箇条書き）\n' +
         '- `shape: row`（横一列）/ `column`（縦一列）/ `grid`（格子）で、中の箱をアウトラインの順に並べる。それだけだと見えない並びで、`row dashed` のように枠線を書くと名前付きの枠に\n' +
         '- `shape`（actor / db / queue / external / process / store）・`color`・`icon`・`border`（枠線: thick / double / dotted / round / shadow など）で見た目、`note` で説明\n' +
-        '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。`direction: TB` で縦向き\n' +
+        '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。リンクの横に `{red}` と書くとその矢印だけ色が変わる。`direction: TB` で縦向き\n' +
         '- この行の `description` は図全体の説明として図の上に出る。`shape: sticky`（付箋）の行は、`to:` でつないだ箱の隣に付く注釈\n\n' +
         '**図の上での編集**\n\n' +
         '- 箱を選んでそのまま入力すると名前が変わる。右クリックで名前・説明・形・色\n' +
@@ -131,7 +131,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- A row with `shape: frame` is a frame around the rows under it; `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
         '- `shape: row` / `column` / `grid` lines up the boxes in it in outline order: unseen alone, a named frame with a border word like `row dashed`\n' +
         '- `shape` (actor / db / queue / external / process / store), `color`, `icon` and `border` (thick / double / dotted / round / shadow …) for the look, `note` for a description\n' +
-        '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines. `direction: TB` draws it top to bottom\n' +
+        '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines; `{red}` beside a link colours that arrow. `direction: TB` draws it top to bottom\n' +
         '- This row’s `description` goes above the diagram. A row with `shape: sticky` is a sticky note, beside the box it is joined to with `to:`\n\n' +
         '**Editing on the diagram**\n\n' +
         '- Select a box and type to rename it; right-click for its name, description, shape and colour\n' +
@@ -178,7 +178,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   s.addField(alb, 'to', to(web));
   s.addField(web, 'to', to(api, 'gRPC'));
   s.addField(members, 'to', to(db));
-  s.addField(orders, 'to', [to(db, 'SQL'), to(pay)].join(', '));
+  s.addField(orders, 'to', [to(db, 'SQL'), to(pay, '{purple}')].join(', '));
   s.addField(stock, 'to', to(cache));
   // `async` lines are dashed.
   s.addField(orders, 'async', to(queue, t('投入', 'enqueue')));

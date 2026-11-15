@@ -56,6 +56,8 @@ import {
   neighbour,
   reconnect,
   setColor,
+  setLineColor,
+  lineColorOf,
   toggleBorder,
   setDesc,
   setLabel,
@@ -1696,6 +1698,22 @@ function EdgeMenu({
             >
               {LINE_CHOICES[k]?.() ?? k}
             </button>
+          ))}
+        </div>
+      )}
+      {!dep && (
+        <div class="dg-menu-row" role="group" aria-label={t('色', 'Colour')}>
+          {[null, ...COLOR_CHOICES].map((c) => (
+            <button
+              key={c ?? ''}
+              class={'dg-swatch' + (c ? '' : ' none') + (lineColorOf(edge) === (c ?? undefined) ? ' on' : '')}
+              title={c ?? t('種類の色', 'As its kind')}
+              style={c ? { background: colorValue(c) } : undefined}
+              onClick={() => {
+                close();
+                if (setLineColor(store, edge, c)) ctl.commit();
+              }}
+            />
           ))}
         </div>
       )}

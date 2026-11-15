@@ -21,7 +21,8 @@
  * is dashed, `both` has arrows at both ends, `link` none, anything else (`to`)
  * a plain arrow. `lines` on the zoomed item sets more, as fields under it:
  * `calls: dotted red`, `sync: both` (words: solid / dashed / dotted, arrow /
- * both / none, a colour).
+ * both / none, a colour). The same words in braces beside a link set that
+ * one arrow's look: `to: [[DB]] SQL {red}`.
  *
  * On the zoomed item: `direction: LR | TB`. The diagram view draws a flow:
  * each box after the ones its arrows come from, frames laid out inside out;
@@ -119,10 +120,18 @@ export function sidesOf(word: string): Sides | null {
   return { ...(from && { from }), ...(to && { to }) };
 }
 
-/** The words beside a link: its label, and the sides it is pinned to (the word saying so taken out). */
-export function splitSides(words: string): { label: string; sides: Sides } {
+/**
+ * The words beside a link: its label, the sides it is pinned to, and its own
+ * look (`{red dashed}`), the words saying those taken out.
+ */
+export function splitSides(words: string): { label: string; sides: Sides; look?: string } {
   let sides: Sides = {};
+  let look = '';
   const label = words
+    .replace(/\{([^{}]*)\}/g, (_, w: string) => {
+      look = [look, w.trim()].filter(Boolean).join(' ');
+      return ' ';
+    })
     .replace(/(^|\s)(\S*@\S*)(?=\s|$)/g, (m, _sp, w: string) => {
       const found = sidesOf(w);
       if (!found) return m;
@@ -131,7 +140,7 @@ export function splitSides(words: string): { label: string; sides: Sides } {
     })
     .replace(/\s+/g, ' ')
     .trim();
-  return { label, sides };
+  return { label, sides, ...(look && { look }) };
 }
 
 /** Field names with a look of their own, and no label of their name. */
@@ -235,6 +244,8 @@ export interface DiagramEdge {
   style: LineStyle;
   /** The sides of its boxes it is pinned to (`下@上` beside its link); else the sides facing each other. */
   sides: Sides;
+  /** Its own look, written in braces beside its link (`{red}`), over its kind's. */
+  look?: string;
   /** Where the arrow is written: the links (to ref) in these fields, which removing it takes out. */
   links: { field: string; ref: string }[];
 }
@@ -362,13 +373,14 @@ export function buildDiagram(
     label: string,
     style: LineStyle,
     link: { field: string; ref: string },
-    sides: Sides = {}
+    sides: Sides = {},
+    own?: string
   ) => {
     if (!from || !to || from === to) return;
     const k = `${from}>${to}>${label}`;
     const e = seen.get(k);
     if (e) return void e.links.push(link);
-    seen.set(k, { from, to, label, style, sides, links: [link] });
+    seen.set(k, { from, to, label, style: own ? lineStyle(own, style) : style, sides, ...(own && { look: own }), links: [link] });
     edges.push(seen.get(k)!);
   };
   for (const id of nodes.keys()) {
@@ -381,9 +393,10 @@ export function buildDiagram(
         for (const part of text.split(',')) {
           const ref = refIds(part)[0];
           if (!ref || !store.get(ref)) continue;
-          const { label, sides } = splitSides(part.replace(/\[\[[^\]]*\]\]/g, ''));
+          const { label, sides, look: own } = splitSides(part.replace(/\[\[[^\]]*\]\]/g, ''));
           const to = drawn(ref);
-          push(id, to, label || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), lookOf(key, id, to), { field: c, ref }, sides);
+          const named = label || (key in LINE_KEYS ? '' : store.node(c).key!.trim());
+          push(id, to, named, lookOf(key, id, to), { field: c, ref }, sides, own);
         }
       }
     }

@@ -16,6 +16,8 @@ import {
   setColor,
   setDesc,
   setLabel,
+  setLineColor,
+  lineColorOf,
   setLineKind,
   setShape,
   setSide,
@@ -335,4 +337,33 @@ test('the ends of an arrow are pinned to sides beside its link, kept by its labe
   expect(edge(a, x).sides).toEqual({ from: 'bottom' });
   setSide(s, edge(a, x), 'from', null);
   expect(s.fieldValue(a, 'to')).toBe(`[[${x}]] gRPC`);
+});
+
+test('an arrow has a look of its own in braces beside its link: a colour set there, kept by its label and sides', () => {
+  const { s, a, b, x, draw } = drawing();
+  s.addField(a, 'to', `[[${b}]] HTTPS, [[${x}]] {dashed}`);
+  s.addField(a, 'async', `[[${b}]] events`);
+  const edges = () => draw().d.edges;
+  const edge = (to: string, label = '') => edges().find((e) => e.to === to && (!label || e.label === label))!;
+  expect(edge(x).style).toEqual({ dash: 'dashed', ends: 'arrow' });
+  expect(edge(x).label).toBe('');
+  expect(setLineColor(s, edge(b, 'HTTPS'), 'red')).toBe(true);
+  expect(s.fieldValue(a, 'to')).toBe(`[[${b}]] HTTPS {red}, [[${x}]] {dashed}`);
+  expect(edge(b, 'HTTPS').style).toEqual({ dash: 'solid', ends: 'arrow', color: '#d9534f' });
+  expect(lineColorOf(edge(b, 'HTTPS'))).toBe('red');
+  // Over its kind's look: an async arrow stays dashed in blue.
+  setLineColor(s, edge(b, 'events'), 'blue');
+  expect(edge(b, 'events').style).toMatchObject({ dash: 'dashed', color: '#3b6fd8' });
+  // A new colour replaces the old, and other look words stay.
+  setLineColor(s, edge(x), 'green');
+  expect(s.fieldValue(a, 'to')).toBe(`[[${b}]] HTTPS {red}, [[${x}]] {dashed green}`);
+  // The label and sides keep it.
+  setLabel(s, edge(b, 'HTTPS'), 'gRPC');
+  setSide(s, edge(b, 'gRPC'), 'to', 'top');
+  expect(edge(b, 'gRPC').look).toBe('red');
+  // Its kind's colour again: the braces go when nothing is left in them.
+  setLineColor(s, edge(b, 'gRPC'), null);
+  setLineColor(s, edge(x), null);
+  expect(s.fieldValue(a, 'to')).toMatch(new RegExp(`^\\[\\[${b}\\]\\] gRPC @(上|top), \\[\\[${x}\\]\\] \\{dashed\\}$`));
+  expect(lineColorOf(edge(x))).toBeUndefined();
 });
