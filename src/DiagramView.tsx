@@ -724,25 +724,38 @@ const GROUP_NAMES = {
 };
 const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
 
-/** The parts of a box's text its menu colours, one at a time. */
-const FONT_PART_CHOICES: [FontPart, () => string][] = [
-  ['all', () => t('文字全体', 'All text')],
+/** The parts of a box's text its menu colours apart, each in a row of its own. */
+const FONT_PART_CHOICES: [Exclude<FontPart, 'all'>, () => string][] = [
   ['name', () => t('名前', 'Name')],
   ['desc', () => t('説明', 'Description')],
   ['props', () => t('属性', 'Fields')],
 ];
 
-/** A row of colours to pick from in a menu, the first taking the colour away; letters shows each as a coloured A, for text. */
-function Swatches(props: { label: string; value?: string; none: string; letters?: boolean; onPick: (color: string | null) => void }) {
+/**
+ * A row of colours to pick from in a menu, the first taking the colour away;
+ * letters shows each as a coloured A, for text, after the row's label.
+ */
+function Swatches(props: {
+  label: string;
+  value?: string;
+  none: string;
+  letters?: boolean;
+  onPick: (color: string | null) => void;
+  /** In place of the label at its start. */
+  head?: ComponentChildren;
+  /** The colour drawn for none (as the text, for a part of it). */
+  noneColor?: string;
+}) {
   const { value, letters, onPick } = props;
   return (
     <div class={'dg-menu-row' + (letters ? ' letters' : '')} role="group" aria-label={props.label}>
+      {letters && (props.head ?? <span class="dg-swatch-label">{props.label}</span>)}
       {[null, ...COLOR_CHOICES].map((c) => (
         <button
           key={c ?? ''}
           class={'dg-swatch' + (c ? '' : ' none') + (value === (c ?? undefined) ? ' on' : '')}
           title={c ?? props.none}
-          style={c ? (letters ? { color: colorValue(c) } : { background: colorValue(c) }) : undefined}
+          style={c ? (letters ? { color: colorValue(c) } : { background: colorValue(c) }) : props.noneColor && { color: props.noneColor }}
           onClick={() => onPick(c)}
         >
           {letters && 'A'}
@@ -1543,8 +1556,13 @@ function BoxMenu(props: {
   // The name and description, typed here and written when the menu closes (unless by Escape).
   const [name, setName] = useState(store.node(id).text);
   const [desc, setDescText] = useState(() => descOf(store, id));
-  /** Which part of its text the A's colour. */
-  const [inkPart, setInkPart] = useState<FontPart>('all');
+  const font = fontWords(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean));
+  /** Whether the name, description and fields are coloured apart: open at first when they are. */
+  const [inkParts, setInkParts] = useState(() => !!(font.name || font.desc || font.props));
+  const ink = (part: FontPart) => (c: string | null) => {
+    setFontColor(store, id, part, c);
+    ctl.commit();
+  };
   const onClose = () => {
     props.onClose();
     let changed = false;
@@ -1611,24 +1629,36 @@ function BoxMenu(props: {
         none={t('色なし', 'No colour')}
         onPick={(c) => run(() => (setColor(store, id, c), ctl.commit()))()}
       />
-      <div class="dg-menu-row dg-ink-parts" role="group" aria-label={t('色を変える文字', 'Text to colour')}>
-        {FONT_PART_CHOICES.map(([p, label]) => (
-          <button key={p} class={'dg-chip' + (inkPart === p ? ' on' : '')} onClick={() => setInkPart(p)}>
-            {label()}
-          </button>
-        ))}
-      </div>
+      {/* The text: all of it in one row, or its name, description and fields in a row each. Left open after a pick. */}
       <Swatches
-        label={t('文字の色', 'Text colour')}
+        label={t('文字', 'Text')}
+        head={
+          <button
+            class="dg-swatch-label dg-ink-more"
+            aria-expanded={inkParts}
+            title={t('名前・説明・属性を別々の色に', 'Colour the name, description and fields apart')}
+            onClick={() => setInkParts(!inkParts)}
+          >
+            {t('文字', 'Text')} {inkParts ? '▾' : '▸'}
+          </button>
+        }
         letters
-        value={fontWords(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean))[inkPart]}
+        value={font.all}
         none={t('ふつうの色', 'Usual colour')}
-        onPick={(c) => {
-          // Left open, to colour the other parts too.
-          setFontColor(store, id, inkPart, c);
-          ctl.commit();
-        }}
+        onPick={ink('all')}
       />
+      {inkParts &&
+        FONT_PART_CHOICES.map(([p, label]) => (
+          <Swatches
+            key={p}
+            noneColor={colorValue(font.all)}
+            label={label()}
+            letters
+            value={font[p]}
+            none={t('文字の色のまま', 'As the text')}
+            onPick={ink(p)}
+          />
+        ))}
       <div class="dg-menu-row" role="group" aria-label={t('線', 'Outline')}>
         {BORDER_CHOICES.map(([w, label]) => (
           <button

@@ -1195,4 +1195,8 @@ textarea.dg-menu-input { field-sizing: content; min-height: 3.2em; max-height: 1
 .item-menu .dg-swatch.none { background: linear-gradient(135deg, var(--bg) 45%, var(--danger) 45%, var(--danger) 55%, var(--bg) 55%); border-color: var(--faint); }
 .item-menu .letters .dg-swatch { background: var(--bg); border-color: var(--faint); font-size: 12px; font-weight: 700; line-height: 1; }
 .item-menu .letters .dg-swatch.none { color: var(--fg); background: var(--bg); }
+.item-menu .letters { align-items: center; }
+.dg-swatch-label { width: 3.5em; font-size: 12px; color: var(--muted); }
+.item-menu .dg-ink-more { display: inline-block; flex: none; width: 3.5em; padding: 0; border-radius: 0; background: none; text-align: left; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.item-menu .dg-ink-more:hover { color: var(--fg); }
 .item-menu .dg-swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
