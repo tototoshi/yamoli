@@ -118,7 +118,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- 行が箱。`to: [[API]] gRPC` のように属性に書いたリンクが矢印で、後ろの語がラベル\n' +
         '- `shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（枠でも入れ物でもない行の下の行は、箱の中に箇条書き）\n' +
         '- `shape: row`（横一列）/ `column`（縦一列）/ `grid`（格子）で、中の箱をアウトラインの順に並べる。それだけだと見えない並びで、`row dashed` のように枠線を書くと名前付きの枠に\n' +
-        '- `shape`（actor / db / queue / external / process / store）・`color`・`icon` で見た目、`note` で説明\n' +
+        '- `shape`（actor / db / queue / external / process / store）・`color`・`icon`・`border`（枠線: thick / double / dotted / round / shadow など）で見た目、`note` で説明\n' +
         '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。`direction: TB` で縦向き\n' +
         '- この行の `description` は図全体の説明として図の上に出る。`shape: sticky`（付箋）の行は、`to:` でつないだ箱の隣に付く注釈\n\n' +
         '**図の上での編集**\n\n' +
@@ -130,7 +130,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- Each row is a box. A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
         '- A row with `shape: frame` is a frame around the rows under it; `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
         '- `shape: row` / `column` / `grid` lines up the boxes in it in outline order: unseen alone, a named frame with a border word like `row dashed`\n' +
-        '- `shape` (actor / db / queue / external / process / store), `color` and `icon` for the look, `note` for a description\n' +
+        '- `shape` (actor / db / queue / external / process / store), `color`, `icon` and `border` (thick / double / dotted / round / shadow …) for the look, `note` for a description\n' +
         '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines. `direction: TB` draws it top to bottom\n' +
         '- This row’s `description` goes above the diagram. A row with `shape: sticky` is a sticky note, beside the box it is joined to with `to:`\n\n' +
         '**Editing on the diagram**\n\n' +
@@ -164,13 +164,13 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
     tech: 'Go',
   });
   const data = add(vpc, t('データ', 'Data'), { shape: 'column dashed', note: t('毎晩バックアップ', 'Backed up nightly') });
-  const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
+  const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16', border: 'thick' });
   const cache = add(data, t('キャッシュ', 'Cache'), { shape: 'db', tech: 'Redis' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
   const remark = add(vpc, t('キューが 1,000 件を超えたらワーカーを増やす', 'Add workers when the queue passes 1,000 jobs'), {
     shape: 'sticky',
   });
-  const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });
+  const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple', border: 'double shadow' });
   const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', icon: 'mail', tech: 'SendGrid' });
 
   s.addField(user, 'to', to(cdn, 'HTTPS'));

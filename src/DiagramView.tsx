@@ -26,6 +26,10 @@ import {
   PAD,
   PROCESS_PAD,
   PROP_SIZE,
+  BORDER_KEYS,
+  BORDER_WORDS,
+  borderOf,
+  type Border,
   colorValue,
   CONTAINER,
   type Box,
@@ -52,6 +56,7 @@ import {
   neighbour,
   reconnect,
   setColor,
+  toggleBorder,
   setDesc,
   setLabel,
   setLineKind,
@@ -683,6 +688,19 @@ const SHAPE_CHOICES: [ShapeChoice, () => string][] = [
   ['row', () => t('横並び', 'Row')],
   ['column', () => t('縦並び', 'Column')],
   ['grid', () => t('格子', 'Grid')],
+];
+/** The outlines offered in a box's menu, each turned on and off there. */
+const BORDER_CHOICES: [string, () => string][] = [
+  ['solid', () => t('実線', 'Solid')],
+  ['dashed', () => t('破線', 'Dashed')],
+  ['dotted', () => t('点線', 'Dotted')],
+  ['none', () => t('線なし', 'None')],
+  ['thick', () => t('太く', 'Thick')],
+  ['thin', () => t('細く', 'Thin')],
+  ['double', () => t('二重', 'Double')],
+  ['round', () => t('角丸', 'Round')],
+  ['square', () => t('角', 'Square')],
+  ['shadow', () => t('影', 'Shadow')],
 ];
 /** What boxes selected together can be put in, from their menu. */
 const GROUP_CHOICES = [
@@ -1456,6 +1474,11 @@ function BoxMenu(props: {
     : (shapeWords.map((w) => arrangeOf(w)?.kind).find(Boolean) ??
       (shapeWords.includes('frame') ? 'frame' : SHAPE_CHOICES.some(([s]) => s === shapeWords[0]) ? shapeWords[0] : 'box'));
   const color = store.fieldValue(id, 'color')?.toLowerCase();
+  const border = borderOf(BORDER_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean));
+  const borderOn = (w: string) => {
+    const [part, value] = BORDER_WORDS[w];
+    return border?.[part] === value;
+  };
   return (
     <PopupMenu x={x} y={y} onClose={onClose} onCancel={props.onClose}>
       <input
@@ -1508,6 +1531,20 @@ function BoxMenu(props: {
               ctl.commit();
             })}
           />
+        ))}
+      </div>
+      <div class="dg-menu-row" role="group" aria-label={t('線', 'Outline')}>
+        {BORDER_CHOICES.map(([w, label]) => (
+          <button
+            key={w}
+            class={'dg-chip' + (borderOn(w) ? ' on' : '')}
+            onClick={() => {
+              toggleBorder(store, id, w);
+              ctl.commit();
+            }}
+          >
+            {label()}
+          </button>
         ))}
       </div>
       <hr />
@@ -1704,6 +1741,48 @@ interface Drawn {
 const tint = (color: string | undefined, amount = 12) =>
   color ? { stroke: color, fill: `color-mix(in srgb, ${color} ${amount}%, var(--bg))` } : undefined;
 
+type Look = Record<string, string | number>;
+const WEIGHTS = { thin: 0.8, thick: 2.4 };
+const SHADOW = 'drop-shadow(0 2px 3px rgb(0 0 0 / 0.22))';
+
+/** An outline's look as its border says, over look (its colour's); width is the stroke's as the stylesheet draws it. */
+function outlined(border: Border | undefined, look: Look | undefined, width: number): Look | undefined {
+  if (!border) return look;
+  const w = border.weight ? WEIGHTS[border.weight] : width;
+  const k = Math.max(1, w / 1.2);
+  return {
+    ...look,
+    ...(border.color && { stroke: border.color }),
+    ...(border.weight && { strokeWidth: w }),
+    ...(border.dash === 'solid' && { strokeDasharray: 'none' }),
+    ...(border.dash === 'dashed' && { strokeDasharray: `${5 * k} ${4 * k}` }),
+    ...(border.dash === 'dotted' && { strokeDasharray: `0 ${3 * k}`, strokeLinecap: 'round' }),
+    ...(border.shadow && { filter: SHADOW }),
+    ...(border.none && { stroke: 'transparent' }),
+  };
+}
+
+/** The lines drawn on a shape (a cylinder's rim, a queue's bars): the outline's colour and width. */
+const linesOf = (look: Look | undefined) =>
+  look && { ...(look.stroke && { stroke: look.stroke }), ...(look.strokeWidth && { strokeWidth: look.strokeWidth }) };
+
+/** A rounded rectangle's corners: rx as drawn, or as the border says. */
+const cornerOf = (border: Border | undefined, rx: number, h: number) =>
+  border?.corner === 'square' ? 0 : border?.corner === 'round' ? Math.min(h / 2, 18) : rx;
+
+/** The second, inner line of a double border, inset from w×h. */
+function Inner({ look, w, h, rx, ellipse }: { look: Look | undefined; w: number; h: number; rx: number; ellipse?: boolean }) {
+  const { filter: _, ...line } = look ?? {};
+  const style = { ...line, fill: 'none' };
+  const d = DOUBLE_GAP;
+  return ellipse ? (
+    <ellipse class="dg-double" cx={w / 2} cy={h / 2} rx={w / 2 - d} ry={h / 2 - d} style={style} />
+  ) : (
+    <rect class="dg-double" x={d} y={d} width={w - 2 * d} height={h - 2 * d} rx={Math.max(0, rx - d)} style={style} />
+  );
+}
+const DOUBLE_GAP = 3;
+
 /** An icon from icons.ts, or an emoji, in a size×size square at x, y. */
 function Icon({ value, x, y, size, color }: { value: string; x: number; y: number; size: number; color?: string }) {
   const icon = iconOf(value);
@@ -1726,6 +1805,9 @@ function Icon({ value, x, y, size, color }: { value: string; x: number; y: numbe
 }
 
 function Frame({ node, box, on, onHover }: Drawn) {
+  const seen = node.frame !== 'none' && node.frame !== 'hidden';
+  const look = seen ? outlined(node.border, tint(node.color, 6), node.frame === 'box' ? 1.2 : 1) : undefined;
+  const rx = cornerOf(node.border, 8, box.h);
   return (
     <g
       class={'dg-frame ' + node.frame + (node.done ? ' done' : '')}
@@ -1736,19 +1818,18 @@ function Frame({ node, box, on, onHover }: Drawn) {
       onContextMenu={on && ((e) => on.menu(e, node.id))}
     >
       <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
-      <rect
-        width={box.w}
-        height={box.h}
-        rx={8}
-        style={node.frame === 'none' || node.frame === 'hidden' ? undefined : tint(node.color, 6)}
-      />
+      <rect width={box.w} height={box.h} rx={rx} style={look} />
+      {look && node.border?.double && <Inner look={look} w={box.w} h={box.h} rx={rx} />}
     </g>
   );
 }
 
 function Shape({ node, box, on, onHover }: Drawn) {
   const { w, h } = box;
-  const style = tint(node.color);
+  const style = outlined(node.border, tint(node.color), 1.2);
+  const lines = linesOf(style);
+  const rx = cornerOf(node.border, 6, h);
+  const double = node.border?.double;
   const actor = node.shape === 'actor';
   const top = actor ? 36 : PAD + (node.shape === 'db' ? 12 : node.shape === 'process' ? PROCESS_PAD : 0);
   const cx = node.shape === 'queue' ? (w - 16) / 2 : w / 2;
@@ -1774,7 +1855,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
       outline = (
         <>
           <path d={`M0,6 a${rx},6 0 0,1 ${w},0 V${h - 6} a${rx},6 0 0,1 ${-w},0 Z`} style={style} />
-          <path class="dg-line" d={`M0,6 a${rx},6 0 0,0 ${w},0`} style={style && { stroke: style.stroke }} />
+          <path class="dg-line" d={`M0,6 a${rx},6 0 0,0 ${w},0`} style={lines} />
         </>
       );
       break;
@@ -1782,36 +1863,47 @@ function Shape({ node, box, on, onHover }: Drawn) {
     case 'queue':
       outline = (
         <>
-          <rect width={w} height={h} rx={6} style={style} />
-          <path class="dg-line" d={`M${w - 16},0 V${h} M${w - 10},0 V${h}`} style={style && { stroke: style.stroke }} />
+          <rect width={w} height={h} rx={rx} style={style} />
+          {double && <Inner look={style} w={w} h={h} rx={rx} />}
+          <path class="dg-line" d={`M${w - 16},0 V${h} M${w - 10},0 V${h}`} style={lines} />
         </>
       );
       break;
     case 'process':
-      outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} style={style} />;
+      outline = (
+        <>
+          <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} style={style} />
+          {double && <Inner look={style} w={w} h={h} rx={0} ellipse />}
+        </>
+      );
       break;
     case 'store':
       // Two lines, along the top and bottom (as in Yourdon / DeMarco, beside a process's ellipse).
       outline = (
         <>
           <rect class="dg-store-bg" width={w} height={h} style={style && { fill: style.fill }} />
-          <path d={`M0,0 H${w} M0,${h} H${w}`} style={{ fill: 'none', ...(style && { stroke: style.stroke }) }} />
+          <path d={`M0,0 H${w} M0,${h} H${w}`} style={{ ...style, fill: 'none' }} />
         </>
       );
       break;
     case 'sticky': {
       const f = NOTE_FOLD;
-      const paper = tint(node.color, 25);
+      const paper = outlined(node.border, tint(node.color, 25), 1.2);
       outline = (
         <>
           <path class="dg-note" d={`M0,0 H${w - f} L${w},${f} V${h} H0 Z`} style={paper} />
-          <path class="dg-line dg-note-fold" d={`M${w - f},0 V${f} H${w}`} style={paper && { stroke: paper.stroke }} />
+          <path class="dg-line dg-note-fold" d={`M${w - f},0 V${f} H${w}`} style={linesOf(paper)} />
         </>
       );
       break;
     }
     default:
-      outline = <rect class={node.shape === 'external' ? 'dashed' : undefined} width={w} height={h} rx={6} style={style} />;
+      outline = (
+        <>
+          <rect class={node.shape === 'external' ? 'dashed' : undefined} width={w} height={h} rx={rx} style={style} />
+          {double && <Inner look={style} w={w} h={h} rx={rx} />}
+        </>
+      );
   }
   if (node.shape === 'sticky') {
     // Written on it from the top left, like a note: its name, then any description and fields.

@@ -14,6 +14,7 @@ const PROPS = [
   'stroke-linecap',
   'stroke-linejoin',
   'stroke-opacity',
+  'filter',
   'opacity',
   'font-family',
   'font-size',

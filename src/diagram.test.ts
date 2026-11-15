@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
   arrangeOf,
+  borderOf,
   buildDiagram,
   diagramDesc,
   sidesOf,
@@ -533,4 +534,19 @@ test('a sticky note holds its name wrapped, and plain lines to or from it are do
   const lines = s.field(sys, 'lines')!.id;
   s.addField(lines, 'to', 'dashed');
   expect(buildDiagram(s, sys).edges.find((e) => e.from === note && e.to === api)!.style.dash).toBe('dashed');
+});
+
+test('a border is read from its words, English or Japanese, and is not shown as a field', () => {
+  expect(borderOf('thick dashed red')).toEqual({ weight: 'thick', dash: 'dashed', color: '#d9534f' });
+  expect(borderOf('太 点線、二重 丸 影')).toEqual({ weight: 'thick', dash: 'dotted', double: true, corner: 'round', shadow: true });
+  expect(borderOf('なし')).toEqual({ none: true });
+  expect(borderOf('wavy')).toBeUndefined();
+  expect(borderOf(undefined)).toBeUndefined();
+  const { s, sys, api, vpc } = system();
+  s.addField(api, '枠線', 'double square');
+  s.addField(vpc, 'border', 'solid');
+  const d = buildDiagram(s, sys);
+  expect(d.nodes.get(api)!.border).toEqual({ double: true, corner: 'square' });
+  expect(d.nodes.get(api)!.props).toEqual([]);
+  expect(d.nodes.get(vpc)!.border).toEqual({ dash: 'solid' });
 });

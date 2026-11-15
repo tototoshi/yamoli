@@ -19,6 +19,7 @@ import {
   setLineKind,
   setShape,
   setSide,
+  toggleBorder,
   group,
   ungroup,
 } from './diagramEdit';
@@ -56,6 +57,24 @@ test('shape and colour are set as fields, and a plain box or no colour takes the
   setShape(s, a, 'box');
   setColor(s, a, null);
   expect(s.node(a).children).toEqual([]);
+});
+
+test('a border word turns on and off, in place of one saying the same thing', () => {
+  const { s, a, b } = drawing();
+  toggleBorder(s, a, 'dashed');
+  toggleBorder(s, a, 'thick');
+  expect(s.fieldValue(a, 'border')).toBe('dashed thick');
+  toggleBorder(s, a, 'dotted');
+  expect(s.fieldValue(a, 'border')).toBe('thick dotted');
+  toggleBorder(s, a, 'none');
+  expect(s.fieldValue(a, 'border')).toBe('thick none');
+  toggleBorder(s, a, 'none');
+  toggleBorder(s, a, 'thick');
+  expect(s.field(a, 'border')).toBeUndefined();
+  // Written in Japanese, with a colour: the same word in English turns it off, the rest stay.
+  s.addField(b, '枠線', '太 赤 red');
+  toggleBorder(s, b, 'thick');
+  expect(s.fieldValue(b, '枠線')).toBe('赤 red');
 });
 
 test('lining up a frame keeps it drawn as it was; a plain box lined up is unseen', () => {

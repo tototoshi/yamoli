@@ -10,6 +10,8 @@
  *   shape                box / actor / db / queue / external / process
  *                        (an ellipse) / store (a data store: two lines)
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
+ *   border (枠線)        its outline: solid / dashed / dotted, thick / thin,
+ *                        double, round / square corners, shadow, none, a colour
  *   icon                 server, database, cloud … (icons.ts) or an emoji
  *   note / description   wrapped text under the name, in a box or a frame
  *                        (also a `note` block); long text makes the box wider
@@ -44,7 +46,20 @@ const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external', 'process', '
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
-const DRAWING_KEYS = new Set(['shape', 'color', 'icon', 'direction', 'lines', 'layout', 'embed', 'completed', DEP_KEY, VIEWS_KEY]);
+const DRAWING_KEYS = new Set([
+  'shape',
+  'color',
+  'border',
+  '枠線',
+  'icon',
+  'direction',
+  'lines',
+  'layout',
+  'embed',
+  'completed',
+  DEP_KEY,
+  VIEWS_KEY,
+]);
 
 /** How the boxes in a frame are lined up: in a row, a column, or a grid of `columns` across (0: as square as it gets). */
 export type Arrange = { kind: 'row' } | { kind: 'column' } | { kind: 'grid'; columns: number };
@@ -136,6 +151,59 @@ export function lineStyle(words: string, base: LineStyle = { dash: 'solid', ends
   return out;
 }
 
+/** How a box's (or a frame's) outline is drawn, from its `border` words; what is not said is as the shape draws it. */
+export interface Border {
+  dash?: 'solid' | 'dashed' | 'dotted';
+  weight?: 'thin' | 'thick';
+  double?: boolean;
+  corner?: 'round' | 'square';
+  shadow?: boolean;
+  /** No outline at all. */
+  none?: boolean;
+  color?: string;
+}
+
+/** The words of `border`, each with the part it sets, Japanese ones beside them. */
+export const BORDER_WORDS: Record<string, [keyof Border, string | boolean]> = {
+  solid: ['dash', 'solid'],
+  dashed: ['dash', 'dashed'],
+  dotted: ['dash', 'dotted'],
+  thin: ['weight', 'thin'],
+  thick: ['weight', 'thick'],
+  double: ['double', true],
+  round: ['corner', 'round'],
+  square: ['corner', 'square'],
+  shadow: ['shadow', true],
+  none: ['none', true],
+  実線: ['dash', 'solid'],
+  破線: ['dash', 'dashed'],
+  点線: ['dash', 'dotted'],
+  細: ['weight', 'thin'],
+  太: ['weight', 'thick'],
+  二重: ['double', true],
+  丸: ['corner', 'round'],
+  角: ['corner', 'square'],
+  影: ['shadow', true],
+  なし: ['none', true],
+};
+
+/** The fields a box's outline is read from. */
+export const BORDER_KEYS = ['border', '枠線'];
+
+/** A box's outline from words like `thick dashed red` or `太 破線`; undefined when they say nothing. */
+export function borderOf(words: string | undefined): Border | undefined {
+  const out: Border = {};
+  for (const w of (words ?? '')
+    .toLowerCase()
+    .split(/[\s,、]+/)
+    .filter(Boolean)) {
+    const set = BORDER_WORDS[w];
+    if (set) (out as Record<string, unknown>)[set[0]] = set[1];
+    else if (colorValue(w)) out.color = colorValue(w);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export interface DiagramNode {
   id: string;
   label: string;
@@ -145,6 +213,8 @@ export interface DiagramNode {
   /** How the frame's border is drawn. */
   frame: FrameStyle;
   color?: string;
+  /** Its outline, where `border` says. */
+  border?: Border;
   /** The `icon` value; icons.ts tells what it draws. */
   icon?: string;
   /** Text about it (`note`, `description`), on one line; wrapped when drawn. */
@@ -253,6 +323,7 @@ export function buildDiagram(
       isFrame: shape.includes('frame') || !!border || !!arranged,
       frame: border ?? (arranged && !shape.includes('frame') ? 'hidden' : 'dashed'),
       color: colorValue(store.fieldValue(id, 'color')),
+      border: borderOf(BORDER_KEYS.map((k) => store.fieldValue(id, k)).find((v) => v?.trim())),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       desc,
       props,

@@ -5,6 +5,8 @@
  * drawn from (diagram.ts), so the outline stays the one source.
  */
 import {
+  BORDER_KEYS,
+  BORDER_WORDS,
   CONTAINER,
   DESC_KEYS,
   LINE_KEYS,
@@ -68,6 +70,25 @@ const FRAME_WORDS = ['dashed', 'solid', 'none'];
 export function setColor(store: OutlineStore, id: string, color: string | null) {
   const f = store.field(id, 'color');
   if (color) store.setField(id, 'color', color);
+  else if (f) store.remove(f.id);
+}
+
+/**
+ * Turn a word of a box's `border` on or off (`dashed`, `thick`, `shadow` …).
+ * Turning one on takes out the others saying the same thing (`dotted` for
+ * `dashed`, `none` for either), and the field goes when no word is left.
+ */
+export function toggleBorder(store: OutlineStore, id: string, word: string) {
+  const f = BORDER_KEYS.map((k) => store.field(id, k)).find(Boolean);
+  const words = (f?.text ?? '').split(/[\s,、]+/).filter(Boolean);
+  const part = (w: string) => {
+    const p = BORDER_WORDS[w.toLowerCase()]?.[0];
+    return p === 'none' ? 'dash' : p;
+  };
+  const on = words.some((w) => BORDER_WORDS[w.toLowerCase()]?.join() === BORDER_WORDS[word].join());
+  const kept = words.filter((w) => part(w) !== part(word));
+  const next = (on ? kept : [...kept, word]).join(' ');
+  if (next) store.setField(id, f?.key?.trim() ?? 'border', next);
   else if (f) store.remove(f.id);
 }
 
