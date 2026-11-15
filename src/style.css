@@ -1041,6 +1041,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-label { text-anchor: middle; font-weight: 600; fill: var(--fg); font-size: 13px; }
 .dg-prop { text-anchor: middle; fill: var(--muted); font-size: 11px; }
 .dg-desc { text-anchor: middle; fill: var(--summary); font-size: 11px; }
+.dg-node path.dg-note { fill: #fff4b8; stroke: #d9c25c; }
+.dg-node .dg-note-fold { stroke: #d9c25c; }
+.dg-note-text { font-size: 12px; fill: var(--fg); }
+.dg-node text.left { text-anchor: start; }
 .dg-node.done { opacity: 0.5; }
 .dg-node.done .dg-label { text-decoration: line-through; }
 .dg-frame rect { fill: var(--data-bg); stroke: #c9ced6; stroke-width: 1; stroke-dasharray: 6 4; }

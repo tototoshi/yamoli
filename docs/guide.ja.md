@@ -136,7 +136,7 @@ children:
 | `shape: row` / `column` / `grid` | 中の箱を矢印に関係なく、アウトラインの順に並べる。`row` / `横`: 横一列、`column` / `縦`: 縦一列、`grid` / `格子`: 格子状に折り返す（`grid 3` で3列。省略するとほぼ正方形になる列数）。それだけだと枠も名前も描かない、見えない並びになる（行の名前はアウトライン上のメモ）。`row dashed` / `grid 3 solid` / `row none` / `frame row` のように枠線か `frame` を続けると、名前付きの枠になる。中の矢印は線を引くだけで、並びには使わない |
 | 属性の中の `[[リンク]]` | 矢印。リンクの後ろの言葉（なければ属性名、`to` を除く）がラベルになる。`after` の矢印は依存先から引かれる。同じ辺に付く矢印は、相手の位置の順に少しずつずらして付く |
 | `[[リンク]] SQL @上` | 矢印の付く辺を決める。`@` の後ろがリンク先に入る辺、前がリンク元から出る辺（`下@上`、`右@`）。`上` / `下` / `左` / `右`（`top` / `bottom` / `left` / `right`）。決めた矢印は辺からまっすぐ出入りし、間に箱があれば直角に曲がってよける |
-| `shape` | `box` / `actor` / `db` / `queue` / `external` / `process`（楕円）/ `store`（データストア）。DFD なら、外部エンティティは `box`、プロセスは `process`、データストアは `store`、データフローは `to: [[箱]] 注文データ` のようなラベル付きの矢印で |
+| `shape` | `box` / `actor` / `db` / `queue` / `external` / `process`（楕円）/ `store`（データストア）/ `sticky` または `付箋`（注釈用の付箋。名前が折り返して書かれ、`to:` で箱につなぐと矢印なしの点線でその箱の隣に付く）。DFD なら、外部エンティティは `box`、プロセスは `process`、データストアは `store`、データフローは `to: [[箱]] 注文データ` のようなラベル付きの矢印で |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` または `#hex` |
 | `icon` | 名前の前のアイコン: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`、または絵文字。actor では人型の代わりになる |
 | `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい。ズームした項目に書くと図全体の説明として、図の上に出る（SVG・PNG にも入る） |

@@ -39,8 +39,8 @@ import { nodeLabel, refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 import { VIEWS_KEY } from './views';
 
-export type Shape = 'box' | 'actor' | 'db' | 'queue' | 'external' | 'process' | 'store';
-const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external', 'process', 'store'];
+export type Shape = 'box' | 'actor' | 'db' | 'queue' | 'external' | 'process' | 'store' | 'sticky';
+const SHAPES: Shape[] = ['box', 'actor', 'db', 'queue', 'external', 'process', 'store', 'sticky'];
 export type Direction = 'LR' | 'TB';
 
 /** Fields that shape the drawing rather than being shown in the box. */
@@ -249,7 +249,7 @@ export function buildDiagram(
     nodes.set(id, {
       id,
       label: nodeLabel(store, id),
-      shape: SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
+      shape: shape[0] === '付箋' ? 'sticky' : SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
       isFrame: shape.includes('frame') || !!border || !!arranged,
       frame: border ?? (arranged && !shape.includes('frame') ? 'hidden' : 'dashed'),
       color: colorValue(store.fieldValue(id, 'color')),
@@ -278,6 +278,10 @@ export function buildDiagram(
     if (k) looks.set(k, lineStyle(store.node(c).text, looks.get(k)));
   }
   const look = (key: string) => looks.get(key) ?? lineStyle('');
+  // A plain line to or from a sticky note is a dotted one without a head, as notes are pinned on rather than flowed to.
+  const pinned = !lines?.children.some((c) => store.node(c).key?.trim().toLowerCase() === 'to');
+  const lookOf = (key: string, from: string, to: string | null) =>
+    key === 'to' && pinned && [from, to].some((n) => n && nodes.get(n)?.shape === 'sticky') ? lineStyle('dotted none') : look(key);
 
   const edges: DiagramEdge[] = [];
   const seen = new Map<string, DiagramEdge>();
@@ -307,7 +311,8 @@ export function buildDiagram(
           const ref = refIds(part)[0];
           if (!ref || !store.get(ref)) continue;
           const { label, sides } = splitSides(part.replace(/\[\[[^\]]*\]\]/g, ''));
-          push(id, drawn(ref), label || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), look(key), { field: c, ref }, sides);
+          const to = drawn(ref);
+          push(id, to, label || (key in LINE_KEYS ? '' : store.node(c).key!.trim()), lookOf(key, id, to), { field: c, ref }, sides);
         }
       }
     }
@@ -530,8 +535,23 @@ const framePad = (n: DiagramNode) => (n.frame === 'hidden' ? 4 : FRAME_PAD);
 export const PROCESS_PAD = 8;
 
 /** Size of a box (not a frame) by its contents. */
+/** Type size, line height and widest line of a sticky note's text. */
+export const NOTE_SIZE = 12;
+export const NOTE_LINE = 16;
+const NOTE_WIDTH = 180;
+/** Size of a sticky note's folded corner. */
+export const NOTE_FOLD = 10;
+/** A sticky note's text, which is its name, wrapped. */
+export const noteLines = (n: DiagramNode, measure: Measure) => evenWrap(n.label, NOTE_WIDTH, measure, NOTE_SIZE);
+
 export function boxSize(n: DiagramNode, measure: Measure): { w: number; h: number } {
   const desc = descLines(n, measure);
+  if (n.shape === 'sticky') {
+    const text = noteLines(n, measure);
+    const widest = Math.max(...text.map((l) => measure(l, NOTE_SIZE)), ...[...desc, ...n.props].map((p) => measure(p, PROP_SIZE)));
+    const h = text.length * NOTE_LINE + (desc.length + n.props.length) * PROP_LINE + 2 * PAD;
+    return { w: Math.max(Math.ceil(widest) + 2 * PAD + NOTE_FOLD / 2, 64), h: Math.max(h, 40) };
+  }
   const text = Math.max(titleWidth(n, measure), ...[...desc, ...n.props].map((p) => measure(p, PROP_SIZE)));
   const lines = LINE + (desc.length + n.props.length) * PROP_LINE;
   if (n.shape === 'actor') return { w: Math.max(text + 8, 44), h: ACTOR + 6 + lines };
@@ -600,6 +620,16 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
     }
     if (arrange) return lineUp(units, arrange);
     const set = new Set(units);
+    // A sticky note on a box goes beside it, not where its line would rank it.
+    const sticky = (u: string) => nodes.get(u)!.shape === 'sticky' && !nodes.get(u)!.isFrame;
+    const onBox = new Map<string, string>();
+    for (const e of d.edges) {
+      const [a, b] = [liftTo(e.from, set), liftTo(e.to, set)];
+      if (!a || !b || a === b || sticky(a) === sticky(b)) continue;
+      const [note, box] = sticky(a) ? [a, b] : [b, a];
+      if (!onBox.has(note)) onBox.set(note, box);
+    }
+    const ranked = units.filter((u) => !onBox.has(u));
     const succ = new Map(units.map((u) => [u, [] as string[]]));
     const pred = new Map(units.map((u) => [u, [] as string[]]));
     /** Widest label on the arrows leaving each unit, to leave room for it after the unit's rank. */
@@ -607,18 +637,24 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
     for (const e of d.edges) {
       const a = liftTo(e.from, set);
       const b = liftTo(e.to, set);
-      if (!a || !b || a === b) continue;
+      if (!a || !b || a === b || onBox.has(a) || onBox.has(b)) continue;
       if (e.label) labelAfter.set(a, Math.max(labelAfter.get(a) ?? 0, measure(e.label, PROP_SIZE)));
       if (!succ.get(a)!.includes(b)) {
         succ.get(a)!.push(b);
         pred.get(b)!.push(a);
       }
     }
-    const rank = ranks(units, succ, pred);
+    const rank = ranks(ranked, succ, pred);
     const layers: string[][] = [];
-    for (const u of units) (layers[rank.get(u)!] ??= []).push(u);
+    for (const u of ranked) (layers[rank.get(u)!] ??= []).push(u);
     const filled = layers.filter(Boolean);
     orderLayers(filled, succ, pred);
+    for (const [note, box] of onBox) {
+      const layer = filled.find((l) => l.includes(box))!;
+      let i = layer.indexOf(box) + 1;
+      while (i < layer.length && onBox.get(layer[i]) === box) i++;
+      layer.splice(i, 0, note);
+    }
 
     // Ranks one after another; each layer centred across.
     const rankStart: number[] = [];

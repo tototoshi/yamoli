@@ -11,6 +11,10 @@ import { useCtl } from './context';
 import {
   buildDiagram,
   descLines,
+  NOTE_FOLD,
+  NOTE_LINE,
+  NOTE_SIZE,
+  noteLines,
   diagramDesc,
   DIAGRAM_DESC_SIZE,
   estimate,
@@ -673,6 +677,7 @@ const SHAPE_CHOICES: [ShapeChoice, () => string][] = [
   ['external', () => t('外部', 'External')],
   ['process', () => t('プロセス', 'Process')],
   ['store', () => t('データストア', 'Data store')],
+  ['sticky', () => t('付箋', 'Sticky note')],
   ['frame', () => t('枠', 'Frame')],
   [CONTAINER, () => t('入れ物', 'Container')],
   ['row', () => t('横並び', 'Row')],
@@ -1792,8 +1797,47 @@ function Shape({ node, box, on, onHover }: Drawn) {
         </>
       );
       break;
+    case 'sticky': {
+      const f = NOTE_FOLD;
+      const paper = tint(node.color, 25);
+      outline = (
+        <>
+          <path class="dg-note" d={`M0,0 H${w - f} L${w},${f} V${h} H0 Z`} style={paper} />
+          <path class="dg-line dg-note-fold" d={`M${w - f},0 V${f} H${w}`} style={paper && { stroke: paper.stroke }} />
+        </>
+      );
+      break;
+    }
     default:
       outline = <rect class={node.shape === 'external' ? 'dashed' : undefined} width={w} height={h} rx={6} style={style} />;
+  }
+  if (node.shape === 'sticky') {
+    // Written on it from the top left, like a note: its name, then any description and fields.
+    const text = noteLines(node, measure);
+    const below = [...desc.map((d) => ['dg-desc', d]), ...node.props.map((p) => ['dg-prop', p])];
+    return (
+      <g
+        class={'dg-node' + (node.done ? ' done' : '')}
+        transform={`translate(${box.x},${box.y})`}
+        onMouseEnter={() => onHover(node.id)}
+        onPointerDown={on && ((e) => on.press(e, node.id))}
+        onDblClick={on && (() => on.rename(node.id))}
+        onContextMenu={on && ((e) => on.menu(e, node.id))}
+      >
+        <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
+        {outline}
+        {text.map((l, i) => (
+          <text key={i} class="dg-note-text" x={PAD} y={PAD + NOTE_SIZE + i * NOTE_LINE}>
+            {l}
+          </text>
+        ))}
+        {below.map(([cls, l], i) => (
+          <text key={'b' + i} class={cls + ' left'} x={PAD} y={PAD + text.length * NOTE_LINE + (i + 1) * (PROP_SIZE + 3)}>
+            {l}
+          </text>
+        ))}
+      </g>
+    );
   }
   return (
     <g

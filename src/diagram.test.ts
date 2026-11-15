@@ -504,3 +504,29 @@ test("the zoomed item's own description goes above a flow, wrapped to about the 
   expect(tree.desc).toBeUndefined();
   expect(tree.nodes.get(sys)!.desc).toBe(d.desc);
 });
+
+test('a sticky note holds its name wrapped, and plain lines to or from it are dotted without a head', () => {
+  const { s, sys, api, db, vpc } = system();
+  const note = s.addChild(sys, -1, 'Reads go to a replica; writes to the primary, which can lag a few seconds behind').id;
+  s.addField(note, 'shape', '付箋');
+  s.addField(note, 'to', `[[${api}]]`);
+  s.addField(note, 'async', `[[${db}]]`);
+  const d = buildDiagram(s, sys);
+  expect(d.nodes.get(note)!.shape).toBe('sticky');
+  const style = (to: string) => d.edges.find((e) => e.from === note && e.to === to)!.style;
+  expect(style(api)).toEqual({ dash: 'dotted', ends: 'none' });
+  expect(style(db).dash).toBe('dashed'); // a line of its own kind keeps its look
+  const L = layout(d);
+  const b = L.boxes.get(note)!;
+  expect(b.w).toBeLessThan(240);
+  expect(b.h).toBeGreaterThan(50); // several lines
+  // Beside what it is on (the frame holding API), not ranked before it by its line.
+  const v = L.boxes.get(vpc)!;
+  expect(b.x).toBe(v.x);
+  expect(b.y).toBeGreaterThanOrEqual(v.y + v.h);
+  // Unless lines say how `to` looks.
+  s.addField(sys, 'lines', '');
+  const lines = s.field(sys, 'lines')!.id;
+  s.addField(lines, 'to', 'dashed');
+  expect(buildDiagram(s, sys).edges.find((e) => e.from === note && e.to === api)!.style.dash).toBe('dashed');
+});
