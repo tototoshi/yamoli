@@ -142,7 +142,7 @@ children:
 | `font` / `文字色` | 箱や枠の文字の色。`color` と同じ色名か `#hex`。色だけなら文字全体（説明と属性は少し薄く）、`名前:` / `説明:` / `属性:`（`name:` / `desc:` / `props:`）を付けるとその部分だけ（例: `font: red 属性:gray`） |
 | `border` / `枠線` | 箱や枠の線。`solid`（実線）/ `dashed`（破線）/ `dotted`（点線）/ `none`（なし）、`thick`（太）/ `thin`（細）、`double`（二重）、`round`（丸）/ `square`（角）、`shadow`（影）、色を空白区切りで組み合わせる（例: `border: thick dashed red`、`枠線: 二重 影`） |
 | `icon` | 名前の前のアイコン: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`、または絵文字。actor では人型の代わりになる |
-| `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい。ズームした項目に書くと図全体の説明として、図の上に出る（SVG・PNG にも入る） |
+| `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい。ズームした項目に書くと図全体の説明として、図の上に出る（SVG・PNG にも入る）。説明と箱の名前の中の `**太字**`・`*斜体*`・`~~取り消し~~`・`` `コード` `` はそのように描かれる |
 | その他の属性 | 箱の中の小さな `key: value` の行 |
 | `layout`（ズームした項目に） | 一番外の箱を `shape: row` などと同じ言葉で並べる。枠や入れ物に書くと `shape` の並べ方より優先 |
 | `direction`（ズームした項目に） | `LR`（左から右、既定）/ `TB`（上から下） |

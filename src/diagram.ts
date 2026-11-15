@@ -18,6 +18,8 @@
  *                        double, round / square corners, shadow, none, a colour
  *   icon                 server, database, cloud … (icons.ts) or an emoji
  *   note / description   wrapped text under the name, in a box or a frame
+ *                        (in it and the name, **bold**, *italic*, ~~struck~~
+ *                        and `code` are drawn so)
  *                        (also a `note` block); long text makes the box wider
  *   other fields         small `key: value` lines inside the box
  *
@@ -42,6 +44,7 @@
  */
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
+import { parseInline } from './inline';
 import { nodeLabel, refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 import { VIEWS_KEY } from './views';
@@ -278,6 +281,8 @@ export interface DiagramNode {
   icon?: string;
   /** Text about it (`note`, `description`), on one line; wrapped when drawn. */
   desc?: string;
+  /** Where its label and description are bold, italic …, if anywhere. */
+  marks?: { label?: Mark[]; desc?: Mark[] };
   /** `key: value` lines shown under the label. */
   props: string[];
   /** Rows drawn inside this one (a frame), in outline order. */
@@ -311,6 +316,8 @@ export interface Diagram {
   arrange?: Arrange;
   /** The zoomed item's own description, drawn above a flow. */
   desc?: string;
+  /** Where its description is bold, italic … */
+  descMarks?: Mark[];
 }
 
 const COLORS: Record<string, string> = {
@@ -331,15 +338,75 @@ export const colorValue = (v: string | undefined) =>
 /** Fields whose text describes the row, shown as text rather than `key: value`. */
 export const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
 
-/** A field's text as one plain line: Markdown marks and line breaks dropped. */
-const plain = (texts: string[]) =>
-  texts
-    .join('\n')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^\s*(?:#+|[-*+]|\d+[.)])\s+/gm, '')
-    .replace(/[*_`~]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+/** How a stretch of a name or description is drawn: bold, italic, struck through or as code. */
+export type MarkKind = 'strong' | 'em' | 'del' | 'code';
+/** A stretch of text drawn in a style, from its first to past its last character. */
+export interface Mark {
+  from: number;
+  to: number;
+  kind: MarkKind;
+}
+
+/** A run of a line in one style: the marks over it. */
+export interface Run {
+  text: string;
+  kinds: MarkKind[];
+}
+
+/**
+ * The lines text was wrapped into, each as runs of one style. A line is found
+ * in text after the one before (wrapping only trims at the breaks); one not
+ * found is drawn plain.
+ */
+export function markedLines(text: string, lines: string[], marks: Mark[] | undefined): Run[][] {
+  let at = 0;
+  return lines.map((line) => {
+    const start = marks?.length ? text.indexOf(line, at) : -1;
+    if (start < 0) return [{ text: line, kinds: [] }];
+    at = start + line.length;
+    const runs: Run[] = [];
+    for (let i = 0; i < line.length; i++) {
+      const kinds = marks!.filter((m) => m.from <= start + i && start + i < m.to).map((m) => m.kind);
+      const last = runs[runs.length - 1];
+      if (last && last.kinds.join() === kinds.join()) last.text += line[i];
+      else runs.push({ text: line[i], kinds });
+    }
+    return runs;
+  });
+}
+
+/** Text with Markdown marks (`**bold**` …) taken out, and where they were. */
+export function unmark(src: string): { text: string; marks: Mark[] } {
+  let text = '';
+  const marks: Mark[] = [];
+  for (const seg of parseInline(src)) {
+    if (seg.kind === 'strong' || seg.kind === 'em' || seg.kind === 'del' || seg.kind === 'code')
+      marks.push({ from: text.length, to: text.length + seg.text.length, kind: seg.kind });
+    text += seg.text;
+  }
+  return { text, marks };
+}
+
+/** A field's text as one line, line breaks and list marks dropped, and its Markdown marks. */
+const plain = (store: OutlineStore, texts: string[]) =>
+  unmark(
+    withLabels(store, texts.join('\n'))
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^\s*(?:#+|[-*+]|\d+[.)])\s+/gm, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+
+/** The marks of a row's first line, placed in its label (which may start with a field's name). */
+function labelMarks(store: OutlineStore, id: string, label: string): Mark[] | undefined {
+  const { text, marks } = unmark(
+    withLabels(store, store.node(id).text.split('\n')[0]).replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1')
+  );
+  const at = marks.length ? label.indexOf(text.trim()) : -1;
+  if (at < 0) return undefined;
+  const lead = text.length - text.trimStart().length;
+  return marks.map((m) => ({ ...m, from: m.from - lead + at, to: m.to - lead + at }));
+}
 
 const PROP_MAX = 32;
 const clip = (s: string) => (s.length > PROP_MAX ? s.slice(0, PROP_MAX - 1) + '…' : s);
@@ -353,16 +420,23 @@ export function buildDiagram(
   const nodes = new Map<string, DiagramNode>();
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
   const isDesc = (c: string) => DESC_KEYS.has(store.node(c).key?.trim().toLowerCase() ?? '');
-  /** The text of the first description field under id with any. */
+  /** The text of the first description field under id with any, and its marks. */
   const descOf = (id: string) =>
     store
       .node(id)
       .children.filter(isDesc)
-      .map((c) => withLabels(store, plain(store.fieldTexts(c).filter((x) => x.trim()))))
-      .find((x) => x) || undefined;
+      .map((c) =>
+        plain(
+          store,
+          store.fieldTexts(c).filter((x) => x.trim())
+        )
+      )
+      .find((x) => x.text);
   const add = (id: string, children = rows(id)) => {
     const props: string[] = [];
-    const desc = descOf(id);
+    const about = descOf(id);
+    const label = nodeLabel(store, id);
+    const marks = { label: labelMarks(store, id, label), desc: about?.marks };
     for (const c of store.node(id).children) {
       const f = store.node(c);
       const key = f.key?.trim();
@@ -379,7 +453,8 @@ export function buildDiagram(
       : (shape.find((w) => FRAME_STYLES.includes(w as FrameStyle)) as FrameStyle | undefined);
     nodes.set(id, {
       id,
-      label: nodeLabel(store, id),
+      label,
+      ...((marks.label?.length || marks.desc?.length) && { marks }),
       shape: shape[0] === '付箋' ? 'sticky' : SHAPES.includes(shape[0] as Shape) ? (shape[0] as Shape) : 'box',
       isFrame: shape.includes('frame') || !!border || !!arranged,
       frame: border ?? (arranged && !shape.includes('frame') ? 'hidden' : 'dashed'),
@@ -387,7 +462,7 @@ export function buildDiagram(
       font: fontOf(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean)),
       border: borderOf(BORDER_KEYS.map((k) => store.fieldValue(id, k)).find((v) => v?.trim())),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
-      desc,
+      desc: about?.text,
       props,
       children,
       arrange: arrangeOf(store.fieldValue(id, 'layout')) ?? arranged,
@@ -461,8 +536,9 @@ export function buildDiagram(
     top = [rootId];
   }
   if (kind === 'flow') {
-    const desc = descOf(rootId);
-    return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind, arrange, desc };
+    const about = descOf(rootId);
+    const [desc, descMarks] = [about?.text, about?.marks.length ? about.marks : undefined];
+    return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind, arrange, desc, descMarks };
   }
   return { nodes, top, edges, direction: dir === 'TB' ? 'TB' : 'LR', kind };
 }

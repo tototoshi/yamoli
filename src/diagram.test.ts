@@ -10,6 +10,8 @@ import {
   estimate,
   frameDesc,
   layout,
+  markedLines,
+  unmark,
   wrap,
   type Box,
 } from './diagram';
@@ -549,4 +551,41 @@ test('a border is read from its words, English or Japanese, and is not shown as 
   expect(d.nodes.get(api)!.border).toEqual({ double: true, corner: 'square' });
   expect(d.nodes.get(api)!.props).toEqual([]);
   expect(d.nodes.get(vpc)!.border).toEqual({ dash: 'solid' });
+});
+
+test('bold, italic, struck and code stretches of a name or description are kept, placed in the text drawn', () => {
+  expect(unmark('a **big** and `x` *y* ~~z~~')).toEqual({
+    text: 'a big and x y z',
+    marks: [
+      { from: 2, to: 5, kind: 'strong' },
+      { from: 10, to: 11, kind: 'code' },
+      { from: 12, to: 13, kind: 'em' },
+      { from: 14, to: 15, kind: 'del' },
+    ],
+  });
+  // Wrapped, each line in runs: a mark across a break goes on in the next line.
+  const { text, marks } = unmark('one **two three** four');
+  expect(markedLines(text, ['one two', 'three four'], marks)).toEqual([
+    [
+      { text: 'one ', kinds: [] },
+      { text: 'two', kinds: ['strong'] },
+    ],
+    [
+      { text: 'three', kinds: ['strong'] },
+      { text: ' four', kinds: [] },
+    ],
+  ]);
+  expect(markedLines('abc', ['abc…'], [{ from: 0, to: 1, kind: 'em' }])).toEqual([[{ text: 'abc…', kinds: [] }]]);
+
+  const { s, sys, api, vpc } = system();
+  s.setText(api, 'The **API**');
+  s.addField(api, 'note', 'Reads *only*, see [[' + vpc + ']] **now**');
+  const n = buildDiagram(s, sys).nodes.get(api)!;
+  expect(n.label).toBe('The API');
+  expect(n.marks!.label).toEqual([{ from: 4, to: 7, kind: 'strong' }]);
+  // A link is its target's name before the marks are placed.
+  expect(n.desc).toBe(`Reads only, see ${s.node(vpc).text} now`);
+  const bold = n.marks!.desc!.find((m) => m.kind === 'strong')!;
+  expect(n.desc!.slice(bold.from, bold.to)).toBe('now');
+  expect(buildDiagram(s, sys).nodes.get(vpc)!.marks).toBeUndefined();
 });

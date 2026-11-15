@@ -19,6 +19,7 @@ const PROPS = [
   'font-family',
   'font-size',
   'font-weight',
+  'font-style',
   'text-anchor',
   'text-decoration',
   'paint-order',

@@ -142,7 +142,7 @@ is drawn as:
 | `font` / `文字色` | The colour of the text in a box or frame: a colour word as for `color`, or `#hex`. A colour alone is for all of it (the description and fields a little paler); `name:` / `desc:` / `props:` (`名前:` / `説明:` / `属性:`) before one is for that part only (`font: red props:gray`) |
 | `border` / `枠線` | The outline of a box or frame: `solid` / `dashed` / `dotted` / `none`, `thick` / `thin`, `double`, `round` / `square` corners, `shadow` and a colour, in any mix (`border: thick dashed red`) |
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
-| `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too. On the zoomed item, it describes the whole diagram and goes above it (in the SVG and PNG too) |
+| `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too. On the zoomed item, it describes the whole diagram and goes above it (in the SVG and PNG too). `**bold**`, `*italic*`, `~~struck~~` and `` `code` `` in it or in a box's name are drawn so |
 | Other fields | Small `key: value` lines in the box |
 | `layout` (on the zoomed item) | Lines up the outermost boxes, with the same words as `shape: row` and the rest. On a frame or a container it wins over its `shape` |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |

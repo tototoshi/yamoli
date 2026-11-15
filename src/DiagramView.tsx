@@ -32,6 +32,8 @@ import {
   FONT_KEYS,
   fontWords,
   type FontPart,
+  markedLines,
+  type Run,
   type Border,
   colorValue,
   CONTAINER,
@@ -1235,9 +1237,9 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             <path d="M0,1 L10,5 L0,9 z" fill="context-stroke" />
           </marker>
         </defs>
-        {about.map((l, i) => (
+        {markedLines(d.desc ?? '', about, d.descMarks).map((l, i) => (
           <text key={i} class="dg-about" x={x0} y={aboutTop + (i + 1) * DESC_LINE - 4}>
-            {l}
+            <Runs runs={l} />
           </text>
         ))}
         {[...L.boxes].map(([nid, b]) =>
@@ -1297,11 +1299,11 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             <g key={nid} data-box={nid} style={inkOf(n)}>
               {n.icon && <Icon value={n.icon} x={b.x + 12} y={b.y + 5} size={15} color={n.color} />}
               <text class={'dg-frame-title' + (n.frame === 'box' ? ' box' : '')} x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
-                {n.label}
+                <Runs runs={markedLines(n.label, [n.label], n.marks?.label)[0]} />
               </text>
-              {frameDesc(n, b.w, measure).map((l, i) => (
+              {markedLines(n.desc ?? '', frameDesc(n, b.w, measure), n.marks?.desc).map((l, i) => (
                 <text key={i} class="dg-frame-desc" x={b.x + 12} y={b.y + 17 + (i + 1) * (PROP_SIZE + 3)}>
-                  {l}
+                  <Runs runs={l} />
                 </text>
               ))}
             </g>
@@ -1969,6 +1971,21 @@ function Inner({ look, w, h, rx, ellipse }: { look: Look | undefined; w: number;
 }
 const DOUBLE_GAP = 3;
 
+/** A line's runs: a marked one in a tspan styled by its marks (dg-strong, dg-em …). */
+const Runs = ({ runs }: { runs: Run[] }) => (
+  <>
+    {runs.map((r, i) =>
+      r.kinds.length ? (
+        <tspan key={i} class={r.kinds.map((k) => 'dg-' + k).join(' ')}>
+          {r.text}
+        </tspan>
+      ) : (
+        r.text
+      )
+    )}
+  </>
+);
+
 /** The colours of a box's text by part, for the stylesheet to draw them in (else as usual). */
 const inkOf = ({ font }: DiagramNode) =>
   font &&
@@ -2033,6 +2050,11 @@ function Shape({ node, box, on, onHover }: Drawn) {
   const labelX = iconBeside ? cx + ICON_SPACE / 2 : cx;
   const iconX = cx - (measure(node.label, LABEL_SIZE) + ICON_SPACE) / 2;
   const desc = descLines(node, measure);
+  /** The description's lines, then the fields', each with its class. */
+  const below: [string, Run[]][] = [
+    ...markedLines(node.desc ?? '', desc, node.marks?.desc).map((l): [string, Run[]] => ['dg-desc', l]),
+    ...node.props.map((p): [string, Run[]] => ['dg-prop', [{ text: p, kinds: [] }]]),
+  ];
   let outline;
   switch (node.shape) {
     case 'actor':
@@ -2102,8 +2124,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
   }
   if (node.shape === 'sticky') {
     // Written on it from the top left, like a note: its name, then any description and fields.
-    const text = noteLines(node, measure);
-    const below = [...desc.map((d) => ['dg-desc', d]), ...node.props.map((p) => ['dg-prop', p])];
+    const text = markedLines(node.label, noteLines(node, measure), node.marks?.label);
     return (
       <g
         class={'dg-node' + (node.done ? ' done' : '')}
@@ -2119,12 +2140,12 @@ function Shape({ node, box, on, onHover }: Drawn) {
         {outline}
         {text.map((l, i) => (
           <text key={i} class="dg-note-text" x={PAD} y={PAD + NOTE_SIZE + i * NOTE_LINE}>
-            {l}
+            <Runs runs={l} />
           </text>
         ))}
         {below.map(([cls, l], i) => (
           <text key={'b' + i} class={cls + ' left'} x={PAD} y={PAD + text.length * NOTE_LINE + (i + 1) * (PROP_SIZE + 3)}>
-            {l}
+            <Runs runs={l} />
           </text>
         ))}
       </g>
@@ -2145,11 +2166,11 @@ function Shape({ node, box, on, onHover }: Drawn) {
       {outline}
       {iconBeside && <Icon value={node.icon!} x={iconX} y={top - 1} size={16} color={node.color} />}
       <text class="dg-label" x={labelX} y={top + LABEL_SIZE}>
-        {node.label}
+        <Runs runs={markedLines(node.label, [node.label], node.marks?.label)[0]} />
       </text>
-      {[...desc.map((d) => ['dg-desc', d]), ...node.props.map((p) => ['dg-prop', p])].map(([cls, text], i) => (
+      {below.map(([cls, l], i) => (
         <text key={i} class={cls} x={cx} y={top + LABEL_SIZE + 4 + (i + 1) * (PROP_SIZE + 3)}>
-          {text}
+          <Runs runs={l} />
         </text>
       ))}
     </g>
