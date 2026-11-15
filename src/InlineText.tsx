@@ -6,6 +6,7 @@
 import { useMemo } from 'preact/hooks';
 import { useCtl } from './context';
 import { t } from './i18n';
+import { colorValue } from './colors';
 import { highlight, parseInline, type Seg } from './inline';
 import { nodeLabel } from './links';
 
@@ -37,6 +38,15 @@ export function SegView({ seg }: { seg: Seg }) {
       return <em>{pieces}</em>;
     case 'del':
       return <del>{pieces}</del>;
+    case 'color':
+      // Marked inside too (`[**hot** day]{red}`), each piece keeping its place in the source.
+      return (
+        <span style={{ color: colorValue(seg.color) }}>
+          {parseInline(seg.text).map((s) => (
+            <SegView key={s.start} seg={{ ...s, start: s.start + seg.start }} />
+          ))}
+        </span>
+      );
     case 'tag':
       return (
         <span class="tag" title={t('このタグで検索', 'Search for this tag')}>

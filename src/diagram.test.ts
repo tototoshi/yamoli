@@ -589,3 +589,14 @@ test('bold, italic, struck and code stretches of a name or description are kept,
   expect(n.desc!.slice(bold.from, bold.to)).toBe('now');
   expect(buildDiagram(s, sys).nodes.get(vpc)!.marks).toBeUndefined();
 });
+
+test('a coloured stretch of a description is drawn in its colour, over any other mark', () => {
+  const { text, marks } = unmark('a [**hot** day]{red} b');
+  expect(text).toBe('a hot day b');
+  expect(markedLines(text, [text], marks)[0]).toEqual([
+    { text: 'a ', kinds: [] },
+    { text: 'hot', kinds: ['strong'], color: '#d9534f' },
+    { text: ' day', kinds: [], color: '#d9534f' },
+    { text: ' b', kinds: [] },
+  ]);
+});

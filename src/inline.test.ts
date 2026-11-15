@@ -71,3 +71,22 @@ test('linkAt finds the link around the caret', () => {
   expect(linkAt(src, 46)).toEqual({ kind: 'ref', start: 42, end: 49, refId: 'abc' });
   expect(linkAt(src, 54)).toBeNull(); // bold is not a link
 });
+
+test('[words]{colour} is a stretch in a colour word or #hex; other words in braces stay text', () => {
+  expect(parseInline('a [hot]{red} b [x]{#3b6fd8}')).toEqual([
+    { kind: 'text', text: 'a ', start: 0 },
+    { kind: 'color', text: 'hot', start: 3, color: 'red' },
+    { kind: 'text', text: ' b ', start: 12 },
+    { kind: 'color', text: 'x', start: 16, color: '#3b6fd8' },
+  ]);
+  expect(parseInline('[x]{wavy}').map((s) => s.kind)).toEqual(['text']);
+  expect(markupSpans('[**hot** day]{red}!')).toEqual([
+    { text: '[', cls: 'mk' },
+    { text: '**', cls: 'mk', color: 'red' },
+    { text: 'hot', cls: 'strong', color: 'red' },
+    { text: '**', cls: 'mk', color: 'red' },
+    { text: ' day', cls: 'color', color: 'red' },
+    { text: ']{red}', cls: 'mk' },
+    { text: '!' },
+  ]);
+});

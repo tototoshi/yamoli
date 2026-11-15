@@ -1975,8 +1975,8 @@ const DOUBLE_GAP = 3;
 const Runs = ({ runs }: { runs: Run[] }) => (
   <>
     {runs.map((r, i) =>
-      r.kinds.length ? (
-        <tspan key={i} class={r.kinds.map((k) => 'dg-' + k).join(' ')}>
+      r.kinds.length || r.color ? (
+        <tspan key={i} class={r.kinds.map((k) => 'dg-' + k).join(' ') || undefined} style={r.color && { fill: r.color }}>
           {r.text}
         </tspan>
       ) : (

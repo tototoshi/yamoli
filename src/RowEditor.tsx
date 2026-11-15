@@ -13,6 +13,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { useCtl } from './context';
 import { IS_MAC } from './keys';
 import { t } from './i18n';
+import { colorValue } from './colors';
 import { linkAt, markupSpans, type LinkAt } from './inline';
 import { nodeLabel } from './links';
 import type { OutlineNode } from './model';
@@ -90,7 +91,7 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
     >
       <div class={'text mirror' + (title ? ' title' : '')} aria-hidden="true">
         {spans.map((s, i) => (
-          <span key={i} class={s.cls && 'm-' + s.cls}>
+          <span key={i} class={s.cls && 'm-' + s.cls} style={s.color && { color: colorValue(s.color) }}>
             {s.text}
           </span>
         ))}

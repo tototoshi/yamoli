@@ -102,6 +102,7 @@ export function nodeLabel(store: OutlineStore, id: string, depth = 0): string {
     .split('\n')[0]
     .replace(REF_RE, (src, ref) => (depth < 2 && store.get(ref) ? nodeLabel(store, ref, depth + 1) : src))
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\{#?\w+\}/g, '$1')
     .replace(/\*\*([^*]+)\*\*|~~([^~]+)~~|`([^`]+)`|\*([^*\s][^*]*)\*/g, (_, a, b, c, d) => a ?? b ?? c ?? d)
     .trim();
   if (n.key !== null) return `${n.key}: ${text}`;

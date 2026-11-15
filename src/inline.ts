@@ -1,14 +1,16 @@
 /*
  * Inline formatting for row text shown outside the editor.
  *
- * Supported: `code`, **bold**, *italic*, ~~strike~~, [label](https://…),
+ * Supported: `code`, **bold**, *italic*, ~~strike~~, [words]{red} in a
+ * colour (a colour word or #hex), [label](https://…),
  * bare https:// URLs, #tags and [[id]] links to other items. Markup characters are hidden; every segment
  * remembers where its text starts in the source so a click can be mapped
  * back to a caret position.
  */
+import { COLOR_WORDS } from './colors';
 import type { Term } from './search';
 
-export type SegKind = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link' | 'tag' | 'ref';
+export type SegKind = 'text' | 'code' | 'strong' | 'em' | 'del' | 'color' | 'link' | 'tag' | 'ref';
 
 export interface Seg {
   kind: SegKind;
@@ -18,7 +20,12 @@ export interface Seg {
   href?: string;
   /** Target node id of a 'ref' segment (whose text is the raw `[[id]]`). */
   refId?: string;
+  /** The colour word (or #hex) of a 'color' segment. */
+  color?: string;
 }
+
+/** A colour as written in `[words]{red}`. */
+const COLOR_RE = `(?:${COLOR_WORDS.join('|')}|#[0-9a-fA-F]{3,8})`;
 
 const INLINE = new RegExp(
   [
@@ -26,6 +33,7 @@ const INLINE = new RegExp(
     /`(?<code>[^`]+)`/,
     /\*\*(?<strong>[^*]+)\*\*/,
     /~~(?<del>[^~]+)~~/,
+    new RegExp(`\\[(?<colored>[^\\]]+)\\]\\{(?<color>${COLOR_RE})\\}`),
     /\*(?<em>[^*\s][^*]*)\*/,
     /\[(?<label>[^\]]+)\]\((?<href>https?:\/\/[^)\s]+)\)/,
     /(?<url>https?:\/\/[^\s<>()]+)/,
@@ -48,6 +56,7 @@ export function parseInline(src: string): Seg[] {
     else if (g.code !== undefined) push({ kind: 'code', text: g.code, start: i + 1 });
     else if (g.strong !== undefined) push({ kind: 'strong', text: g.strong, start: i + 2 });
     else if (g.del !== undefined) push({ kind: 'del', text: g.del, start: i + 2 });
+    else if (g.colored !== undefined) push({ kind: 'color', text: g.colored, start: i + 1, color: g.color });
     else if (g.em !== undefined) push({ kind: 'em', text: g.em, start: i + 1 });
     else if (g.label !== undefined) push({ kind: 'link', text: g.label, start: i + 1, href: g.href });
     else if (g.url !== undefined) push({ kind: 'link', text: g.url, start: i, href: g.url });
@@ -62,6 +71,8 @@ export function parseInline(src: string): Seg[] {
 export interface MarkSpan {
   text: string;
   cls?: 'mk' | SegKind;
+  /** The colour word of a 'color' span. */
+  color?: string;
 }
 
 /**
@@ -71,7 +82,7 @@ export interface MarkSpan {
 export function markupSpans(src: string): MarkSpan[] {
   const out: MarkSpan[] = [];
   let last = 0;
-  const put = (text: string, cls?: MarkSpan['cls']) => text && out.push({ text, cls });
+  const put = (text: string, cls?: MarkSpan['cls'], color?: string) => text && out.push({ text, cls, ...(color && { color }) });
   for (const m of src.matchAll(INLINE)) {
     const g = m.groups!;
     const i = m.index! + (g.pre?.length ?? 0);
@@ -80,7 +91,12 @@ export function markupSpans(src: string): MarkSpan[] {
     else if (g.code !== undefined) (put('`', 'mk'), put(g.code, 'code'), put('`', 'mk'));
     else if (g.strong !== undefined) (put('**', 'mk'), put(g.strong, 'strong'), put('**', 'mk'));
     else if (g.del !== undefined) (put('~~', 'mk'), put(g.del, 'del'), put('~~', 'mk'));
-    else if (g.em !== undefined) (put('*', 'mk'), put(g.em, 'em'), put('*', 'mk'));
+    else if (g.colored !== undefined) {
+      // Its words styled as they are marked, all in its colour.
+      put('[', 'mk');
+      for (const sp of markupSpans(g.colored)) out.push({ ...sp, cls: sp.cls ?? 'color', color: g.color });
+      put(`]{${g.color}}`, 'mk');
+    } else if (g.em !== undefined) (put('*', 'mk'), put(g.em, 'em'), put('*', 'mk'));
     else if (g.label !== undefined) (put('[', 'mk'), put(g.label, 'link'), put(`](${g.href})`, 'mk'));
     else if (g.url !== undefined) put(g.url, 'link');
     else put(g.tag, 'tag');

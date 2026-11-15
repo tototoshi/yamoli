@@ -42,6 +42,7 @@
  * dashed`, `grid 3 solid`) it is a frame, its name on top. `layout` with the
  * same words does it for the zoomed item (or a frame).
  */
+import { colorValue } from './colors';
 import { DEP_KEY, dependencies } from './deps';
 import { iconOf } from './icons';
 import { parseInline } from './inline';
@@ -320,37 +321,27 @@ export interface Diagram {
   descMarks?: Mark[];
 }
 
-const COLORS: Record<string, string> = {
-  red: '#d9534f',
-  orange: '#e8892c',
-  yellow: '#c9a227',
-  green: '#3a9a5b',
-  blue: '#3b6fd8',
-  purple: '#8a4fc8',
-  gray: '#7d848e',
-  grey: '#7d848e',
-};
-
-/** A colour word (`blue`) or `#hex` as the colour drawn; undefined for anything else. */
-export const colorValue = (v: string | undefined) =>
-  v ? (COLORS[v.toLowerCase()] ?? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : undefined)) : undefined;
+export { colorValue };
 
 /** Fields whose text describes the row, shown as text rather than `key: value`. */
 export const DESC_KEYS = new Set(['note', 'notes', 'description', 'desc', '説明', 'メモ']);
 
-/** How a stretch of a name or description is drawn: bold, italic, struck through or as code. */
-export type MarkKind = 'strong' | 'em' | 'del' | 'code';
+/** How a stretch of a name or description is drawn: bold, italic, struck through, as code or in a colour. */
+export type MarkKind = 'strong' | 'em' | 'del' | 'code' | 'color';
 /** A stretch of text drawn in a style, from its first to past its last character. */
 export interface Mark {
   from: number;
   to: number;
   kind: MarkKind;
+  /** The colour drawn, for a `color` mark. */
+  color?: string;
 }
 
 /** A run of a line in one style: the marks over it. */
 export interface Run {
   text: string;
   kinds: MarkKind[];
+  color?: string;
 }
 
 /**
@@ -366,10 +357,12 @@ export function markedLines(text: string, lines: string[], marks: Mark[] | undef
     at = start + line.length;
     const runs: Run[] = [];
     for (let i = 0; i < line.length; i++) {
-      const kinds = marks!.filter((m) => m.from <= start + i && start + i < m.to).map((m) => m.kind);
+      const over = marks!.filter((m) => m.from <= start + i && start + i < m.to);
+      const kinds = over.map((m) => m.kind).filter((k) => k !== 'color');
+      const color = [...over].reverse().find((m) => m.color)?.color; // the innermost
       const last = runs[runs.length - 1];
-      if (last && last.kinds.join() === kinds.join()) last.text += line[i];
-      else runs.push({ text: line[i], kinds });
+      if (last && last.kinds.join() === kinds.join() && last.color === color) last.text += line[i];
+      else runs.push({ text: line[i], kinds, ...(color && { color }) });
     }
     return runs;
   });
@@ -382,6 +375,14 @@ export function unmark(src: string): { text: string; marks: Mark[] } {
   for (const seg of parseInline(src)) {
     if (seg.kind === 'strong' || seg.kind === 'em' || seg.kind === 'del' || seg.kind === 'code')
       marks.push({ from: text.length, to: text.length + seg.text.length, kind: seg.kind });
+    else if (seg.kind === 'color') {
+      // Marked inside too: `[**hot** day]{red}`.
+      const inner = unmark(seg.text);
+      marks.push({ from: text.length, to: text.length + inner.text.length, kind: 'color', color: colorValue(seg.color) });
+      marks.push(...inner.marks.map((m) => ({ ...m, from: m.from + text.length, to: m.to + text.length })));
+      text += inner.text;
+      continue;
+    }
     text += seg.text;
   }
   return { text, marks };
