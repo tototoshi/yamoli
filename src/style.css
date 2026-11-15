@@ -1166,7 +1166,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-type-at .dg-rename { pointer-events: auto; }
 .dg-type-at .dg-rename.dg-type-idle { opacity: 0; pointer-events: none; }
 .dg-label-input { font-size: 12px; font-weight: 400; }
-.dg-menu { min-width: 240px; }
+.dg-menu { min-width: 240px; max-height: calc(100vh - 16px); overflow-y: auto; }
 /* A name, description or label typed in the menu. */
 .dg-menu-input {
   display: block;
@@ -1183,6 +1183,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   resize: vertical;
 }
 input.dg-menu-input { font-weight: 600; }
+/* A description grows with what is typed, up to a few lines, then scrolls. */
+textarea.dg-menu-input { field-sizing: content; min-height: 3.2em; max-height: 10em; }
 .dg-menu-input:focus { border-color: var(--accent); outline: none; }
 .dg-menu-note { padding: 4px 10px; color: var(--muted); font-size: 12px; }
 .dg-menu-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; }

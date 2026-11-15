@@ -178,7 +178,7 @@ export function ItemMenuView() {
   useEffect(() => {
     if (!m) return;
     const close = (e: Event) => {
-      if (e.type === 'mousedown' && ref.current?.contains(e.target as Node)) return;
+      if (e.type !== 'blur' && e.type !== 'hashchange' && ref.current?.contains(e.target as Node)) return;
       ctl.closeMenu();
     };
     document.addEventListener('mousedown', close);

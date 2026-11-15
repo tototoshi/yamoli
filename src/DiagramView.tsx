@@ -1569,7 +1569,8 @@ function PopupMenu({
     if (first instanceof HTMLInputElement) first.select();
     const away = (e: Event) => !ref.current?.contains(e.target as Node) && on.current.onClose();
     const key = (e: KeyboardEvent) => e.key === 'Escape' && !imeActive(e) && on.current.onCancel();
-    const scroll = () => on.current.onClose();
+    // A long name or description scrolls inside its field: only a scroll outside the menu closes it.
+    const scroll = (e: Event) => !ref.current?.contains(e.target as Node) && on.current.onClose();
     window.addEventListener('pointerdown', away, true);
     window.addEventListener('keydown', key);
     window.addEventListener('scroll', scroll, true);
@@ -1579,14 +1580,15 @@ function PopupMenu({
       window.removeEventListener('scroll', scroll, true);
     };
   }, []);
+  // Kept in the window by its own size, which grows with a long description.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.left = `${Math.max(8, Math.min(x, window.innerWidth - el.offsetWidth - 8))}px`;
+    el.style.top = `${Math.max(8, Math.min(y, window.innerHeight - el.offsetHeight - 8))}px`;
+  });
   return (
-    <div
-      ref={ref}
-      class="item-menu dg-menu"
-      role="menu"
-      style={{ left: `${Math.min(x, window.innerWidth - 260)}px`, top: `${Math.min(y, window.innerHeight - 380)}px` }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+    <div ref={ref} class="item-menu dg-menu" role="menu" onContextMenu={(e) => e.preventDefault()}>
       {title && <div class="item-menu-title">{title}</div>}
       {children}
     </div>
