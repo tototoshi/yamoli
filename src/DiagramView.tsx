@@ -202,17 +202,43 @@ export function route(
   // A stretch down to the lane, not through a box.
   const open = (x: number, y1: number, y2: number) =>
     boxes.every((r) => x <= r.x - 4 || x >= r.x + r.w + 4 || Math.max(y1, y2) <= r.y - 4 || Math.min(y1, y2) >= r.y + r.h + 4);
-  let best: { cost: number; pts: Pt[] } | null = null;
+  // Every way clear of boxes, least out of the way first: only those that could still beat the best so far have their crossings counted.
+  const ways: { y: number; x1: number; x2: number; out: number }[] = [];
   for (const y of lanesNear) {
-    for (const x1 of turns(x1s, s)) {
-      if (!open(x1, p0[1], y) || !free([x1, p0[1]], [x1, y])) continue;
-      for (const x2 of turns(x2s, -s)) {
-        if (s * (x2 - x1) <= SPACING || !open(x2, y, p3[1]) || !free([x2, y], [x2, p3[1]]) || !free([x1, y], [x2, y])) continue;
-        const pts: Pt[] = [p0, [x1, p0[1]], [x1, y], [x2, y], [x2, p3[1]], p3];
-        const cost = CROSSING * taken.crossings(pts.map(sw)) + Math.abs(y - wanted) + (Math.abs(x1 - x1s) + Math.abs(x2 - x2s)) / 2;
-        if (!best || cost < best.cost) best = { cost, pts };
+    const ones = turns(x1s, s).filter((x1) => open(x1, p0[1], y) && free([x1, p0[1]], [x1, y]));
+    const twos = turns(x2s, -s).filter((x2) => open(x2, y, p3[1]) && free([x2, y], [x2, p3[1]]));
+    for (const x1 of ones) {
+      for (const x2 of twos) {
+        if (s * (x2 - x1) > SPACING) ways.push({ y, x1, x2, out: Math.abs(y - wanted) + (Math.abs(x1 - x1s) + Math.abs(x2 - x2s)) / 2 });
       }
     }
+  }
+  ways.sort((m, n) => m.out - n.out);
+  // Crossings counted in three parts, each counted once: up to the furthest turn into the lane, the lane between, and on from the first turn out.
+  const [m1, m2] = [x1s + s * 5 * SPACING, x2s - s * 5 * SPACING];
+  const counted = new Map<string, number>();
+  const part = (key: string, pts: Pt[]) => {
+    if (!counted.has(key)) counted.set(key, taken.crossings(pts.map(sw)));
+    return counted.get(key)!;
+  };
+  const crossings = (pts: Pt[]) => {
+    const [[x1, y], [x2]] = [pts[2], pts[3]];
+    if (s * (m2 - m1) < 0) return taken.crossings(pts.map(sw));
+    const lane: Pt[] = [
+      [m1, y],
+      [m2, y],
+    ];
+    return (
+      part(`in ${x1} ${y}`, [...pts.slice(0, 3), lane[0]]) + part(`lane ${y}`, lane) + part(`out ${x2} ${y}`, [lane[1], ...pts.slice(3)])
+    );
+  };
+  let best: { cost: number; pts: Pt[] } | null = null;
+  for (const { y, x1, x2, out } of ways) {
+    if (best && out >= best.cost) break;
+    if (!free([x1, y], [x2, y])) continue;
+    const pts: Pt[] = [p0, [x1, p0[1]], [x1, y], [x2, y], [x2, p3[1]], p3];
+    const cost = out + CROSSING * crossings(pts);
+    if (!best || cost < best.cost) best = { cost, pts };
   }
   const lane = best ? best.pts[2][1] : (nearest[0] ?? wanted);
   const [x1, x2] = best ? [best.pts[1][0], best.pts[3][0]] : [x1s, x2s];
@@ -242,42 +268,95 @@ const CROSSING = 80;
 
 /** The straight stretches of the lines drawn so far, for the next ones to keep off. */
 export class Taken {
-  /** Across the page: [y, from x, to x]. */
-  private across: [number, number, number][] = [];
-  /** Down the page: [x, from y, to y]. */
-  private down: [number, number, number][] = [];
+  /** Across the page, by where they are down it: [y, from x, to x, which stretch]. */
+  private across = new Map<number, [number, number, number, number][]>();
+  /** Down the page, by where they are across it: [x, from y, to y, which stretch]. */
+  private down = new Map<number, [number, number, number, number][]>();
   /** Every stretch, curves as short straight ones, to count crossings with. */
   private all: [Pt, Pt][] = [];
+  /** Which of them pass through each square of the page, so only those near a line are looked at. */
+  private cells = new Map<number, number[]>();
+  /** The last count each stretch was looked at in, so one in several squares counts once. */
+  private seen: number[] = [];
+  private count = 0;
+  /** Stretches taken away for now (of a line being drawn again). */
+  private hidden = new Set<number>();
 
-  /** How many of the lines drawn the line through pts crosses (touching at an end doesn't count). */
-  crossings(pts: Pt[]): number {
+  private static CELL = 48;
+  /** The squares a stretch from p to q passes through (those its bounds cover). */
+  private static squares([x1, y1]: Pt, [x2, y2]: Pt, each: (key: number) => void) {
+    const c = Taken.CELL;
+    for (let i = Math.floor(Math.min(x1, x2) / c); i <= Math.floor(Math.max(x1, x2) / c); i++)
+      for (let j = Math.floor(Math.min(y1, y2) / c); j <= Math.floor(Math.max(y1, y2) / c); j++) each(i * 65536 + j);
+  }
+
+  /** How many stretches have been drawn. */
+  get size() {
+    return this.all.length;
+  }
+
+  /** How many of the lines drawn (the first `upto` stretches) the line through pts crosses (touching at an end doesn't count). */
+  crossings(pts: Pt[], upto = Infinity): number {
     const turn = (a: Pt, b: Pt, c: Pt) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
     let n = 0;
     for (let i = 1; i < pts.length; i++) {
       const [p, q] = [pts[i - 1], pts[i]];
-      for (const [r, t] of this.all) {
-        if (turn(p, q, r) * turn(p, q, t) < 0 && turn(r, t, p) * turn(r, t, q) < 0) n++;
-      }
+      const count = ++this.count;
+      Taken.squares(p, q, (key) => {
+        for (const k of this.cells.get(key) ?? []) {
+          if (this.seen[k] === count || k >= upto || this.hidden.has(k)) continue;
+          this.seen[k] = count;
+          const [r, t] = this.all[k];
+          if (turn(p, q, r) * turn(p, q, t) < 0 && turn(r, t, p) * turn(r, t, q) < 0) n++;
+        }
+      });
     }
     return n;
   }
 
   /** Whether a straight stretch from p to q keeps clear of every one running the same way. */
   free([x1, y1]: Pt, [x2, y2]: Pt): boolean {
-    const runs = (list: [number, number, number][], at: number, a: number, b: number) =>
-      list.every(([c, lo, hi]) => Math.abs(c - at) >= SPACING - 1 || Math.min(hi, Math.max(a, b)) - Math.max(lo, Math.min(a, b)) <= 2);
+    const runs = (by: Map<number, [number, number, number, number][]>, at: number, a: number, b: number) =>
+      [-1, 0, 1].every((k) =>
+        (by.get(Math.round(at / SPACING) + k) ?? []).every(
+          ([c, lo, hi, n]) =>
+            Math.abs(c - at) >= SPACING - 1 || Math.min(hi, Math.max(a, b)) - Math.max(lo, Math.min(a, b)) <= 2 || this.hidden.has(n)
+        )
+      );
     if (y1 === y2) return runs(this.across, y1, x1, x2);
     if (x1 === x2) return runs(this.down, x1, y1, y2);
     return true;
   }
 
-  /** Note the stretches of a line through pts. */
-  add(pts: Pt[]) {
+  /** Note the stretches of a line through pts; which they are, to hide them again. */
+  add(pts: Pt[]): [number, number] {
+    const first = this.all.length;
+    const put = (by: Map<number, [number, number, number, number][]>, run: [number, number, number, number]) => {
+      const k = Math.round(run[0] / SPACING);
+      const list = by.get(k);
+      if (list) list.push(run);
+      else by.set(k, [run]);
+    };
     for (let i = 1; i < pts.length; i++) {
-      this.all.push([pts[i - 1], pts[i]]);
-      const [[x1, y1], [x2, y2]] = [pts[i - 1], pts[i]];
-      if (y1 === y2) this.across.push([y1, Math.min(x1, x2), Math.max(x1, x2)]);
-      else if (x1 === x2) this.down.push([x1, Math.min(y1, y2), Math.max(y1, y2)]);
+      const [p, q] = [pts[i - 1], pts[i]];
+      const k = this.all.push([p, q]) - 1;
+      Taken.squares(p, q, (key) => {
+        const list = this.cells.get(key);
+        if (list) list.push(k);
+        else this.cells.set(key, [k]);
+      });
+      const [[x1, y1], [x2, y2]] = [p, q];
+      if (y1 === y2) put(this.across, [y1, Math.min(x1, x2), Math.max(x1, x2), k]);
+      else if (x1 === x2) put(this.down, [x1, Math.min(y1, y2), Math.max(y1, y2), k]);
+    }
+    return [first, this.all.length];
+  }
+
+  /** Leave out stretches added before (from, to), as if not drawn, or put them back. */
+  hide([from, to]: [number, number], hidden = true) {
+    for (let k = from; k < to; k++) {
+      if (hidden) this.hidden.add(k);
+      else this.hidden.delete(k);
     }
   }
 }
@@ -407,6 +486,112 @@ export function aroundBoxes(s: { p: Pt; out: Pt }, e: { p: Pt; out: Pt }, boxes:
     if (len > longest) [longest, mid] = [len, [(pts[i][0] + pts[i - 1][0]) / 2, (pts[i][1] + pts[i - 1][1]) / 2]];
   }
   return { d: rounded(pts), mid, pts, ends: [s.p, e.p] as [Pt, Pt], trace: pts };
+}
+
+/** The way each arrow goes, and the sides of its boxes it joins. */
+export function routeAll(d: Diagram, L: Layout, measure: Measure) {
+  // A frame's description is in the way of lines too (its title alone has room above the contents),
+  // except of lines to that frame.
+  const heads = new Map<string, Box>();
+  for (const [nid, b] of L.boxes) {
+    const n = d.nodes.get(nid)!;
+    if (b.frame && n.desc) heads.set(nid, { x: b.x, y: b.y + 4, w: b.w, h: frameHead(n, b.w, measure) - 4, frame: false });
+  }
+  const all = [...L.boxes.values()];
+  // The sides each arrow joins its boxes by: where pinned, else facing each other.
+  const sidesOf = new Map(
+    d.edges.map((e) => {
+      const natural = facing(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction);
+      return [e, [e.sides.from ?? natural[0], e.sides.to ?? natural[1]] as [Side, Side]];
+    })
+  );
+  // Ends sharing a side of a box spread out along it, in the order of the boxes at their other ends, so they don't cross.
+  const at = new Map(d.edges.map((e) => [e, [0.5, 0.5] as [number, number]]));
+  const sharing = new Map<string, { e: DiagramEdge; end: 0 | 1; box: string; side: Side; other: Box }[]>();
+  for (const e of d.edges) {
+    const [s0, s1] = sidesOf.get(e)!;
+    for (const end of [
+      { e, end: 0 as const, box: e.from, side: s0, other: L.boxes.get(e.to)! },
+      { e, end: 1 as const, box: e.to, side: s1, other: L.boxes.get(e.from)! },
+    ]) {
+      const k = `${end.box} ${end.side}`;
+      sharing.set(k, [...(sharing.get(k) ?? []), end]);
+    }
+  }
+  for (const ends of sharing.values()) {
+    if (ends.length < 2) continue;
+    const { box, side } = ends[0];
+    const b = L.boxes.get(box)!;
+    const across = side === 'top' || side === 'bottom';
+    const centre = (r: Box) => (across ? r.x + r.w / 2 : r.y + r.h / 2);
+    const len = across ? b.w : b.h;
+    const step = Math.min(len / (ends.length + 1), 16) / len;
+    ends.sort((p, q) => centre(p.other) - centre(q.other));
+    ends.forEach(({ e, end }, i) => (at.get(e)![end] = 0.5 + (i - (ends.length - 1) / 2) * step));
+  }
+  const routeOf = (e: DiagramEdge, taken?: Taken) => {
+    const others = [...all, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
+    const labelWidth = e.label ? measure(e.label, PROP_SIZE) + 8 : 0;
+    return route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, labelWidth, sidesOf.get(e), at.get(e), taken);
+  };
+  // Curves first: they go their own way, and the lines going round boxes then pick ways crossing them least.
+  const first = new Map(d.edges.map((e) => [e, routeOf(e)]));
+  const curved = d.edges.filter((e) => !first.get(e)!.pts.length);
+  // Lines going round boxes after, one by one, each keeping off those before: in whichever of a few orders crosses least
+  // (when there are many, trying more orders takes long and seldom helps).
+  const rounding = d.edges.filter((e) => first.get(e)!.pts.length);
+  const from = (e: DiagramEdge) => {
+    const b = L.boxes.get(e.from)!;
+    return b.y + b.h / 2 + (b.x + b.w / 2) / 1e4;
+  };
+  const orders = [
+    rounding,
+    [...rounding].reverse(),
+    [...rounding].sort((p, q) => from(p) - from(q)),
+    [...rounding].sort((p, q) => from(q) - from(p)),
+  ];
+  /** Every line's crossings with the others, each counted once. */
+  const crossingsIn = (rs: Map<DiagramEdge, Route>) => {
+    const t = new Taken();
+    let n = 0;
+    for (const r of rs.values()) {
+      n += t.crossings(r.trace);
+      t.add(r.trace);
+    }
+    return n;
+  };
+  let routes = new Map<DiagramEdge, Route>();
+  let fewest = Infinity;
+  for (const order of orders.slice(0, rounding.length > 1 && rounding.length <= 30 ? 4 : 1)) {
+    const taken = new Taken();
+    const rs = new Map(curved.map((e) => [e, first.get(e)!]));
+    for (const r of rs.values()) taken.add(r.trace);
+    for (const e of order) rs.set(e, routeOf(e, taken));
+    const n = crossingsIn(rs);
+    if (n < fewest) [routes, fewest] = [rs, n];
+    if (!n) break;
+  }
+  // Then each line going around boxes is routed again knowing all the others, kept when it crosses fewer.
+  const drawn = new Taken();
+  const stretches = new Map([...routes].map(([e, r]) => [e, drawn.add(r.trace)]));
+  for (let pass = 0; pass < 2 && fewest > 0; pass++) {
+    for (const e of rounding) {
+      const was = stretches.get(e)!;
+      drawn.hide(was);
+      const now = drawn.crossings(routes.get(e)!.trace);
+      const before = drawn.size;
+      const again = now ? routeOf(e, drawn) : null;
+      const added: [number, number] = [before, drawn.size];
+      if (again && drawn.crossings(again.trace, before) < now) {
+        routes.set(e, again);
+        stretches.set(e, added);
+      } else {
+        drawn.hide(added);
+        drawn.hide(was, false);
+      }
+    }
+  }
+  return { routes, sidesOf };
 }
 
 /** A polyline with its corners rounded. */
@@ -542,6 +727,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   const [bend, setBend] = useState<{ fixed: Pt; at: Pt; to: string | null } | null>(null);
   /** A box being dragged: how far, and where it would go. */
   const [moving, setMoving] = useState<{ id: string; dx: number; dy: number; drop: Drop | null } | null>(null);
+  /** The arrows' ways last worked out, and for what. */
+  const routed = useRef<{ key: string; routes: Route[]; sides: [Side, Side][] } | null>(null);
   const showCompleted = ctl.prefs.showCompleted;
   // Built anew on each render: the store changes in place, and laying out a page of boxes is quick.
   const d = buildDiagram(store, id, { showCompleted, kind });
@@ -651,99 +838,18 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   }
 
   const near = (e: { from: string; to: string }) => hover !== null && (e.from === hover || e.to === hover);
-  // A frame's description is in the way of lines too (its title alone has room above the contents),
-  // except of lines to that frame.
-  const heads = new Map<string, Box>();
-  for (const [nid, b] of L.boxes) {
-    const n = d.nodes.get(nid)!;
-    if (b.frame && n.desc) heads.set(nid, { x: b.x, y: b.y + 4, w: b.w, h: frameHead(n, b.w, measure) - 4, frame: false });
+  // Routed again only when the boxes or arrows change, not on hovering or selecting.
+  const routedFor = JSON.stringify([
+    d.direction,
+    [...L.boxes].map(([nid, b]) => [nid, b.x, b.y, b.w, b.h, b.frame, b.frame && d.nodes.get(nid)!.desc]),
+    d.edges.map((e) => [e.from, e.to, e.label, e.sides]),
+  ]);
+  if (routed.current?.key !== routedFor) {
+    const r = routeAll(d, L, measure);
+    routed.current = { key: routedFor, routes: d.edges.map((e) => r.routes.get(e)!), sides: d.edges.map((e) => r.sidesOf.get(e)!) };
   }
-  const all = [...L.boxes.values()];
-  // The sides each arrow joins its boxes by: where pinned, else facing each other.
-  const sidesOf = new Map(
-    d.edges.map((e) => {
-      const natural = facing(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction);
-      return [e, [e.sides.from ?? natural[0], e.sides.to ?? natural[1]] as [Side, Side]];
-    })
-  );
-  // Ends sharing a side of a box spread out along it, in the order of the boxes at their other ends, so they don't cross.
-  const at = new Map(d.edges.map((e) => [e, [0.5, 0.5] as [number, number]]));
-  const sharing = new Map<string, { e: DiagramEdge; end: 0 | 1; box: string; side: Side; other: Box }[]>();
-  for (const e of d.edges) {
-    const [s0, s1] = sidesOf.get(e)!;
-    for (const end of [
-      { e, end: 0 as const, box: e.from, side: s0, other: L.boxes.get(e.to)! },
-      { e, end: 1 as const, box: e.to, side: s1, other: L.boxes.get(e.from)! },
-    ]) {
-      const k = `${end.box} ${end.side}`;
-      sharing.set(k, [...(sharing.get(k) ?? []), end]);
-    }
-  }
-  for (const ends of sharing.values()) {
-    if (ends.length < 2) continue;
-    const { box, side } = ends[0];
-    const b = L.boxes.get(box)!;
-    const across = side === 'top' || side === 'bottom';
-    const centre = (r: Box) => (across ? r.x + r.w / 2 : r.y + r.h / 2);
-    const len = across ? b.w : b.h;
-    const step = Math.min(len / (ends.length + 1), 16) / len;
-    ends.sort((p, q) => centre(p.other) - centre(q.other));
-    ends.forEach(({ e, end }, i) => (at.get(e)![end] = 0.5 + (i - (ends.length - 1) / 2) * step));
-  }
-  const routeOf = (e: DiagramEdge, taken?: Taken) => {
-    const others = [...all, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
-    const labelWidth = e.label ? measure(e.label, PROP_SIZE) + 8 : 0;
-    return route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, labelWidth, sidesOf.get(e), at.get(e), taken);
-  };
-  // Curves first: they go their own way, and the lines going round boxes then pick ways crossing them least.
-  const curved = new Set(d.edges.filter((e) => !routeOf(e).pts.length));
-  // Lines going round boxes after, one by one, each keeping off those before: in whichever of a few orders crosses least.
-  const rounding = d.edges.filter((e) => !curved.has(e));
-  const from = (e: DiagramEdge) => {
-    const b = L.boxes.get(e.from)!;
-    return b.y + b.h / 2 + (b.x + b.w / 2) / 1e4;
-  };
-  const orders = [
-    rounding,
-    [...rounding].reverse(),
-    [...rounding].sort((p, q) => from(p) - from(q)),
-    [...rounding].sort((p, q) => from(q) - from(p)),
-  ];
-  /** Every line's crossings with the others, each counted once. */
-  const crossingsIn = (rs: Map<DiagramEdge, Route>) => {
-    const t = new Taken();
-    let n = 0;
-    for (const r of rs.values()) {
-      n += t.crossings(r.trace);
-      t.add(r.trace);
-    }
-    return n;
-  };
-  let routes = new Map<DiagramEdge, Route>();
-  let fewest = Infinity;
-  for (const order of rounding.length > 1 ? orders : [rounding]) {
-    const taken = new Taken();
-    const rs = new Map(d.edges.filter((e) => curved.has(e)).map((e) => [e, routeOf(e, taken)]));
-    for (const e of order) rs.set(e, routeOf(e, taken));
-    const n = crossingsIn(rs);
-    if (n < fewest) [routes, fewest] = [rs, n];
-    if (!n) break;
-  }
-  // Then each line going around boxes is routed again knowing all the others, kept when it crosses fewer.
-  const others = (e: DiagramEdge) => {
-    const t = new Taken();
-    for (const [o, r] of routes) if (o !== e) t.add(r.trace);
-    return t;
-  };
-  for (let pass = 0; pass < 2 && fewest > 0; pass++) {
-    for (const e of d.edges) {
-      if (curved.has(e)) continue;
-      const now = routes.get(e)!;
-      const again = routeOf(e, others(e));
-      const rest = others(e);
-      if (rest.crossings(again.trace) < rest.crossings(now.trace)) routes.set(e, again);
-    }
-  }
+  const routes = new Map(d.edges.map((e, i) => [e, routed.current!.routes[i]]));
+  const sidesOf = new Map(d.edges.map((e, i) => [e, routed.current!.sides[i]]));
   // The drawing's bounds: the boxes, and lines going around them with their labels.
   let [x0, y0, x1, y1] = [0, 0, L.width, L.height];
   for (const e of d.edges) {
