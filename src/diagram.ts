@@ -10,7 +10,10 @@
  *   shape                box / actor / db / queue / external / process
  *                        (an ellipse) / store (a data store: two lines)
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
- *   font (文字色)        the colour of its text, as for color
+ *   font (文字色)        the colour of its text, as for color (the description
+ *                        and fields a little paler); `名前:` / `説明:` / `属性:`
+ *                        (`name:` / `desc:` / `props:`) before a colour for one
+ *                        part: `font: red 属性:gray`
  *   border (枠線)        its outline: solid / dashed / dotted, thick / thin,
  *                        double, round / square corners, shadow, none, a colour
  *   icon                 server, database, cloud … (icons.ts) or an emoji
@@ -202,6 +205,45 @@ export const BORDER_WORDS: Record<string, [keyof Border, string | boolean]> = {
 /** The fields a box's text colour is read from. */
 export const FONT_KEYS = ['font', '文字色'];
 
+/** The parts of a box's text that take a colour of their own; `all` is a colour alone, for all of them. */
+export type FontPart = 'all' | 'name' | 'desc' | 'props';
+const FONT_PARTS: Record<string, FontPart> = {
+  name: 'name',
+  名前: 'name',
+  desc: 'desc',
+  description: 'desc',
+  説明: 'desc',
+  props: 'props',
+  fields: 'props',
+  属性: 'props',
+};
+
+/** The colour words of a `font` value by part: `red 属性:gray` → { all: 'red', props: 'gray' }; other words are left out. */
+export function fontWords(value: string | undefined): Partial<Record<FontPart, string>> {
+  const out: Partial<Record<FontPart, string>> = {};
+  for (const w of (value ?? '').split(/\s+/).filter(Boolean)) {
+    const m = w.match(/^([^:：]+)[:：](.+)$/);
+    const part = m ? FONT_PARTS[m[1].toLowerCase()] : 'all';
+    const color = m ? m[2] : w;
+    if (part && colorValue(color)) out[part] = color.toLowerCase();
+  }
+  return out;
+}
+
+/** The colours a box's text is drawn in, by part: one set for all goes paler in the description and fields. */
+export interface Font {
+  name?: string;
+  desc?: string;
+  props?: string;
+}
+function fontOf(value: string | undefined): Font | undefined {
+  const w = fontWords(value);
+  const all = colorValue(w.all);
+  const pale = (amount: number) => all && `color-mix(in srgb, ${all} ${amount}%, var(--bg))`;
+  const font = { name: colorValue(w.name) ?? all, desc: colorValue(w.desc) ?? pale(80), props: colorValue(w.props) ?? pale(55) };
+  return font.name || font.desc || font.props ? font : undefined;
+}
+
 /** The fields a box's outline is read from. */
 export const BORDER_KEYS = ['border', '枠線'];
 
@@ -228,8 +270,8 @@ export interface DiagramNode {
   /** How the frame's border is drawn. */
   frame: FrameStyle;
   color?: string;
-  /** The colour of its text, where `font` says. */
-  font?: string;
+  /** The colours of its text, where `font` says. */
+  font?: Font;
   /** Its outline, where `border` says. */
   border?: Border;
   /** The `icon` value; icons.ts tells what it draws. */
@@ -342,7 +384,7 @@ export function buildDiagram(
       isFrame: shape.includes('frame') || !!border || !!arranged,
       frame: border ?? (arranged && !shape.includes('frame') ? 'hidden' : 'dashed'),
       color: colorValue(store.fieldValue(id, 'color')),
-      font: colorValue(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean)),
+      font: fontOf(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean)),
       border: borderOf(BORDER_KEYS.map((k) => store.fieldValue(id, k)).find((v) => v?.trim())),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       desc,

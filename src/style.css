@@ -1038,12 +1038,12 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* A data store is drawn by its lines; its box only fills. */
 .dg-node rect.dg-store-bg { stroke: none; }
 .dg-actor { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linecap: round; }
-.dg-label { text-anchor: middle; font-weight: 600; fill: var(--fg); font-size: 13px; }
-.dg-prop { text-anchor: middle; fill: var(--muted); font-size: 11px; }
-.dg-desc { text-anchor: middle; fill: var(--summary); font-size: 11px; }
+.dg-label { text-anchor: middle; font-weight: 600; fill: var(--ink-name, var(--fg)); font-size: 13px; }
+.dg-prop { text-anchor: middle; fill: var(--ink-props, var(--muted)); font-size: 11px; }
+.dg-desc { text-anchor: middle; fill: var(--ink-desc, var(--summary)); font-size: 11px; }
 .dg-node path.dg-note { fill: #fff4b8; stroke: #d9c25c; }
 .dg-node .dg-note-fold { stroke: #d9c25c; }
-.dg-note-text { font-size: 12px; fill: var(--fg); }
+.dg-note-text { font-size: 12px; fill: var(--ink-name, var(--fg)); }
 .dg-node text.left { text-anchor: start; }
 .dg-node.done { opacity: 0.5; }
 .dg-node.done .dg-label { text-decoration: line-through; }
@@ -1055,10 +1055,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-icon { fill: none; stroke: var(--fg); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .dg-icon-text { text-anchor: middle; pointer-events: none; }
 .dg-frame:hover rect { stroke: var(--accent); }
-.dg-frame-title { font-size: 12px; font-weight: 600; fill: var(--summary); paint-order: stroke; stroke: var(--data-bg); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
-.dg-frame-title.box { font-size: 13px; fill: var(--fg); stroke: var(--bg); }
+.dg-frame-title { font-size: 12px; font-weight: 600; fill: var(--ink-name, var(--summary)); paint-order: stroke; stroke: var(--data-bg); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
+.dg-frame-title.box { font-size: 13px; fill: var(--ink-name, var(--fg)); stroke: var(--bg); }
 .dg-about { font-size: 12px; fill: var(--summary); pointer-events: none; }
-.dg-frame-desc { font-size: 11px; fill: var(--summary); paint-order: stroke; stroke: var(--data-bg); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.dg-frame-desc { font-size: 11px; fill: var(--ink-desc, var(--summary)); paint-order: stroke; stroke: var(--data-bg); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .dg-branch { fill: none; stroke: #b6bcc5; stroke-width: 1.5; }
 .dg-edge path { fill: none; stroke: var(--edge, #7d848e); stroke-width: 1.3; }
 .dg-edge.dashed path { stroke-dasharray: 6 4; }

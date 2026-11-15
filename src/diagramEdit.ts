@@ -9,6 +9,8 @@ import {
   BORDER_WORDS,
   colorValue,
   FONT_KEYS,
+  fontWords,
+  type FontPart,
   CONTAINER,
   DESC_KEYS,
   LINE_KEYS,
@@ -94,10 +96,27 @@ export function toggleBorder(store: OutlineStore, id: string, word: string) {
   else if (f) store.remove(f.id);
 }
 
-/** Give a box's text a colour, or (null) the usual one; written to the field it has (`font` or `文字色`). */
-export function setFontColor(store: OutlineStore, id: string, color: string | null) {
+/** How a part of a box's text is named before its colour in `font`, in the language of the app. */
+const FONT_PART_WORD: Record<Exclude<FontPart, 'all'>, [string, string]> = {
+  name: ['名前', 'name'],
+  desc: ['説明', 'desc'],
+  props: ['属性', 'props'],
+};
+
+/**
+ * Give a part of a box's text (or all of it) a colour, or (null) the usual
+ * one, in the field it has (`font` or `文字色`); the field goes when no
+ * colour is left in it.
+ */
+export function setFontColor(store: OutlineStore, id: string, part: FontPart, color: string | null) {
   const f = FONT_KEYS.map((k) => store.field(id, k)).find(Boolean);
-  if (color) store.setField(id, f?.key?.trim() ?? 'font', color);
+  const words = { ...fontWords(f?.text), [part]: color ?? undefined };
+  const ja = lang() === 'ja' ? 0 : 1;
+  const next = (['all', 'name', 'desc', 'props'] as const)
+    .filter((p) => words[p])
+    .map((p) => (p === 'all' ? words[p] : `${FONT_PART_WORD[p][ja]}:${words[p]}`))
+    .join(' ');
+  if (next) store.setField(id, f?.key?.trim() ?? 'font', next);
   else if (f) store.remove(f.id);
 }
 

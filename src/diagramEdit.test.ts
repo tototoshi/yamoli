@@ -369,15 +369,28 @@ test('an arrow has a look of its own in braces beside its link: a colour set the
   expect(lineColorOf(edge(x))).toBeUndefined();
 });
 
-test("a box's text colour is set in font (or 文字色, where it has that), and taken away", () => {
+test("a box's text is coloured all at once (its description and fields paler) or part by part, in font or 文字色", () => {
   const { s, a, b, draw } = drawing();
-  setFontColor(s, a, 'red');
+  const font = (id: string) => draw().d.nodes.get(id)!.font;
+  setFontColor(s, a, 'all', 'red');
   expect(s.fieldValue(a, 'font')).toBe('red');
-  expect(draw().d.nodes.get(a)!).toMatchObject({ font: '#d9534f', props: [] });
-  setFontColor(s, a, null);
+  expect(font(a)).toEqual({
+    name: '#d9534f',
+    desc: 'color-mix(in srgb, #d9534f 80%, var(--bg))',
+    props: 'color-mix(in srgb, #d9534f 55%, var(--bg))',
+  });
+  expect(draw().d.nodes.get(a)!.props).toEqual([]);
+  // A part's own colour, written after the colour for all.
+  setFontColor(s, a, 'props', 'gray');
+  expect(s.fieldValue(a, 'font')).toMatch(/^red (属性|props):gray$/);
+  expect(font(a)).toMatchObject({ name: '#d9534f', props: '#7d848e' });
+  setFontColor(s, a, 'all', null);
+  expect(font(a)).toEqual({ name: undefined, desc: undefined, props: '#7d848e' });
+  setFontColor(s, a, 'props', null);
   expect(s.node(a).children).toEqual([]);
-  s.addField(b, '文字色', '#123456');
-  expect(draw().d.nodes.get(b)!.font).toBe('#123456');
-  setFontColor(s, b, 'blue');
-  expect(s.fieldValue(b, '文字色')).toBe('blue');
+  // Written by hand, in Japanese, with a full-width colon; unknown words are dropped when it is set.
+  s.addField(b, '文字色', '説明：#123456 名前:blue wavy');
+  expect(font(b)).toEqual({ name: '#3b6fd8', desc: '#123456', props: undefined });
+  setFontColor(s, b, 'name', 'green');
+  expect(s.fieldValue(b, '文字色')).toMatch(/^(名前|name):green (説明|desc):#123456$/);
 });
