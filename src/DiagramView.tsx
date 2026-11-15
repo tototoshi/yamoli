@@ -118,7 +118,7 @@ function onSide(r: Box, side: Side, t: number): { p: Pt; out: Pt } {
  * or below (left or right of) the boxes in the way. Pinned to other sides, it
  * curves straight out of one and into the other.
  */
-function route(
+export function route(
   a: Box,
   b: Box,
   dir: Direction,

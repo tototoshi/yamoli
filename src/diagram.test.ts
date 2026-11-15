@@ -453,3 +453,22 @@ test('a word beside a link pins its ends to sides: before the @ where it leaves,
   expect(splitSides(' SQL 書き込み @上 ')).toEqual({ label: 'SQL 書き込み', sides: { to: 'top' } });
   expect(splitSides('mail me@example.com')).toEqual({ label: 'mail me@example.com', sides: {} });
 });
+
+test('boxes in each column are put in the order where the arrows between columns cross least', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  // In this outline order, sorting each column by where its neighbours are still leaves a crossing.
+  const ids = Object.fromEntries('BFCHEAIDG'.split('').map((n) => [n, s.addChild(p, -1, n).id]));
+  const arrows = ['AE', 'BD', 'BE', 'BF', 'BG', 'CG', 'EH', 'EI', 'FH', 'GH'];
+  for (const from of 'ABCEFG') {
+    const to = arrows.filter((a) => a[0] === from).map((a) => `[[${ids[a[1]]}]]`);
+    s.addField(ids[from], 'to', to.join(', '));
+  }
+  const L = layout(buildDiagram(s, p));
+  const at = (n: string) => L.boxes.get(ids[n])!;
+  for (const [a, b] of arrows) {
+    for (const [c, d] of arrows) {
+      if (at(a).x === at(c).x) expect((at(a).y - at(c).y) * (at(b).y - at(d).y)).toBeGreaterThanOrEqual(0);
+    }
+  }
+});
