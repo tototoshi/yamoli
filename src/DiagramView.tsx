@@ -29,6 +29,7 @@ import {
   BORDER_KEYS,
   BORDER_WORDS,
   borderOf,
+  FONT_KEYS,
   type Border,
   colorValue,
   CONTAINER,
@@ -56,6 +57,7 @@ import {
   neighbour,
   reconnect,
   setColor,
+  setFontColor,
   setLineColor,
   lineColorOf,
   toggleBorder,
@@ -720,6 +722,26 @@ const GROUP_NAMES = {
 };
 const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
 
+/** A row of colours to pick from in a menu, the first taking the colour away; letters shows each as a coloured A, for text. */
+function Swatches(props: { label: string; value?: string; none: string; letters?: boolean; onPick: (color: string | null) => void }) {
+  const { value, letters, onPick } = props;
+  return (
+    <div class={'dg-menu-row' + (letters ? ' letters' : '')} role="group" aria-label={props.label}>
+      {[null, ...COLOR_CHOICES].map((c) => (
+        <button
+          key={c ?? ''}
+          class={'dg-swatch' + (c ? '' : ' none') + (value === (c ?? undefined) ? ' on' : '')}
+          title={c ?? props.none}
+          style={c ? (letters ? { color: colorValue(c) } : { background: colorValue(c) }) : undefined}
+          onClick={() => onPick(c)}
+        >
+          {letters && 'A'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const edgeKey = (e: DiagramEdge) => `${e.from}>${e.to}>${e.label}>${e.style.dash}${e.style.ends}`;
 
 /**
@@ -1251,11 +1273,22 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           return (
             <g key={nid} data-box={nid}>
               {n.icon && <Icon value={n.icon} x={b.x + 12} y={b.y + 5} size={15} color={n.color} />}
-              <text class={'dg-frame-title' + (n.frame === 'box' ? ' box' : '')} x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
+              <text
+                class={'dg-frame-title' + (n.frame === 'box' ? ' box' : '')}
+                x={b.x + 12 + (n.icon ? ICON_SPACE : 0)}
+                y={b.y + 17}
+                style={n.font ? { fill: n.font } : undefined}
+              >
                 {n.label}
               </text>
               {frameDesc(n, b.w, measure).map((l, i) => (
-                <text key={i} class="dg-frame-desc" x={b.x + 12} y={b.y + 17 + (i + 1) * (PROP_SIZE + 3)}>
+                <text
+                  key={i}
+                  class="dg-frame-desc"
+                  x={b.x + 12}
+                  y={b.y + 17 + (i + 1) * (PROP_SIZE + 3)}
+                  style={n.font ? { fill: n.font } : undefined}
+                >
                   {l}
                 </text>
               ))}
@@ -1571,28 +1604,21 @@ function BoxMenu(props: {
           </button>
         ))}
       </div>
-      <div class="dg-menu-row" role="group" aria-label={t('色', 'Colour')}>
-        <button
-          class={'dg-swatch none' + (!color ? ' on' : '')}
-          title={t('色なし', 'No colour')}
-          onClick={run(() => {
-            setColor(store, id, null);
-            ctl.commit();
-          })}
-        />
-        {COLOR_CHOICES.map((c) => (
-          <button
-            key={c}
-            class={'dg-swatch' + (color === c ? ' on' : '')}
-            title={c}
-            style={{ background: colorValue(c) }}
-            onClick={run(() => {
-              setColor(store, id, c);
-              ctl.commit();
-            })}
-          />
-        ))}
-      </div>
+      <Swatches
+        label={t('色', 'Colour')}
+        value={color}
+        none={t('色なし', 'No colour')}
+        onPick={(c) => run(() => (setColor(store, id, c), ctl.commit()))()}
+      />
+      <Swatches
+        label={t('文字の色', 'Text colour')}
+        letters
+        value={FONT_KEYS.map((k) => store.fieldValue(id, k))
+          .find(Boolean)
+          ?.toLowerCase()}
+        none={t('ふつうの色', 'Usual colour')}
+        onPick={(c) => run(() => (setFontColor(store, id, c), ctl.commit()))()}
+      />
       <div class="dg-menu-row" role="group" aria-label={t('線', 'Outline')}>
         {BORDER_CHOICES.map(([w, label]) => (
           <button
@@ -1760,20 +1786,15 @@ function EdgeMenu({
         </div>
       )}
       {!dep && (
-        <div class="dg-menu-row" role="group" aria-label={t('色', 'Colour')}>
-          {[null, ...COLOR_CHOICES].map((c) => (
-            <button
-              key={c ?? ''}
-              class={'dg-swatch' + (c ? '' : ' none') + (lineColorOf(edge) === (c ?? undefined) ? ' on' : '')}
-              title={c ?? t('種類の色', 'As its kind')}
-              style={c ? { background: colorValue(c) } : undefined}
-              onClick={() => {
-                close();
-                if (setLineColor(store, edge, c)) ctl.commit();
-              }}
-            />
-          ))}
-        </div>
+        <Swatches
+          label={t('色', 'Colour')}
+          value={lineColorOf(edge)}
+          none={t('種類の色', 'As its kind')}
+          onPick={(c) => {
+            close();
+            if (setLineColor(store, edge, c)) ctl.commit();
+          }}
+        />
       )}
       {(edge.sides.from || edge.sides.to) && (
         <button
@@ -1907,6 +1928,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
   const lines = linesOf(style);
   const rx = cornerOf(node.border, 6, h);
   const double = node.border?.double;
+  const ink = node.font ? { fill: node.font } : undefined;
   const actor = node.shape === 'actor';
   const top = actor ? 36 : PAD + (node.shape === 'db' ? 12 : node.shape === 'process' ? PROCESS_PAD : 0);
   const cx = node.shape === 'queue' ? (w - 16) / 2 : w / 2;
@@ -1999,12 +2021,12 @@ function Shape({ node, box, on, onHover }: Drawn) {
         <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
         {outline}
         {text.map((l, i) => (
-          <text key={i} class="dg-note-text" x={PAD} y={PAD + NOTE_SIZE + i * NOTE_LINE}>
+          <text key={i} class="dg-note-text" x={PAD} y={PAD + NOTE_SIZE + i * NOTE_LINE} style={ink}>
             {l}
           </text>
         ))}
         {below.map(([cls, l], i) => (
-          <text key={'b' + i} class={cls + ' left'} x={PAD} y={PAD + text.length * NOTE_LINE + (i + 1) * (PROP_SIZE + 3)}>
+          <text key={'b' + i} class={cls + ' left'} x={PAD} y={PAD + text.length * NOTE_LINE + (i + 1) * (PROP_SIZE + 3)} style={ink}>
             {l}
           </text>
         ))}
@@ -2024,11 +2046,11 @@ function Shape({ node, box, on, onHover }: Drawn) {
       <title>{node.desc ? `${node.label}\n${node.desc}` : node.label}</title>
       {outline}
       {iconBeside && <Icon value={node.icon!} x={iconX} y={top - 1} size={16} color={node.color} />}
-      <text class="dg-label" x={labelX} y={top + LABEL_SIZE}>
+      <text class="dg-label" x={labelX} y={top + LABEL_SIZE} style={ink}>
         {node.label}
       </text>
       {[...desc.map((d) => ['dg-desc', d]), ...node.props.map((p) => ['dg-prop', p])].map(([cls, text], i) => (
-        <text key={i} class={cls} x={cx} y={top + LABEL_SIZE + 4 + (i + 1) * (PROP_SIZE + 3)}>
+        <text key={i} class={cls} x={cx} y={top + LABEL_SIZE + 4 + (i + 1) * (PROP_SIZE + 3)} style={ink}>
           {text}
         </text>
       ))}

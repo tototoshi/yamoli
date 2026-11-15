@@ -14,6 +14,7 @@ import {
   neighbour,
   reconnect,
   setColor,
+  setFontColor,
   setDesc,
   setLabel,
   setLineColor,
@@ -366,4 +367,17 @@ test('an arrow has a look of its own in braces beside its link: a colour set the
   setLineColor(s, edge(x), null);
   expect(s.fieldValue(a, 'to')).toMatch(new RegExp(`^\\[\\[${b}\\]\\] gRPC @(上|top), \\[\\[${x}\\]\\] \\{dashed\\}$`));
   expect(lineColorOf(edge(x))).toBeUndefined();
+});
+
+test("a box's text colour is set in font (or 文字色, where it has that), and taken away", () => {
+  const { s, a, b, draw } = drawing();
+  setFontColor(s, a, 'red');
+  expect(s.fieldValue(a, 'font')).toBe('red');
+  expect(draw().d.nodes.get(a)!).toMatchObject({ font: '#d9534f', props: [] });
+  setFontColor(s, a, null);
+  expect(s.node(a).children).toEqual([]);
+  s.addField(b, '文字色', '#123456');
+  expect(draw().d.nodes.get(b)!.font).toBe('#123456');
+  setFontColor(s, b, 'blue');
+  expect(s.fieldValue(b, '文字色')).toBe('blue');
 });

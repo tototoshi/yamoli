@@ -10,6 +10,7 @@
  *   shape                box / actor / db / queue / external / process
  *                        (an ellipse) / store (a data store: two lines)
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
+ *   font (文字色)        the colour of its text, as for color
  *   border (枠線)        its outline: solid / dashed / dotted, thick / thin,
  *                        double, round / square corners, shadow, none, a colour
  *   icon                 server, database, cloud … (icons.ts) or an emoji
@@ -50,6 +51,8 @@ export type Direction = 'LR' | 'TB';
 const DRAWING_KEYS = new Set([
   'shape',
   'color',
+  'font',
+  '文字色',
   'border',
   '枠線',
   'icon',
@@ -196,6 +199,9 @@ export const BORDER_WORDS: Record<string, [keyof Border, string | boolean]> = {
   なし: ['none', true],
 };
 
+/** The fields a box's text colour is read from. */
+export const FONT_KEYS = ['font', '文字色'];
+
 /** The fields a box's outline is read from. */
 export const BORDER_KEYS = ['border', '枠線'];
 
@@ -222,6 +228,8 @@ export interface DiagramNode {
   /** How the frame's border is drawn. */
   frame: FrameStyle;
   color?: string;
+  /** The colour of its text, where `font` says. */
+  font?: string;
   /** Its outline, where `border` says. */
   border?: Border;
   /** The `icon` value; icons.ts tells what it draws. */
@@ -334,6 +342,7 @@ export function buildDiagram(
       isFrame: shape.includes('frame') || !!border || !!arranged,
       frame: border ?? (arranged && !shape.includes('frame') ? 'hidden' : 'dashed'),
       color: colorValue(store.fieldValue(id, 'color')),
+      font: colorValue(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean)),
       border: borderOf(BORDER_KEYS.map((k) => store.fieldValue(id, k)).find((v) => v?.trim())),
       icon: iconOf(store.fieldValue(id, 'icon')) ? store.fieldValue(id, 'icon') : undefined,
       desc,

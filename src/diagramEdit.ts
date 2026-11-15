@@ -8,6 +8,7 @@ import {
   BORDER_KEYS,
   BORDER_WORDS,
   colorValue,
+  FONT_KEYS,
   CONTAINER,
   DESC_KEYS,
   LINE_KEYS,
@@ -90,6 +91,13 @@ export function toggleBorder(store: OutlineStore, id: string, word: string) {
   const kept = words.filter((w) => part(w) !== part(word));
   const next = (on ? kept : [...kept, word]).join(' ');
   if (next) store.setField(id, f?.key?.trim() ?? 'border', next);
+  else if (f) store.remove(f.id);
+}
+
+/** Give a box's text a colour, or (null) the usual one; written to the field it has (`font` or `文字色`). */
+export function setFontColor(store: OutlineStore, id: string, color: string | null) {
+  const f = FONT_KEYS.map((k) => store.field(id, k)).find(Boolean);
+  if (color) store.setField(id, f?.key?.trim() ?? 'font', color);
   else if (f) store.remove(f.id);
 }
 
