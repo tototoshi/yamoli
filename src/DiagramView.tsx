@@ -1559,6 +1559,8 @@ function BoxMenu(props: {
   const font = fontWords(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean));
   /** Whether the name, description and fields are coloured apart: open at first when they are. */
   const [inkParts, setInkParts] = useState(() => !!(font.name || font.desc || font.props));
+  /** Which of its looks has its choices open. */
+  const [look, setLook] = useState<'shape' | 'fill' | 'text' | 'line' | null>(null);
   const ink = (part: FontPart) => (c: string | null) => {
     setFontColor(store, id, part, c);
     ctl.commit();
@@ -1609,70 +1611,117 @@ function BoxMenu(props: {
         onInput={(e) => setDescText(e.currentTarget.value)}
         onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), onClose())}
       />
-      <div class="dg-menu-row" role="group" aria-label={t('形', 'Shape')}>
-        {SHAPE_CHOICES.map(([s, label]) => (
+      {/* How it looks: a button each showing what it is now, opening its choices below (one at a time). */}
+      <div class="dg-looks" role="group" aria-label={t('見た目', 'Look')}>
+        {(
+          [
+            ['shape', t('形', 'Shape'), <span>{SHAPE_CHOICES.find(([s]) => s === shape)?.[1]()}</span>],
+            [
+              'fill',
+              t('塗り', 'Fill'),
+              <span class={'dg-look-dot' + (color ? '' : ' none')} style={color && { background: colorValue(color) }} />,
+            ],
+            ['text', t('文字', 'Text'), <b style={{ color: colorValue(font.all ?? font.name) }}>A</b>],
+            [
+              'line',
+              t('線', 'Line'),
+              <svg width="22" height="14" aria-hidden="true">
+                <rect
+                  x="2"
+                  y="2"
+                  width="18"
+                  height="10"
+                  rx={cornerOf(border, 3, 10)}
+                  style={outlined(border, { stroke: 'currentColor', fill: 'none' }, 1.2)}
+                />
+              </svg>,
+            ],
+          ] as const
+        ).map(([k, label, now]) => (
           <button
-            key={s}
-            class={'dg-chip' + (shape === s ? ' on' : '')}
-            onClick={run(() => {
-              setShape(store, id, s);
-              ctl.commit();
-            })}
+            key={k}
+            class={'dg-look' + (look === k ? ' on' : '')}
+            aria-expanded={look === k}
+            onClick={() => setLook(look === k ? null : k)}
           >
-            {label()}
+            {label} {now}
           </button>
         ))}
       </div>
-      <Swatches
-        label={t('色', 'Colour')}
-        value={color}
-        none={t('色なし', 'No colour')}
-        onPick={(c) => run(() => (setColor(store, id, c), ctl.commit()))()}
-      />
+      {look === 'shape' && (
+        <div class="dg-menu-row" role="group" aria-label={t('形', 'Shape')}>
+          {SHAPE_CHOICES.map(([s, label]) => (
+            <button
+              key={s}
+              class={'dg-chip' + (shape === s ? ' on' : '')}
+              onClick={run(() => {
+                setShape(store, id, s);
+                ctl.commit();
+              })}
+            >
+              {label()}
+            </button>
+          ))}
+        </div>
+      )}
+      {look === 'fill' && (
+        <Swatches
+          label={t('色', 'Colour')}
+          value={color}
+          none={t('色なし', 'No colour')}
+          onPick={(c) => run(() => (setColor(store, id, c), ctl.commit()))()}
+        />
+      )}
       {/* The text: all of it in one row, or its name, description and fields in a row each. Left open after a pick. */}
-      <Swatches
-        label={t('文字', 'Text')}
-        head={
-          <button
-            class="dg-swatch-label dg-ink-more"
-            aria-expanded={inkParts}
-            title={t('名前・説明・属性を別々の色に', 'Colour the name, description and fields apart')}
-            onClick={() => setInkParts(!inkParts)}
-          >
-            {t('文字', 'Text')} {inkParts ? '▾' : '▸'}
-          </button>
-        }
-        letters
-        value={font.all}
-        none={t('ふつうの色', 'Usual colour')}
-        onPick={ink('all')}
-      />
-      {inkParts &&
-        FONT_PART_CHOICES.map(([p, label]) => (
+      {look === 'text' && (
+        <>
           <Swatches
-            key={p}
-            noneColor={colorValue(font.all)}
-            label={label()}
+            label={t('文字', 'Text')}
+            head={
+              <button
+                class="dg-swatch-label dg-ink-more"
+                aria-expanded={inkParts}
+                title={t('名前・説明・属性を別々の色に', 'Colour the name, description and fields apart')}
+                onClick={() => setInkParts(!inkParts)}
+              >
+                {t('全体', 'All')} {inkParts ? '▾' : '▸'}
+              </button>
+            }
             letters
-            value={font[p]}
-            none={t('文字の色のまま', 'As the text')}
-            onPick={ink(p)}
+            value={font.all}
+            none={t('ふつうの色', 'Usual colour')}
+            onPick={ink('all')}
           />
-        ))}
-      <div class="dg-menu-row" role="group" aria-label={t('線', 'Outline')}>
-        {BORDER_CHOICES.map(([w, label]) => (
-          <button
-            key={w}
-            class={'dg-chip' + (borderOn(w) ? ' on' : '')}
-            onClick={() => {
-              toggleBorder(store, id, w);
-              ctl.commit();
-            }}
-          >
-            {label()}
-          </button>
-        ))}
-      </div>
+          {inkParts &&
+            FONT_PART_CHOICES.map(([p, label]) => (
+              <Swatches
+                key={p}
+                noneColor={colorValue(font.all)}
+                label={label()}
+                letters
+                value={font[p]}
+                none={t('文字の色のまま', 'As the text')}
+                onPick={ink(p)}
+              />
+            ))}
+        </>
+      )}
+      {look === 'line' && (
+        <div class="dg-menu-row" role="group" aria-label={t('線', 'Outline')}>
+          {BORDER_CHOICES.map(([w, label]) => (
+            <button
+              key={w}
+              class={'dg-chip' + (borderOn(w) ? ' on' : '')}
+              onClick={() => {
+                toggleBorder(store, id, w);
+                ctl.commit();
+              }}
+            >
+              {label()}
+            </button>
+          ))}
+        </div>
+      )}
       <hr />
       {holds && (
         <button role="menuitem" onClick={run(props.onAddInside)}>
