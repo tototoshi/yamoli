@@ -1134,6 +1134,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* Editing the diagram: the selection, arrows drawn and picked, boxes dragged, names typed, the box menu. */
 .diagram-tools .dg-add { margin-right: auto; }
 .diagram-export { display: flex; gap: 6px; }
+.diagram-part { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .diagram.editable .dg-node, .diagram.editable .dg-frame { cursor: grab; touch-action: none; }
 .dg-selected { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
 .dg-edge .dg-edge-hit { stroke: transparent; stroke-width: 12; stroke-dasharray: none; pointer-events: stroke; cursor: pointer; }

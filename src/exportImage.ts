@@ -25,26 +25,48 @@ const PROPS = [
   'vector-effect',
 ];
 
-/** A copy of svg that looks the same on its own: styles written in, on the page's background. */
-export function standaloneSvg(svg: SVGSVGElement): string {
+/** Classes highlighting what is selected or near the pointer, which a saved image is without. */
+const LIT = ['near', 'selected', 'picked', 'far'];
+
+/**
+ * A copy of svg that looks the same on its own: styles written in, on the
+ * page's background. Editing marks (`.dg-editing`) are left out, and so is
+ * any element keep says no to; view crops it to that part of the drawing.
+ */
+export function standaloneSvg(
+  svg: SVGSVGElement,
+  { keep, view }: { keep?: (el: Element) => boolean; view?: [number, number, number, number] } = {}
+): string {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   const from = [svg, ...svg.querySelectorAll('*')];
   const to = [copy, ...copy.querySelectorAll('*')];
+  // Read as drawn with nothing highlighted, then highlighted again as it was.
+  const lit = from.flatMap((el) => LIT.filter((c) => el.classList.contains(c)).map((c) => [el, c] as const));
+  lit.forEach(([el, c]) => el.classList.remove(c));
   from.forEach((el, i) => {
     const cs = getComputedStyle(el);
     (to[i] as SVGElement).setAttribute('style', PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(';'));
-    to[i].removeAttribute('class');
   });
+  lit.forEach(([el, c]) => el.classList.add(c));
+  from.forEach((el, i) => {
+    if (el.classList.contains('dg-editing') || (keep && !keep(el))) to[i].remove();
+    else to[i].removeAttribute('class');
+  });
+  if (view) {
+    copy.setAttribute('viewBox', view.join(' '));
+    copy.setAttribute('width', String(view[2]));
+    copy.setAttribute('height', String(view[3]));
+  }
 
   // Arrowheads take the colour of their line (context-stroke), which not every viewer
   // supports: give each colour a marker of its own.
   const markers = new Map<string, string>();
-  to.forEach((el, i) => {
+  to.forEach((el) => {
     for (const attr of ['marker-start', 'marker-end']) {
       const ref = el.getAttribute(attr)?.match(/url\(#(.+)\)/)?.[1];
       const marker = ref && copy.querySelector(`marker#${CSS.escape(ref)}`);
       if (!marker) continue;
-      const color = getComputedStyle(from[i]).stroke;
+      const color = (el as SVGElement).style.stroke; // as written above, with nothing highlighted
       let id = markers.get(color);
       if (!id) {
         id = `${ref}-${markers.size}`;
@@ -58,7 +80,7 @@ export function standaloneSvg(svg: SVGSVGElement): string {
     }
   });
 
-  const [x, y, w, h] = (svg.getAttribute('viewBox') ?? '').split(/\s+/).map(Number);
+  const [x, y, w, h] = (copy.getAttribute('viewBox') ?? '').split(/\s+/).map(Number);
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   Object.entries({ x, y, width: w, height: h, fill: getComputedStyle(document.body).backgroundColor }).forEach(([k, v]) =>
     bg.setAttribute(k, String(v))

@@ -72,7 +72,7 @@ import {
 } from './diagramEdit';
 import { DEP_KEY } from './deps';
 import { standaloneSvg } from './exportImage';
-import { ExportTools } from './ExportTools';
+import { ExportTools, type Drawing } from './ExportTools';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
 import { nodeLabel } from './links';
@@ -743,6 +743,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   };
   /** The selected boxes and where they were right-clicked. */
   const [manyMenu, setManyMenu] = useState<{ x: number; y: number } | null>(null);
+  /** Whether saving an image with boxes selected saves only them. */
+  const [onlyChosen, setOnlyChosen] = useState(true);
   const [renaming, setRenaming] = useState<string | null>(null);
   /** The arrow whose label is being written (its key). */
   const [labeling, setLabeling] = useState<string | null>(null);
@@ -897,6 +899,42 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   }
   const W = x1 - x0 + 2 * M;
   const H = y1 - y0 + 2 * M;
+
+  /**
+   * The drawing to save: all of it, or (with boxes selected and only them
+   * asked for) those boxes, all inside them and the arrows between them,
+   * cropped to what they cover.
+   */
+  const drawing = (): Drawing => {
+    const svg = svgRef.current!;
+    if (!chosen.length || !onlyChosen) return { svg: standaloneSvg(svg), width: W, height: H };
+    const part = new Set<string>();
+    const take = (n: string) => {
+      if (part.has(n)) return;
+      part.add(n);
+      d.nodes.get(n)?.children.forEach(take);
+    };
+    chosen.forEach(take);
+    const keep = (el: Element) => {
+      const box = el.closest('[data-box]');
+      if (box) return part.has(box.getAttribute('data-box')!);
+      const line = el.closest('[data-from]');
+      if (line) return part.has(line.getAttribute('data-from')!) && part.has(line.getAttribute('data-to')!);
+      return !el.closest('.dg-about');
+    };
+    // Its bounds, from where its parts are drawn on the page.
+    const m = svg.getScreenCTM()!.inverse();
+    let [left, top, right, bottom] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const el of svg.querySelectorAll('[data-box], [data-from]')) {
+      if (el.closest('.dg-editing') || !keep(el)) continue;
+      const at = el.getBoundingClientRect();
+      const p = new DOMPoint(at.left, at.top).matrixTransform(m);
+      const q = new DOMPoint(at.right, at.bottom).matrixTransform(m);
+      [left, top, right, bottom] = [Math.min(left, p.x), Math.min(top, p.y), Math.max(right, q.x), Math.max(bottom, q.y)];
+    }
+    const view: [number, number, number, number] = [left - M, top - M, right - left + 2 * M, bottom - top + 2 * M];
+    return { svg: standaloneSvg(svg, { keep, view }), width: view[2], height: view[3] };
+  };
 
   // ---- editing
 
@@ -1120,9 +1158,18 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       {!embedded && (
         <div class="diagram-tools">
           <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />
+          {chosen.length > 0 && (
+            <label
+              class="diagram-part"
+              title={t('選んだ箱と、その間の矢印だけを書き出す', 'Save only the boxes selected and the arrows between them')}
+            >
+              <input type="checkbox" checked={onlyChosen} onChange={(e) => setOnlyChosen(e.currentTarget.checked)} />
+              {t('選択した箱だけ', 'Selected boxes only')}
+            </label>
+          )}
           <ExportTools
             class="diagram-export"
-            drawing={() => ({ svg: standaloneSvg(svgRef.current!), width: W, height: H })}
+            drawing={drawing}
             name={store.get(id) && id !== store.rootId ? store.node(id).text : 'Home'}
           />
         </div>
@@ -1152,7 +1199,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           b.frame ? <Frame key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={setHover} /> : null
         )}
         {L.branches.map(([a, b]) => (
-          <path key={a + '>' + b} class="dg-branch" d={branch(L.boxes.get(a)!, L.boxes.get(b)!, d.direction)} />
+          <path key={a + '>' + b} class="dg-branch" data-from={a} data-to={b} d={branch(L.boxes.get(a)!, L.boxes.get(b)!, d.direction)} />
         ))}
         {d.edges.map((e) => {
           const r = routes.get(e)!;
@@ -1160,6 +1207,8 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           return (
             <g
               key={k}
+              data-from={e.from}
+              data-to={e.to}
               class={'dg-edge ' + e.style.dash + (near(e) ? ' near' : '') + (selectedEdge === e ? ' selected' : '')}
               style={e.style.color ? `--edge: ${e.style.color}` : undefined}
             >
@@ -1200,7 +1249,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           const n = d.nodes.get(nid)!;
           if (!b.frame || n.frame === 'hidden') return null;
           return (
-            <g key={nid}>
+            <g key={nid} data-box={nid}>
               {n.icon && <Icon value={n.icon} x={b.x + 12} y={b.y + 5} size={15} color={n.color} />}
               <text class={'dg-frame-title' + (n.frame === 'box' ? ' box' : '')} x={b.x + 12 + (n.icon ? ICON_SPACE : 0)} y={b.y + 17}>
                 {n.label}
@@ -1220,126 +1269,135 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           const nth = d.edges
             .filter((o) => o.label && ((o.from === e.from && o.to === e.to) || (o.from === e.to && o.to === e.from)))
             .indexOf(e);
-          return <EdgeLabel key={edgeKey(e)} text={e.label} at={[mid[0], mid[1] + nth * 18]} near={near(e)} />;
+          return <EdgeLabel key={edgeKey(e)} edge={e} text={e.label} at={[mid[0], mid[1] + nth * 18]} near={near(e)} />;
         })}
 
-        {/* editing: the selection, the dot to draw arrows from, an arrow or a box being dragged */}
-        {!moving &&
-          chosen.map((c) => {
-            const b = L.boxes.get(c)!;
-            return <rect key={c} class="dg-selected" x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} rx={9} />;
-          })}
-        {selectedEdge && (
-          <g
-            class="dg-delete"
-            transform={`translate(${routes.get(selectedEdge)!.mid[0]},${routes.get(selectedEdge)!.mid[1] - (selectedEdge.label ? 20 : 0)})`}
-            onPointerDown={(ev) => ev.stopPropagation()}
-            onClick={remove}
-          >
-            <title>{t('この矢印を削除', 'Remove this arrow')}</title>
-            <circle r={8} />
-            <text y={4}>×</text>
-          </g>
-        )}
-        {selectedEdge &&
-          !bend &&
-          (['from', 'to'] as const).map((end) => {
-            const [cx, cy] = routes.get(selectedEdge)!.ends[end === 'from' ? 0 : 1];
-            return (
-              <circle key={end} class="dg-link-dot dg-end" cx={cx} cy={cy} r={5} onPointerDown={(ev) => startBend(ev, selectedEdge, end)}>
-                <title>{t('ドラッグして、つなぐ箱を変える', 'Drag to join another box')}</title>
-              </circle>
-            );
-          })}
-        {bend && (
-          <>
-            {bend.to && (
-              <rect
-                class="dg-drop"
-                x={L.boxes.get(bend.to)!.x - 4}
-                y={L.boxes.get(bend.to)!.y - 4}
-                width={L.boxes.get(bend.to)!.w + 8}
-                height={L.boxes.get(bend.to)!.h + 8}
-                rx={9}
-              />
-            )}
-            <line class="dg-link-line" x1={bend.fixed[0]} y1={bend.fixed[1]} x2={bend.at[0]} y2={bend.at[1]} />
-          </>
-        )}
-        {dotFor && L.boxes.has(dotFor) && (
-          <circle
-            class="dg-link-dot"
-            cx={dotAt(L.boxes.get(dotFor)!)[0]}
-            cy={dotAt(L.boxes.get(dotFor)!)[1]}
-            r={5}
-            onMouseEnter={() => setHover(dotFor)}
-            onPointerDown={(e) => startLink(e, dotFor)}
-          >
-            <title>{t('ドラッグして、矢印を引く先の箱へ', 'Drag to the box the arrow should point to')}</title>
-          </circle>
-        )}
-        {link && linkFrom && (
-          <>
-            {link.to && (
-              <rect
-                class="dg-drop"
-                x={L.boxes.get(link.to)!.x - 4}
-                y={L.boxes.get(link.to)!.y - 4}
-                width={L.boxes.get(link.to)!.w + 8}
-                height={L.boxes.get(link.to)!.h + 8}
-                rx={9}
-              />
-            )}
-            <line class="dg-link-line" x1={dotAt(linkFrom)[0]} y1={dotAt(linkFrom)[1]} x2={link.at[0]} y2={link.at[1]} />
-          </>
-        )}
-        {moving && movingBox && (
-          <>
-            {dropHolder && (
-              <rect class="dg-drop" x={dropHolder.x - 4} y={dropHolder.y - 4} width={dropHolder.w + 8} height={dropHolder.h + 8} rx={10} />
-            )}
-            <DropMark d={d} L={L} drop={moving.drop} />
-            <rect
-              class="dg-ghost"
-              x={movingBox.x + moving.dx}
-              y={movingBox.y + moving.dy}
-              width={movingBox.w}
-              height={movingBox.h}
-              rx={6}
-            />
-          </>
-        )}
-        {typeAt && (
-          <foreignObject class="dg-type-at" {...typeAt}>
-            <TypeIn
-              key={`${selectedBox ?? (sel && 'edge' in sel && sel.edge)}#${typedIn}`}
-              class={selectedBox ? 'dg-rename' : 'dg-rename dg-label-input'}
-              onKey={(e) => onKey.current(e)}
-              onDone={typed}
-            />
-          </foreignObject>
-        )}
-        {renaming && renamed && (
-          <foreignObject {...nameAt(renamed)}>
-            <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
-          </foreignObject>
-        )}
-        {labeling &&
-          (() => {
-            const e = d.edges.find((x) => edgeKey(x) === labeling);
-            if (!e) return null;
-            return (
-              <foreignObject {...labelAt(routes.get(e)!.mid)}>
-                <CellInput
-                  key={labeling}
-                  class="dg-rename dg-label-input"
-                  placeholder={t('ラベル', 'Label')}
-                  value={labelOf(store, e)}
-                  onDone={(text) => label(e, text)}
+        {/* editing: the selection, the dot to draw arrows from, an arrow or a box being dragged; never saved in an image */}
+        <g class="dg-editing">
+          {!moving &&
+            chosen.map((c) => {
+              const b = L.boxes.get(c)!;
+              return <rect key={c} class="dg-selected" x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} rx={9} />;
+            })}
+          {selectedEdge && (
+            <g
+              class="dg-delete"
+              transform={`translate(${routes.get(selectedEdge)!.mid[0]},${routes.get(selectedEdge)!.mid[1] - (selectedEdge.label ? 20 : 0)})`}
+              onPointerDown={(ev) => ev.stopPropagation()}
+              onClick={remove}
+            >
+              <title>{t('この矢印を削除', 'Remove this arrow')}</title>
+              <circle r={8} />
+              <text y={4}>×</text>
+            </g>
+          )}
+          {selectedEdge &&
+            !bend &&
+            (['from', 'to'] as const).map((end) => {
+              const [cx, cy] = routes.get(selectedEdge)!.ends[end === 'from' ? 0 : 1];
+              return (
+                <circle key={end} class="dg-link-dot dg-end" cx={cx} cy={cy} r={5} onPointerDown={(ev) => startBend(ev, selectedEdge, end)}>
+                  <title>{t('ドラッグして、つなぐ箱を変える', 'Drag to join another box')}</title>
+                </circle>
+              );
+            })}
+          {bend && (
+            <>
+              {bend.to && (
+                <rect
+                  class="dg-drop"
+                  x={L.boxes.get(bend.to)!.x - 4}
+                  y={L.boxes.get(bend.to)!.y - 4}
+                  width={L.boxes.get(bend.to)!.w + 8}
+                  height={L.boxes.get(bend.to)!.h + 8}
+                  rx={9}
                 />
-              </foreignObject>
-            );
-          })()}
+              )}
+              <line class="dg-link-line" x1={bend.fixed[0]} y1={bend.fixed[1]} x2={bend.at[0]} y2={bend.at[1]} />
+            </>
+          )}
+          {dotFor && L.boxes.has(dotFor) && (
+            <circle
+              class="dg-link-dot"
+              cx={dotAt(L.boxes.get(dotFor)!)[0]}
+              cy={dotAt(L.boxes.get(dotFor)!)[1]}
+              r={5}
+              onMouseEnter={() => setHover(dotFor)}
+              onPointerDown={(e) => startLink(e, dotFor)}
+            >
+              <title>{t('ドラッグして、矢印を引く先の箱へ', 'Drag to the box the arrow should point to')}</title>
+            </circle>
+          )}
+          {link && linkFrom && (
+            <>
+              {link.to && (
+                <rect
+                  class="dg-drop"
+                  x={L.boxes.get(link.to)!.x - 4}
+                  y={L.boxes.get(link.to)!.y - 4}
+                  width={L.boxes.get(link.to)!.w + 8}
+                  height={L.boxes.get(link.to)!.h + 8}
+                  rx={9}
+                />
+              )}
+              <line class="dg-link-line" x1={dotAt(linkFrom)[0]} y1={dotAt(linkFrom)[1]} x2={link.at[0]} y2={link.at[1]} />
+            </>
+          )}
+          {moving && movingBox && (
+            <>
+              {dropHolder && (
+                <rect
+                  class="dg-drop"
+                  x={dropHolder.x - 4}
+                  y={dropHolder.y - 4}
+                  width={dropHolder.w + 8}
+                  height={dropHolder.h + 8}
+                  rx={10}
+                />
+              )}
+              <DropMark d={d} L={L} drop={moving.drop} />
+              <rect
+                class="dg-ghost"
+                x={movingBox.x + moving.dx}
+                y={movingBox.y + moving.dy}
+                width={movingBox.w}
+                height={movingBox.h}
+                rx={6}
+              />
+            </>
+          )}
+          {typeAt && (
+            <foreignObject class="dg-type-at" {...typeAt}>
+              <TypeIn
+                key={`${selectedBox ?? (sel && 'edge' in sel && sel.edge)}#${typedIn}`}
+                class={selectedBox ? 'dg-rename' : 'dg-rename dg-label-input'}
+                onKey={(e) => onKey.current(e)}
+                onDone={typed}
+              />
+            </foreignObject>
+          )}
+          {renaming && renamed && (
+            <foreignObject {...nameAt(renamed)}>
+              <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
+            </foreignObject>
+          )}
+          {labeling &&
+            (() => {
+              const e = d.edges.find((x) => edgeKey(x) === labeling);
+              if (!e) return null;
+              return (
+                <foreignObject {...labelAt(routes.get(e)!.mid)}>
+                  <CellInput
+                    key={labeling}
+                    class="dg-rename dg-label-input"
+                    placeholder={t('ラベル', 'Label')}
+                    value={labelOf(store, e)}
+                    onDone={(text) => label(e, text)}
+                  />
+                </foreignObject>
+              );
+            })()}
+        </g>
       </svg>
       {edgeMenu && selectedEdge && (
         <EdgeMenu
@@ -1829,6 +1887,7 @@ function Frame({ node, box, on, onHover }: Drawn) {
   return (
     <g
       class={'dg-frame ' + node.frame + (node.done ? ' done' : '')}
+      data-box={node.id}
       transform={`translate(${box.x},${box.y})`}
       onMouseEnter={() => onHover(node.id)}
       onPointerDown={on && ((e) => on.press(e, node.id))}
@@ -1930,6 +1989,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
     return (
       <g
         class={'dg-node' + (node.done ? ' done' : '')}
+        data-box={node.id}
         transform={`translate(${box.x},${box.y})`}
         onMouseEnter={() => onHover(node.id)}
         onPointerDown={on && ((e) => on.press(e, node.id))}
@@ -1954,6 +2014,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
   return (
     <g
       class={'dg-node' + (node.done ? ' done' : '')}
+      data-box={node.id}
       transform={`translate(${box.x},${box.y})`}
       onMouseEnter={() => onHover(node.id)}
       onPointerDown={on && ((e) => on.press(e, node.id))}
@@ -1975,10 +2036,10 @@ function Shape({ node, box, on, onHover }: Drawn) {
   );
 }
 
-function EdgeLabel({ text, at, near }: { text: string; at: Pt; near: boolean }) {
+function EdgeLabel({ edge, text, at, near }: { edge: DiagramEdge; text: string; at: Pt; near: boolean }) {
   const w = measure(text, PROP_SIZE) + 8;
   return (
-    <g class={'dg-edge-label' + (near ? ' near' : '')} transform={`translate(${at[0]},${at[1]})`}>
+    <g class={'dg-edge-label' + (near ? ' near' : '')} data-from={edge.from} data-to={edge.to} transform={`translate(${at[0]},${at[1]})`}>
       <rect x={-w / 2} y={-8} width={w} height={16} rx={4} />
       <text y={4}>{text}</text>
     </g>

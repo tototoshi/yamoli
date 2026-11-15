@@ -148,7 +148,7 @@ is drawn as:
 
 A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name: `calls: dotted red`, `sync: both` (`solid` / `dashed` / `dotted`, `arrow` / `both` / `none`, a colour).
 
-An arrow to or from a row listed in a box is drawn to the box. Lines that would cross a box go around it. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents.
+An arrow to or from a row listed in a box is drawn to the box. Lines that would cross a box go around it. The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents. With boxes selected, **Selected boxes only** saves just those boxes (a frame with all inside it) and the arrows between them, cropped to them. Selection marks and highlights are left out of the image.
 
 You can edit the diagram where it is drawn. Each edit changes the outline's rows and fields, so the diagram and the outline always match.
 
