@@ -139,7 +139,7 @@ children:
 | `shape` | `box` / `actor` / `db` / `queue` / `external` / `process`（楕円）/ `store`（データストア）。DFD なら、外部エンティティは `box`、プロセスは `process`、データストアは `store`、データフローは `to: [[箱]] 注文データ` のようなラベル付きの矢印で |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` または `#hex` |
 | `icon` | 名前の前のアイコン: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`、または絵文字。actor では人型の代わりになる |
-| `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい |
+| `note` / `description` | 箱や枠の名前の下に出る説明文。折り返して表示し、長いと箱が横に、さらに縦に広がる。`note` のブロックでもよい。ズームした項目に書くと図全体の説明として、図の上に出る（SVG・PNG にも入る） |
 | その他の属性 | 箱の中の小さな `key: value` の行 |
 | `layout`（ズームした項目に） | 一番外の箱を `shape: row` などと同じ言葉で並べる。枠や入れ物に書くと `shape` の並べ方より優先 |
 | `direction`（ズームした項目に） | `LR`（左から右、既定）/ `TB`（上から下） |

@@ -11,6 +11,8 @@ import { useCtl } from './context';
 import {
   buildDiagram,
   descLines,
+  diagramDesc,
+  DIAGRAM_DESC_SIZE,
   estimate,
   frameDesc,
   frameHead,
@@ -66,6 +68,9 @@ import { nodeLabel } from './links';
 import { imeActive } from './RowEditor';
 
 const M = 16; // margin around the drawing
+/** Line height of the description above the drawing, and room under it. */
+const DESC_LINE = 17;
+const DESC_GAP = 14;
 
 let ctx: CanvasRenderingContext2D | null | undefined;
 let family = '';
@@ -858,6 +863,13 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     for (const [x, y] of r.pts) [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
     if (r.pts.length) [x0, x1] = [Math.min(x0, r.mid[0] - half), Math.max(x1, r.mid[0] + half)];
   }
+  // The zoomed item's description above it all.
+  const about = diagramDesc(d, x1 - x0, measure);
+  const aboutTop = y0 - about.length * DESC_LINE - (about.length ? DESC_GAP : 0);
+  if (about.length) {
+    y0 = aboutTop;
+    x1 = Math.max(x1, x0 + Math.max(...about.map((l) => measure(l, DIAGRAM_DESC_SIZE))));
+  }
   const W = x1 - x0 + 2 * M;
   const H = y1 - y0 + 2 * M;
 
@@ -1106,6 +1118,11 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
             <path d="M0,1 L10,5 L0,9 z" fill="context-stroke" />
           </marker>
         </defs>
+        {about.map((l, i) => (
+          <text key={i} class="dg-about" x={x0} y={aboutTop + (i + 1) * DESC_LINE - 4}>
+            {l}
+          </text>
+        ))}
         {[...L.boxes].map(([nid, b]) =>
           b.frame ? <Frame key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={setHover} /> : null
         )}

@@ -178,6 +178,8 @@ export interface Diagram {
   kind: 'flow' | 'tree';
   /** How the top-level boxes are lined up (the zoomed item's `layout`). */
   arrange?: Arrange;
+  /** The zoomed item's own description, drawn above a flow. */
+  desc?: string;
 }
 
 const COLORS: Record<string, string> = {
@@ -219,16 +221,21 @@ export function buildDiagram(
 ): Diagram {
   const nodes = new Map<string, DiagramNode>();
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
+  const isDesc = (c: string) => DESC_KEYS.has(store.node(c).key?.trim().toLowerCase() ?? '');
+  /** The text of the first description field under id with any. */
+  const descOf = (id: string) =>
+    store
+      .node(id)
+      .children.filter(isDesc)
+      .map((c) => withLabels(store, plain(store.fieldTexts(c).filter((x) => x.trim()))))
+      .find((x) => x) || undefined;
   const add = (id: string, children = rows(id)) => {
     const props: string[] = [];
-    let desc: string | undefined;
+    const desc = descOf(id);
     for (const c of store.node(id).children) {
       const f = store.node(c);
       const key = f.key?.trim();
-      if (key && DESC_KEYS.has(key.toLowerCase())) {
-        desc ??= withLabels(store, plain(store.fieldTexts(c).filter((x) => x.trim()))) || undefined;
-        continue;
-      }
+      if (isDesc(c)) continue;
       if (!key || f.format !== null || DRAWING_KEYS.has(key.toLowerCase())) continue;
       if (store.fieldTexts(c).some((t) => refIds(t).length)) continue; // drawn as arrows
       props.push(clip(f.children.length ? `${key}: …` : `${key}: ${f.text.trim()}`));
@@ -313,7 +320,10 @@ export function buildDiagram(
     add(rootId, top);
     top = [rootId];
   }
-  if (kind === 'flow') return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind, arrange };
+  if (kind === 'flow') {
+    const desc = descOf(rootId);
+    return { nodes, top, edges: listInBoxes(nodes, top, edges), direction: dir === 'TB' ? 'TB' : 'LR', kind, arrange, desc };
+  }
   return { nodes, top, edges, direction: dir === 'TB' ? 'TB' : 'LR', kind };
 }
 
@@ -480,17 +490,17 @@ export function wrap(text: string, width: number, size: number, measure: Measure
  * text wrapped within width, then narrowed as far as it goes in as many
  * lines, so they come out about even (no word left alone on the last).
  */
-function evenWrap(text: string, width: number, measure: Measure): string[] {
-  const lines = wrap(text, width, PROP_SIZE, measure);
+function evenWrap(text: string, width: number, measure: Measure, size = PROP_SIZE): string[] {
+  const lines = wrap(text, width, size, measure);
   if (lines.length < 2) return lines;
   let lo = width / 2;
   let hi = width;
   while (hi - lo > 2) {
     const mid = (lo + hi) / 2;
-    if (wrap(text, mid, PROP_SIZE, measure).length <= lines.length) hi = mid;
+    if (wrap(text, mid, size, measure).length <= lines.length) hi = mid;
     else lo = mid;
   }
-  return wrap(text, hi, PROP_SIZE, measure);
+  return wrap(text, hi, size, measure);
 }
 
 /** The description's lines as drawn in the box: all of it, at the narrowest width that keeps it to a few lines. */
@@ -502,6 +512,12 @@ export function descLines(n: DiagramNode, measure: Measure): string[] {
 
 /** A frame's description, run across the frame (of width w) rather than kept narrow like a box's. */
 export const frameDesc = (n: DiagramNode, w: number, measure: Measure) => (n.desc ? evenWrap(n.desc, w - 2 * FRAME_PAD, measure) : []);
+
+/** Type size of the description drawn above a whole flow. */
+export const DIAGRAM_DESC_SIZE = 12;
+/** The description of a whole flow, run across a drawing of width w, though no narrower or wider than reads well. */
+export const diagramDesc = (d: Diagram, w: number, measure: Measure) =>
+  d.desc ? evenWrap(d.desc, Math.min(Math.max(w, 320), 640), measure, DIAGRAM_DESC_SIZE) : [];
 
 /** The height of a frame's head: its title, and its description under it (none, unseen). */
 export const frameHead = (n: DiagramNode, w: number, measure: Measure) =>
@@ -793,7 +809,7 @@ function orderLayers(layers: string[][], succ: Map<string, string[]>, pred: Map<
   best.forEach((l, i) => (layers[i] = l));
   index();
   // Then neighbours swapped, wherever that crosses fewer.
-  for (let changed = fewest > 0; changed; ) {
+  for (let changed = fewest > 0; changed;) {
     changed = false;
     for (const layer of layers) {
       for (let i = 0; i + 1 < layer.length; i++) {

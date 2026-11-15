@@ -1,5 +1,17 @@
 import { expect, test } from 'vitest';
-import { arrangeOf, buildDiagram, sidesOf, splitSides, descLines, estimate, frameDesc, layout, wrap, type Box } from './diagram';
+import {
+  arrangeOf,
+  buildDiagram,
+  diagramDesc,
+  sidesOf,
+  splitSides,
+  descLines,
+  estimate,
+  frameDesc,
+  layout,
+  wrap,
+  type Box,
+} from './diagram';
 import { OutlineStore } from './model';
 
 /** The system from the README: a user, a CDN, and a VPC with subnets. */
@@ -471,4 +483,24 @@ test('boxes in each column are put in the order where the arrows between columns
       if (at(a).x === at(c).x) expect((at(a).y - at(c).y) * (at(b).y - at(d).y)).toBeGreaterThanOrEqual(0);
     }
   }
+});
+
+test("the zoomed item's own description goes above a flow, wrapped to about the drawing's width", () => {
+  const { s, sys } = system();
+  expect(buildDiagram(s, sys).desc).toBeUndefined();
+  s.addField(sys, 'description', 'How a request goes from the user through the CDN and the VPC to the database');
+  const d = buildDiagram(s, sys);
+  expect(d.desc).toBe('How a request goes from the user through the CDN and the VPC to the database');
+  const lines = diagramDesc(d, 200, estimate);
+  expect(lines.join(' ')).toBe(d.desc);
+  expect(lines.length).toBeGreaterThan(1);
+  expect(diagramDesc(d, 2000, estimate)).toEqual([d.desc]);
+  s.addField(sys, 'note', 'unused: the first description is the one drawn');
+  const long = { ...d, desc: `${d.desc}, ${d.desc}, ${d.desc}` };
+  expect(diagramDesc(long, 2000, estimate).length).toBeGreaterThan(1); // no wider than reads well
+  expect(buildDiagram(s, sys).desc).toBe(d.desc);
+  // A mind map has the item as its middle box, with the description in it.
+  const tree = buildDiagram(s, sys, { kind: 'tree' });
+  expect(tree.desc).toBeUndefined();
+  expect(tree.nodes.get(sys)!.desc).toBe(d.desc);
 });

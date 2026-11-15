@@ -1053,6 +1053,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-frame:hover rect { stroke: var(--accent); }
 .dg-frame-title { font-size: 12px; font-weight: 600; fill: var(--summary); paint-order: stroke; stroke: var(--data-bg); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
 .dg-frame-title.box { font-size: 13px; fill: var(--fg); stroke: var(--bg); }
+.dg-about { font-size: 12px; fill: var(--summary); pointer-events: none; }
 .dg-frame-desc { font-size: 11px; fill: var(--summary); paint-order: stroke; stroke: var(--data-bg); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .dg-branch { fill: none; stroke: #b6bcc5; stroke-width: 1.5; }
 .dg-edge path { fill: none; stroke: var(--edge, #7d848e); stroke-width: 1.3; }

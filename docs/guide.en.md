@@ -139,7 +139,7 @@ is drawn as:
 | `shape` | `box` / `actor` / `db` / `queue` / `external` / `process` (an ellipse) / `store` (a data store). For a data flow diagram: external entities as `box`, processes as `process`, data stores as `store`, and data flows as labelled arrows like `to: [[box]] order data` |
 | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
 | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
-| `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too |
+| `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too. On the zoomed item, it describes the whole diagram and goes above it (in the SVG and PNG too) |
 | Other fields | Small `key: value` lines in the box |
 | `layout` (on the zoomed item) | Lines up the outermost boxes, with the same words as `shape: row` and the rest. On a frame or a container it wins over its `shape` |
 | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
