@@ -156,11 +156,15 @@ test('the samples draw without overlaps, and the guide embeds them and its own r
     }
     return d;
   };
-  expect(drawn(sys).edges.length).toBe(11);
+  const system = drawn(sys);
+  expect(system.edges.length).toBe(12);
+  // Each has a short description drawn above it, not its how-to block.
+  expect(system.desc!.length).toBeLessThan(120);
   const flows = drawn(dfd);
-  expect(flows.edges.length).toBe(7);
+  expect(flows.edges.length).toBe(8);
+  expect(flows.desc!.length).toBeLessThan(120);
   expect([...flows.nodes.values()].map((n) => n.shape).sort()).toEqual(
-    ['box', 'box', 'process', 'process', 'process', 'store', 'store'].sort()
+    ['box', 'box', 'process', 'process', 'process', 'sticky', 'store', 'store'].sort()
   );
   expect(drawn(map, 'tree').top.length).toBe(1);
 

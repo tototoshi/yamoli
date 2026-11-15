@@ -99,9 +99,18 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   const sys = s.addChild(parentId, -1, t('サンプル: システム構成', 'Sample: System architecture'));
   s.addField(sys.id, 'views', 'diagram');
   s.addField(sys.id, 'direction', 'LR');
+  s.addField(
+    sys.id,
+    'description',
+    t(
+      'Web サービスの本番環境。ユーザーのリクエストは CDN とロードバランサーを通って Web と API に届く',
+      'A web service in production: requests from users reach Web and the API through the CDN and the load balancer'
+    )
+  );
+  // How to use it, under a key of its own: a note on the zoomed item would be drawn above the diagram.
   s.addBlock(
     sys.id,
-    'note',
+    t('使い方', 'howto'),
     'markdown',
     t(
       '「図」に切り替えると構成図になります。図の上でもそのまま編集できます。\n\n' +
@@ -110,7 +119,8 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- `shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（枠でも入れ物でもない行の下の行は、箱の中に箇条書き）\n' +
         '- `shape: row`（横一列）/ `column`（縦一列）/ `grid`（格子）で、中の箱をアウトラインの順に並べる。それだけだと見えない並びで、`row dashed` のように枠線を書くと名前付きの枠に\n' +
         '- `shape`（actor / db / queue / external / process / store）・`color`・`icon` で見た目、`note` で説明\n' +
-        '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。`direction: TB` で縦向き\n\n' +
+        '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。`direction: TB` で縦向き\n' +
+        '- この行の `description` は図全体の説明として図の上に出る。`shape: sticky`（付箋）の行は、`to:` でつないだ箱の隣に付く注釈\n\n' +
         '**図の上での編集**\n\n' +
         '- 箱を選んでそのまま入力すると名前が変わる。右クリックで名前・説明・形・色\n' +
         '- 箱の端の丸から別の箱へドラッグで矢印。矢印を選ぶと両端の丸でつなぎ変え、右クリックで種類やラベル\n' +
@@ -121,7 +131,8 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
         '- A row with `shape: frame` is a frame around the rows under it; `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
         '- `shape: row` / `column` / `grid` lines up the boxes in it in outline order: unseen alone, a named frame with a border word like `row dashed`\n' +
         '- `shape` (actor / db / queue / external / process / store), `color` and `icon` for the look, `note` for a description\n' +
-        '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines. `direction: TB` draws it top to bottom\n\n' +
+        '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines. `direction: TB` draws it top to bottom\n' +
+        '- This row’s `description` goes above the diagram. A row with `shape: sticky` is a sticky note, beside the box it is joined to with `to:`\n\n' +
         '**Editing on the diagram**\n\n' +
         '- Select a box and type to rename it; right-click for its name, description, shape and colour\n' +
         '- Drag from the dot on a box to another for an arrow. A selected arrow’s end dots join it elsewhere; right-click it for its kind and label\n' +
@@ -156,6 +167,9 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16' });
   const cache = add(data, t('キャッシュ', 'Cache'), { shape: 'db', tech: 'Redis' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
+  const remark = add(vpc, t('キューが 1,000 件を超えたらワーカーを増やす', 'Add workers when the queue passes 1,000 jobs'), {
+    shape: 'sticky',
+  });
   const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple' });
   const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', icon: 'mail', tech: 'SendGrid' });
 
@@ -170,6 +184,7 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
   s.addField(orders, 'async', to(queue, t('投入', 'enqueue')));
   s.addField(worker, 'async', to(queue, t('取得', 'poll')));
   s.addField(worker, 'to', to(mail, 'API'));
+  s.addField(remark, 'to', to(queue));
   return sys.id;
 }
 
@@ -177,9 +192,17 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
 export function addDfdSample(s: OutlineStore, parentId: string): string {
   const dfd = s.addChild(parentId, -1, t('サンプル: 注文処理の DFD', 'Sample: Order handling, as a data flow diagram'));
   s.addField(dfd.id, 'views', 'diagram');
+  s.addField(
+    dfd.id,
+    'description',
+    t(
+      '注文を受けてから倉庫へ出荷を指示するまでのデータの流れ',
+      'How order data flows, from taking an order to telling the warehouse to ship it'
+    )
+  );
   s.addBlock(
     dfd.id,
-    'note',
+    t('使い方', 'howto'),
     'markdown',
     t(
       '「図」に切り替えるとデータフロー図になります。\n\n' +
@@ -200,6 +223,11 @@ export function addDfdSample(s: OutlineStore, parentId: string): string {
   const stock = add(dfd.id, t('D2 在庫', 'D2 Stock'), { shape: 'store' });
   const ship = add(dfd.id, t('3.0 出荷指示', '3.0 Order shipping'), { shape: 'process' });
   const warehouse = add(dfd.id, t('倉庫', 'Warehouse'));
+  // A sticky note on a process: beside it, on a dotted line.
+  add(dfd.id, t('在庫が足りない注文は引当せず、翌朝もう一度試す', 'Orders short of stock wait, and are tried again the next morning'), {
+    shape: 'sticky',
+    to: to(allocate),
+  });
 
   s.addField(customer, 'to', to(take, t('注文', 'order')));
   s.addField(take, 'to', to(orders, t('注文データ', 'order details')));
