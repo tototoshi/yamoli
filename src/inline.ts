@@ -71,6 +71,8 @@ export function parseInline(src: string): Seg[] {
 export interface MarkSpan {
   text: string;
   cls?: 'mk' | SegKind;
+  /** The marks it is inside (`**[x]{red}**`: strong around a colour). */
+  within?: SegKind[];
   /** The colour word of a 'color' span. */
   color?: string;
 }
@@ -82,21 +84,24 @@ export interface MarkSpan {
 export function markupSpans(src: string): MarkSpan[] {
   const out: MarkSpan[] = [];
   let last = 0;
-  const put = (text: string, cls?: MarkSpan['cls'], color?: string) => text && out.push({ text, cls, ...(color && { color }) });
+  const put = (text: string, cls?: MarkSpan['cls']) => text && out.push({ text, cls });
+  // The words inside a mark, styled as they are marked themselves, inside it (and in its colour).
+  const nest = (inner: string, kind: SegKind, color?: string) => {
+    for (const sp of markupSpans(inner)) {
+      const within = sp.cls && kind !== 'color' ? [kind, ...(sp.within ?? [])] : sp.within; // a colour is its own
+      out.push({ ...sp, cls: sp.cls ?? kind, ...(within && { within }), ...((sp.color ?? color) && { color: sp.color ?? color }) });
+    }
+  };
   for (const m of src.matchAll(INLINE)) {
     const g = m.groups!;
     const i = m.index! + (g.pre?.length ?? 0);
     put(src.slice(last, i));
     if (g.ref !== undefined) (put('[[', 'mk'), put(g.ref, 'ref'), put(']]', 'mk'));
     else if (g.code !== undefined) (put('`', 'mk'), put(g.code, 'code'), put('`', 'mk'));
-    else if (g.strong !== undefined) (put('**', 'mk'), put(g.strong, 'strong'), put('**', 'mk'));
-    else if (g.del !== undefined) (put('~~', 'mk'), put(g.del, 'del'), put('~~', 'mk'));
-    else if (g.colored !== undefined) {
-      // Its words styled as they are marked, all in its colour.
-      put('[', 'mk');
-      for (const sp of markupSpans(g.colored)) out.push({ ...sp, cls: sp.cls ?? 'color', color: g.color });
-      put(`]{${g.color}}`, 'mk');
-    } else if (g.em !== undefined) (put('*', 'mk'), put(g.em, 'em'), put('*', 'mk'));
+    else if (g.strong !== undefined) (put('**', 'mk'), nest(g.strong, 'strong'), put('**', 'mk'));
+    else if (g.del !== undefined) (put('~~', 'mk'), nest(g.del, 'del'), put('~~', 'mk'));
+    else if (g.colored !== undefined) (put('[', 'mk'), nest(g.colored, 'color', g.color), put(`]{${g.color}}`, 'mk'));
+    else if (g.em !== undefined) (put('*', 'mk'), nest(g.em, 'em'), put('*', 'mk'));
     else if (g.label !== undefined) (put('[', 'mk'), put(g.label, 'link'), put(`](${g.href})`, 'mk'));
     else if (g.url !== undefined) put(g.url, 'link');
     else put(g.tag, 'tag');
@@ -166,4 +171,64 @@ export function highlight(text: string, terms: Term[]): Piece[] {
   }
   if (pos < text.length) pieces.push({ text: text.slice(pos), offset: pos, mark: false });
   return pieces;
+}
+
+/** A mark a shortcut puts around the selection (or takes away): bold, italic, struck through, code. */
+export type MarkKey = 'strong' | 'em' | 'del' | 'code';
+const WRAPS: Record<MarkKey, string> = { strong: '**', em: '*', del: '~~', code: '`' };
+
+/** Text with its selection [start, end), after a change. */
+export interface Edited {
+  text: string;
+  start: number;
+  end: number;
+}
+
+/**
+ * Put a mark around the selection, or take it away where the selection is
+ * already marked so (just inside the marks, or with them). Spaces at the ends
+ * of the selection stay outside. With nothing selected, the marks go in with
+ * the caret between them.
+ */
+export function toggleMark(src: string, start: number, end: number, mark: MarkKey): Edited {
+  const w = WRAPS[mark];
+  const n = w.length;
+  // `*` is half of `**`: an italic mark is no star of a bold one.
+  /** No star just outside the marks [a, b) and [c, d). */
+  const lone = (a: number, d: number) => mark !== 'em' || (src[a - 1] !== '*' && src[d] !== '*');
+  if (src.slice(start - n, start) === w && src.slice(end, end + n) === w && lone(start - n, end + n))
+    return { text: src.slice(0, start - n) + src.slice(start, end) + src.slice(end + n), start: start - n, end: end - n };
+  if (end - start >= 2 * n && src.slice(start, start + n) === w && src.slice(end - n, end) === w && lone(start, end))
+    return { text: src.slice(0, start) + src.slice(start + n, end - n) + src.slice(end), start, end: end - 2 * n };
+  while (start < end && /\s/.test(src[start])) start++;
+  while (end > start && /\s/.test(src[end - 1])) end--;
+  return { text: src.slice(0, start) + w + src.slice(start, end) + w + src.slice(end), start: start + n, end: end + n };
+}
+
+/**
+ * Colour the selection (`[words]{red}`), change the colour of the coloured
+ * stretch it is (just inside the marks, or with them), or (null) take the
+ * colour away.
+ */
+export function colorMark(src: string, start: number, end: number, color: string | null): Edited {
+  const after = new RegExp(`^\\]\\{${COLOR_RE}\\}`);
+  const whole = new RegExp(`^\\[([^\\]]+)\\]\\{${COLOR_RE}\\}$`);
+  let inner: [number, number, number, number] | null = null; // the stretch's start, end, and its words'
+  const tail = src.slice(end).match(after);
+  if (src[start - 1] === '[' && tail) inner = [start - 1, end + tail[0].length, start, end];
+  else if (whole.test(src.slice(start, end))) {
+    const words = src.slice(start, end).match(whole)![1];
+    inner = [start, end, start + 1, start + 1 + words.length];
+  }
+  if (inner) {
+    const [s0, e0, ws, we] = inner;
+    const words = src.slice(ws, we);
+    const by = color ? `[${words}]{${color}}` : words;
+    const at = s0 + (color ? 1 : 0);
+    return { text: src.slice(0, s0) + by + src.slice(e0), start: at, end: at + words.length };
+  }
+  if (!color) return { text: src, start, end };
+  while (start < end && /\s/.test(src[start])) start++;
+  while (end > start && /\s/.test(src[end - 1])) end--;
+  return { text: src.slice(0, start) + `[${src.slice(start, end)}]{${color}}` + src.slice(end), start: start + 1, end: end + 1 };
 }

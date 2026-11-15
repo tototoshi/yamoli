@@ -7,6 +7,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { CellInput } from './CellInput';
+import { COLOR_CHOICES } from './colors';
 import { useCtl } from './context';
 import {
   buildDiagram,
@@ -30,8 +31,6 @@ import {
   BORDER_WORDS,
   borderOf,
   FONT_KEYS,
-  fontWords,
-  type FontPart,
   markedLines,
   type Run,
   type Border,
@@ -79,6 +78,7 @@ import {
 import { DEP_KEY } from './deps';
 import { standaloneSvg } from './exportImage';
 import { ExportTools, type Drawing } from './ExportTools';
+import { reselect, useMarkKeys } from './MarkKeys';
 import { iconOf } from './icons';
 import { lang, t } from './i18n';
 import { nodeLabel } from './links';
@@ -724,40 +724,22 @@ const GROUP_NAMES = {
   grid: () => t('格子', 'Grid'),
   frame: () => t('グループ', 'Group'),
 };
-const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
-
-/** The parts of a box's text its menu colours apart, each in a row of its own. */
-const FONT_PART_CHOICES: [Exclude<FontPart, 'all'>, () => string][] = [
-  ['name', () => t('名前', 'Name')],
-  ['desc', () => t('説明', 'Description')],
-  ['props', () => t('属性', 'Fields')],
-];
 
 /**
  * A row of colours to pick from in a menu, the first taking the colour away;
  * letters shows each as a coloured A, for text, after the row's label.
  */
-function Swatches(props: {
-  label: string;
-  value?: string;
-  none: string;
-  letters?: boolean;
-  onPick: (color: string | null) => void;
-  /** In place of the label at its start. */
-  head?: ComponentChildren;
-  /** The colour drawn for none (as the text, for a part of it). */
-  noneColor?: string;
-}) {
+function Swatches(props: { label: string; value?: string; none: string; letters?: boolean; onPick: (color: string | null) => void }) {
   const { value, letters, onPick } = props;
   return (
     <div class={'dg-menu-row' + (letters ? ' letters' : '')} role="group" aria-label={props.label}>
-      {letters && (props.head ?? <span class="dg-swatch-label">{props.label}</span>)}
+      {letters && <span class="dg-swatch-label">{props.label}</span>}
       {[null, ...COLOR_CHOICES].map((c) => (
         <button
           key={c ?? ''}
           class={'dg-swatch' + (c ? '' : ' none') + (value === (c ?? undefined) ? ' on' : '')}
           title={c ?? props.none}
-          style={c ? (letters ? { color: colorValue(c) } : { background: colorValue(c) }) : props.noneColor && { color: props.noneColor }}
+          style={c ? (letters ? { color: colorValue(c) } : { background: colorValue(c) }) : undefined}
           onClick={() => onPick(c)}
         >
           {letters && 'A'}
@@ -1558,15 +1540,16 @@ function BoxMenu(props: {
   // The name and description, typed here and written when the menu closes (unless by Escape).
   const [name, setName] = useState(store.node(id).text);
   const [desc, setDescText] = useState(() => descOf(store, id));
-  const font = fontWords(FONT_KEYS.map((k) => store.fieldValue(id, k)).find(Boolean));
-  /** Whether the name, description and fields are coloured apart: open at first when they are. */
-  const [inkParts, setInkParts] = useState(() => !!(font.name || font.desc || font.props));
+  // ⌘B and the like mark what is selected in them, as in a row.
+  const nameField = useRef<HTMLInputElement>(null);
+  const descField = useRef<HTMLTextAreaElement>(null);
+  const nameMarks = useMarkKeys((ed) => (setName(ed.text), reselect(nameField.current, ed)));
+  const descMarks = useMarkKeys((ed) => (setDescText(ed.text), reselect(descField.current, ed)));
+  const font = FONT_KEYS.map((k) => store.fieldValue(id, k))
+    .find(Boolean)
+    ?.toLowerCase();
   /** Which of its looks has its choices open. */
   const [look, setLook] = useState<'shape' | 'fill' | 'text' | 'line' | null>(null);
-  const ink = (part: FontPart) => (c: string | null) => {
-    setFontColor(store, id, part, c);
-    ctl.commit();
-  };
   const onClose = () => {
     props.onClose();
     let changed = false;
@@ -1597,22 +1580,32 @@ function BoxMenu(props: {
   };
   return (
     <PopupMenu x={x} y={y} onClose={onClose} onCancel={props.onClose}>
-      <input
-        class="dg-menu-input"
-        aria-label={t('名前', 'Name')}
-        value={name}
-        onInput={(e) => setName(e.currentTarget.value)}
-        onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && (e.preventDefault(), onClose())}
-      />
-      <textarea
-        class="dg-menu-input"
-        rows={2}
-        aria-label={t('説明', 'Description')}
-        placeholder={t('説明（Shift+Enter で改行）', 'Description (Shift+Enter for a new line)')}
-        value={desc}
-        onInput={(e) => setDescText(e.currentTarget.value)}
-        onKeyDown={(e) => !imeActive(e) && e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), onClose())}
-      />
+      <div class="dg-menu-field">
+        <input
+          ref={nameField}
+          class="dg-menu-input"
+          aria-label={t('名前', 'Name')}
+          value={name}
+          onInput={(e) => setName(e.currentTarget.value)}
+          onBlur={nameMarks.close}
+          onKeyDown={(e) => !nameMarks.onKeyDown(e) && !imeActive(e) && e.key === 'Enter' && (e.preventDefault(), onClose())}
+        />
+        {nameMarks.bubble}
+      </div>
+      <div class="dg-menu-field">
+        <textarea
+          ref={descField}
+          class="dg-menu-input"
+          rows={2}
+          aria-label={t('説明', 'Description')}
+          placeholder={t('説明（Shift+Enter で改行）', 'Description (Shift+Enter for a new line)')}
+          value={desc}
+          onInput={(e) => setDescText(e.currentTarget.value)}
+          onBlur={descMarks.close}
+          onKeyDown={(e) => !descMarks.onKeyDown(e) && !imeActive(e) && e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), onClose())}
+        />
+        {descMarks.bubble}
+      </div>
       {/* How it looks: a button each showing what it is now, opening its choices below (one at a time). */}
       <div class="dg-looks" role="group" aria-label={t('見た目', 'Look')}>
         {(
@@ -1623,7 +1616,7 @@ function BoxMenu(props: {
               t('塗り', 'Fill'),
               <span class={'dg-look-dot' + (color ? '' : ' none')} style={color && { background: colorValue(color) }} />,
             ],
-            ['text', t('文字', 'Text'), <b style={{ color: colorValue(font.all ?? font.name) }}>A</b>],
+            ['text', t('文字', 'Text'), <b style={{ color: colorValue(font) }}>A</b>],
             [
               'line',
               t('線', 'Line'),
@@ -1674,39 +1667,15 @@ function BoxMenu(props: {
           onPick={(c) => run(() => (setColor(store, id, c), ctl.commit()))()}
         />
       )}
-      {/* The text: all of it in one row, or its name, description and fields in a row each. Left open after a pick. */}
+      {/* The colour of all its text (a stretch of it is coloured in the text: `[words]{red}`). Left open after a pick. */}
       {look === 'text' && (
-        <>
-          <Swatches
-            label={t('文字', 'Text')}
-            head={
-              <button
-                class="dg-swatch-label dg-ink-more"
-                aria-expanded={inkParts}
-                title={t('名前・説明・属性を別々の色に', 'Colour the name, description and fields apart')}
-                onClick={() => setInkParts(!inkParts)}
-              >
-                {t('全体', 'All')} {inkParts ? '▾' : '▸'}
-              </button>
-            }
-            letters
-            value={font.all}
-            none={t('ふつうの色', 'Usual colour')}
-            onPick={ink('all')}
-          />
-          {inkParts &&
-            FONT_PART_CHOICES.map(([p, label]) => (
-              <Swatches
-                key={p}
-                noneColor={colorValue(font.all)}
-                label={label()}
-                letters
-                value={font[p]}
-                none={t('文字の色のまま', 'As the text')}
-                onPick={ink(p)}
-              />
-            ))}
-        </>
+        <Swatches
+          label={t('文字', 'Text')}
+          letters
+          value={font}
+          none={t('ふつうの色', 'Usual colour')}
+          onPick={(c) => (setFontColor(store, id, c), ctl.commit())}
+        />
       )}
       {look === 'line' && (
         <div class="dg-menu-row" role="group" aria-label={t('線', 'Outline')}>

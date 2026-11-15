@@ -600,3 +600,9 @@ test('a coloured stretch of a description is drawn in its colour, over any other
     { text: ' b', kinds: [] },
   ]);
 });
+
+test('a colour inside bold is drawn bold in the colour', () => {
+  const { text, marks } = unmark('a **[hot]{red}** day');
+  expect(text).toBe('a hot day');
+  expect(markedLines(text, [text], marks)[0][1]).toEqual({ text: 'hot', kinds: ['strong'], color: '#d9534f' });
+});

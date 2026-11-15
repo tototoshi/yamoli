@@ -11,9 +11,8 @@
  *                        (an ellipse) / store (a data store: two lines)
  *   color                red, orange, yellow, green, blue, purple, gray (or #hex)
  *   font (文字色)        the colour of its text, as for color (the description
- *                        and fields a little paler); `名前:` / `説明:` / `属性:`
- *                        (`name:` / `desc:` / `props:`) before a colour for one
- *                        part: `font: red 属性:gray`
+ *                        and fields a little paler); `[words]{red}` in the
+ *                        text colours a stretch of it
  *   border (枠線)        its outline: solid / dashed / dotted, thick / thin,
  *                        double, round / square corners, shadow, none, a colour
  *   icon                 server, database, cloud … (icons.ts) or an emoji
@@ -209,43 +208,16 @@ export const BORDER_WORDS: Record<string, [keyof Border, string | boolean]> = {
 /** The fields a box's text colour is read from. */
 export const FONT_KEYS = ['font', '文字色'];
 
-/** The parts of a box's text that take a colour of their own; `all` is a colour alone, for all of them. */
-export type FontPart = 'all' | 'name' | 'desc' | 'props';
-const FONT_PARTS: Record<string, FontPart> = {
-  name: 'name',
-  名前: 'name',
-  desc: 'desc',
-  description: 'desc',
-  説明: 'desc',
-  props: 'props',
-  fields: 'props',
-  属性: 'props',
-};
-
-/** The colour words of a `font` value by part: `red 属性:gray` → { all: 'red', props: 'gray' }; other words are left out. */
-export function fontWords(value: string | undefined): Partial<Record<FontPart, string>> {
-  const out: Partial<Record<FontPart, string>> = {};
-  for (const w of (value ?? '').split(/\s+/).filter(Boolean)) {
-    const m = w.match(/^([^:：]+)[:：](.+)$/);
-    const part = m ? FONT_PARTS[m[1].toLowerCase()] : 'all';
-    const color = m ? m[2] : w;
-    if (part && colorValue(color)) out[part] = color.toLowerCase();
-  }
-  return out;
-}
-
-/** The colours a box's text is drawn in, by part: one set for all goes paler in the description and fields. */
+/** The colours a box's text is drawn in: its name in the colour, its description and fields a little paler. */
 export interface Font {
   name?: string;
   desc?: string;
   props?: string;
 }
 function fontOf(value: string | undefined): Font | undefined {
-  const w = fontWords(value);
-  const all = colorValue(w.all);
-  const pale = (amount: number) => all && `color-mix(in srgb, ${all} ${amount}%, var(--bg))`;
-  const font = { name: colorValue(w.name) ?? all, desc: colorValue(w.desc) ?? pale(80), props: colorValue(w.props) ?? pale(55) };
-  return font.name || font.desc || font.props ? font : undefined;
+  const color = colorValue(value);
+  const pale = (amount: number) => `color-mix(in srgb, ${color} ${amount}%, var(--bg))`;
+  return color ? { name: color, desc: pale(80), props: pale(55) } : undefined;
 }
 
 /** The fields a box's outline is read from. */
@@ -373,12 +345,12 @@ export function unmark(src: string): { text: string; marks: Mark[] } {
   let text = '';
   const marks: Mark[] = [];
   for (const seg of parseInline(src)) {
-    if (seg.kind === 'strong' || seg.kind === 'em' || seg.kind === 'del' || seg.kind === 'code')
-      marks.push({ from: text.length, to: text.length + seg.text.length, kind: seg.kind });
-    else if (seg.kind === 'color') {
-      // Marked inside too: `[**hot** day]{red}`.
+    if (seg.kind === 'code') marks.push({ from: text.length, to: text.length + seg.text.length, kind: seg.kind });
+    else if (seg.kind === 'strong' || seg.kind === 'em' || seg.kind === 'del' || seg.kind === 'color') {
+      // Marked inside too: `[**hot** day]{red}`, `**[hot]{red}**`.
       const inner = unmark(seg.text);
-      marks.push({ from: text.length, to: text.length + inner.text.length, kind: 'color', color: colorValue(seg.color) });
+      const color = seg.kind === 'color' ? { color: colorValue(seg.color) } : {};
+      marks.push({ from: text.length, to: text.length + inner.text.length, kind: seg.kind, ...color });
       marks.push(...inner.marks.map((m) => ({ ...m, from: m.from + text.length, to: m.to + text.length })));
       text += inner.text;
       continue;

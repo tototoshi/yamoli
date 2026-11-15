@@ -370,6 +370,14 @@ const shortcuts = (): [string, string][] => [
     IS_MAC ? '⌘K' : 'Ctrl+K',
     t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)'),
   ],
+  [
+    IS_MAC ? '⌘B / ⌘I / ⌘⇧X / ⌘E' : 'Ctrl+B / Ctrl+I / Ctrl+Shift+X / Ctrl+E',
+    t('選んだ文字を太字 / 斜体 / 取り消し線 / コードに（もう一度で解除）', 'Bold / italic / strike / code the selection (again to undo)'),
+  ],
+  [
+    IS_MAC ? '⌘⇧H' : 'Ctrl+Shift+H',
+    t('選んだ文字に色を付ける（1〜7 で色、0 で解除）', 'Colour the selection (1–7 picks a colour, 0 takes it off)'),
+  ],
   ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
   [
     t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'),

@@ -356,9 +356,9 @@ export class Editing extends ViewState {
   }
 
   /** Replace a row's text from a tool (link editing) and put the caret at caret. */
-  replaceText(id: string, text: string, caret: number) {
+  replaceText(id: string, text: string, caret: number, end?: number) {
     this.store.setText(id, text);
-    this.commit(fText(id, caret));
+    this.commit(fText(id, caret, end));
   }
 
   /** Set a field's value from outside its editor (the date picker). */

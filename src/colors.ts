@@ -14,6 +14,9 @@ const COLORS: Record<string, string> = {
   grey: '#7d848e',
 };
 
+/** The colours offered to pick from, in order. */
+export const COLOR_CHOICES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
+
 /** The colour words, for a pattern to find them by. */
 export const COLOR_WORDS = Object.keys(COLORS);
 

@@ -22,6 +22,9 @@ export function InlineText({ text }: { text: string }) {
   );
 }
 
+/** What is inside a mark, marked as it is itself (`[**hot** day]{red}`), each piece keeping its place in the source. */
+const nested = (seg: Seg) => parseInline(seg.text).map((s) => <SegView key={s.start} seg={{ ...s, start: s.start + seg.start }} />);
+
 export function SegView({ seg }: { seg: Seg }) {
   const ctl = useCtl();
   const pieces = highlight(seg.text, ctl.terms).map((p) => (
@@ -33,20 +36,13 @@ export function SegView({ seg }: { seg: Seg }) {
     case 'code':
       return <code>{pieces}</code>;
     case 'strong':
-      return <strong>{pieces}</strong>;
+      return <strong>{nested(seg)}</strong>;
     case 'em':
-      return <em>{pieces}</em>;
+      return <em>{nested(seg)}</em>;
     case 'del':
-      return <del>{pieces}</del>;
+      return <del>{nested(seg)}</del>;
     case 'color':
-      // Marked inside too (`[**hot** day]{red}`), each piece keeping its place in the source.
-      return (
-        <span style={{ color: colorValue(seg.color) }}>
-          {parseInline(seg.text).map((s) => (
-            <SegView key={s.start} seg={{ ...s, start: s.start + seg.start }} />
-          ))}
-        </span>
-      );
+      return <span style={{ color: colorValue(seg.color) }}>{nested(seg)}</span>;
     case 'tag':
       return (
         <span class="tag" title={t('このタグで検索', 'Search for this tag')}>

@@ -1174,6 +1174,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-type-at .dg-rename.dg-type-idle { opacity: 0; pointer-events: none; }
 .dg-label-input { font-size: 12px; font-weight: 400; }
 .dg-menu { min-width: 240px; max-height: calc(100vh - 16px); overflow-y: auto; }
+/* A field in the menu, the colour bubble of its shortcut (⌘⇧H) under it. */
+.dg-menu-field { position: relative; }
+.color-pick { gap: 2px; }
+.color-pick button { width: 22px; font-weight: 700; }
 /* A name, description or label typed in the menu. */
 .dg-menu-input {
   display: block;
@@ -1211,6 +1215,4 @@ textarea.dg-menu-input { field-sizing: content; min-height: 3.2em; max-height: 1
 .dg-look-dot.none { background: linear-gradient(135deg, var(--bg) 45%, var(--danger) 45%, var(--danger) 55%, var(--bg) 55%); }
 .dg-look svg { color: var(--fg); }
 .dg-swatch-label { width: 3.5em; font-size: 12px; color: var(--muted); }
-.item-menu .dg-ink-more { display: inline-block; flex: none; width: 3.5em; padding: 0; border-radius: 0; background: none; text-align: left; white-space: nowrap; font-size: 12px; color: var(--muted); }
-.item-menu .dg-ink-more:hover { color: var(--fg); }
 .item-menu .dg-swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { highlight, linkAt, markupSpans, parseInline } from './inline';
+import { colorMark, highlight, linkAt, markupSpans, parseInline, toggleMark } from './inline';
 import { parseQuery } from './search';
 
 test('parseInline splits formatting and keeps source offsets', () => {
@@ -89,4 +89,32 @@ test('[words]{colour} is a stretch in a colour word or #hex; other words in brac
     { text: ']{red}', cls: 'mk' },
     { text: '!' },
   ]);
+});
+
+test('a shortcut puts a mark around the selection, or takes it away when it is marked so', () => {
+  // Wrapped, spaces at its ends left out; the selection stays on the words.
+  expect(toggleMark('a big one', 1, 6, 'strong')).toEqual({ text: 'a **big** one', start: 4, end: 7 });
+  // Again, just inside the marks or with them: unwrapped.
+  expect(toggleMark('a **big** one', 4, 7, 'strong')).toEqual({ text: 'a big one', start: 2, end: 5 });
+  expect(toggleMark('a **big** one', 2, 9, 'strong')).toEqual({ text: 'a big one', start: 2, end: 5 });
+  // Italic inside bold is wrapped, not taken for half of the bold.
+  expect(toggleMark('**big**', 2, 5, 'em').text).toBe('***big***');
+  expect(toggleMark('*big*', 1, 4, 'em').text).toBe('big');
+  expect(toggleMark('x', 1, 1, 'code')).toEqual({ text: 'x``', start: 2, end: 2 });
+  expect(toggleMark('gone', 0, 4, 'del').text).toBe('~~gone~~');
+});
+
+test('a colour goes around the selection, changes on a coloured stretch, and comes off with none', () => {
+  expect(colorMark('a hot day', 2, 5, 'red')).toEqual({ text: 'a [hot]{red} day', start: 3, end: 6 });
+  expect(colorMark('a [hot]{red} day', 3, 6, 'blue')).toEqual({ text: 'a [hot]{blue} day', start: 3, end: 6 });
+  expect(colorMark('a [hot]{red} day', 2, 12, 'green').text).toBe('a [hot]{green} day');
+  expect(colorMark('a [hot]{red} day', 3, 6, null)).toEqual({ text: 'a hot day', start: 2, end: 5 });
+  expect(colorMark('a hot day', 2, 5, null).text).toBe('a hot day');
+});
+
+test('marks inside marks: a colour inside bold, bold inside a colour', () => {
+  expect(markupSpans('**[hot]{red}**').filter((s) => s.text === 'hot')).toEqual([
+    { text: 'hot', cls: 'color', within: ['strong'], color: 'red' },
+  ]);
+  expect(parseInline('**[hot]{red}**')).toEqual([{ kind: 'strong', text: '[hot]{red}', start: 2 }]);
 });

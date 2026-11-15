@@ -15,6 +15,7 @@ import { IS_MAC } from './keys';
 import { t } from './i18n';
 import { colorValue } from './colors';
 import { linkAt, markupSpans, type LinkAt } from './inline';
+import { reselect, useMarkKeys } from './MarkKeys';
 import { nodeLabel } from './links';
 import type { OutlineNode } from './model';
 
@@ -49,6 +50,10 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
   const [caret, setCaret] = useState<number | null>(null);
   const [draft, setDraft] = useState<LinkDraft | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const marks = useMarkKeys((ed) => {
+    reselect(box.current?.querySelector('textarea') ?? null, ed); // at once, for a shortcut right after
+    ctl.replaceText(node.id, ed.text, ed.start, ed.end);
+  });
 
   // Follow the caret however it moves (keys, clicks, focus placing it), for the link bubble.
   useEffect(() => {
@@ -91,7 +96,11 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
     >
       <div class={'text mirror' + (title ? ' title' : '')} aria-hidden="true">
         {spans.map((s, i) => (
-          <span key={i} class={s.cls && 'm-' + s.cls} style={s.color && { color: colorValue(s.color) }}>
+          <span
+            key={i}
+            class={s.cls && [s.cls, ...(s.within ?? [])].map((c) => 'm-' + c).join(' ')}
+            style={s.color && { color: colorValue(s.color) }}
+          >
             {s.text}
           </span>
         ))}
@@ -105,7 +114,7 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
         value={node.text}
         onInput={(e) => ctl.onTextInput(node.id, e.currentTarget)}
         onKeyDown={(e) => {
-          if (imeActive(e)) return;
+          if (imeActive(e) || marks.onKeyDown(e)) return;
           // ⌘K on macOS, where Ctrl+K deletes to the end of the line; Ctrl+K elsewhere.
           if ((IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyK') {
             e.preventDefault();
@@ -113,6 +122,7 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
           }
           ctl.onTextKeydown(e, e.currentTarget);
         }}
+        onBlur={marks.close}
         onPaste={(e) => {
           const ta = e.currentTarget;
           const url = e.clipboardData?.getData('text').trim() ?? '';
@@ -125,7 +135,10 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
           ctl.onTextPaste(e, ta);
         }}
       />
-      {link && <LinkBubble link={link} onEdit={() => editLink(box.current!.querySelector('textarea')!)} replace={replace} />}
+      {marks.bubble}
+      {link && !marks.bubble && (
+        <LinkBubble link={link} onEdit={() => editLink(box.current!.querySelector('textarea')!)} replace={replace} />
+      )}
       {draft && <LinkForm draft={draft} onDone={(by) => (by === null ? backToText() : replace(draft.start, draft.end, by))} />}
     </div>
   );
