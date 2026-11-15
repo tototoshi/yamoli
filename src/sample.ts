@@ -94,19 +94,22 @@ function adder(s: OutlineStore) {
 }
 const to = (id: string, label = '') => `[[${id}]]` + (label && ' ' + label);
 
-/** Append a web service's architecture under parentId, to be seen in the Diagram view, and return its id. */
+/** Append an online shop's architecture under parentId, to be seen in the Diagram view, and return its id. */
 export function addDiagramSample(s: OutlineStore, parentId: string): string {
-  const sys = s.addChild(parentId, -1, t('サンプル: システム構成', 'Sample: System architecture'));
+  const sys = s.addChild(parentId, -1, t('サンプル: ネットショップの構成', 'Sample: An online shop’s architecture'));
   s.addField(sys.id, 'views', 'diagram');
   s.addField(sys.id, 'direction', 'LR');
   s.addField(
     sys.id,
     'description',
     t(
-      'Web サービスの本番環境。ユーザーのリクエストは CDN とロードバランサーを通って Web と API に届く',
-      'A web service in production: requests from users reach Web and the API through the CDN and the load balancer'
+      '本番環境。[リクエストの流れ]{blue}は CDN からロードバランサーを通って Web と API へ。注文は**決済**と**非同期のジョブ**に分かれる',
+      'Production. [Requests]{blue} go from the CDN through the load balancer to Web and the API; an order goes on to **payment** and **jobs done later**'
     )
   );
+  // Looks of lines of its own: `metrics` lines are dotted, grey and headless.
+  const lines = s.addField(sys.id, 'lines').id;
+  s.addField(lines, 'metrics', 'dotted gray none');
   // How to use it, under a key of its own: a note on the zoomed item would be drawn above the diagram.
   s.addBlock(
     sys.id,
@@ -114,77 +117,113 @@ export function addDiagramSample(s: OutlineStore, parentId: string): string {
     'markdown',
     t(
       '「図」に切り替えると構成図になります。図の上でもそのまま編集できます。\n\n' +
-        '**書き方**\n\n' +
-        '- 行が箱。`to: [[API]] gRPC` のように属性に書いたリンクが矢印で、後ろの語がラベル\n' +
-        '- `shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（枠でも入れ物でもない行の下の行は、箱の中に箇条書き）\n' +
-        '- `shape: row`（横一列）/ `column`（縦一列）/ `grid`（格子）で、中の箱をアウトラインの順に並べる。それだけだと見えない並びで、`row dashed` のように枠線を書くと名前付きの枠に\n' +
-        '- `shape`（actor / db / queue / external / process / store）・`color`・`icon`・`border`（枠線: thick / double / dotted / round / shadow など）で見た目、`note` で説明\n' +
-        '- `async:` に書いたリンクは破線、`both:` は両矢印、`link:` は線だけ。リンクの横に `{red}` と書くとその矢印だけ色が変わる。`direction: TB` で縦向き\n' +
-        '- この行の `description` は図全体の説明として図の上に出る。`shape: sticky`（付箋）の行は、`to:` でつないだ箱の隣に付く注釈\n\n' +
+        '**箱と枠**\n\n' +
+        '- 行が箱。`shape: frame` の行は下の行を囲む枠、`shape: container` は中に箱を並べる箱（それ以外の行の下の行は、箱の中に箇条書き）\n' +
+        '- `shape: row` / `column` / `grid` で中の箱をアウトラインの順に並べる。`row dashed` のように線の語を足すと名前付きの枠に\n' +
+        '- 形は `shape`（actor / db / queue / external / process / store / sticky）、塗りは `color`、文字の色は `font`、枠線は `border`（thick / double / dotted / round / shadow …）、アイコンは `icon`\n' +
+        '- `note` / `description` は箱の中の説明。この行の `description` は図全体の説明として上に出る\n\n' +
+        '**矢印**\n\n' +
+        '- `to: [[API]] gRPC` のように属性に書いたリンクが矢印で、後ろの語がラベル\n' +
+        '- `async:` は破線、`both:` は両矢印、`link:` は線だけ。`lines` の下で名前ごとの見た目を決められる（ここでは `metrics: dotted gray none`）\n' +
+        '- リンクの横の `{blue}` でその矢印だけ色が変わる\n\n' +
+        '**文字の書式**\n\n' +
+        '- 名前や説明の中の `**太字**`・`*斜体*`・`~~取り消し~~`・`` `コード` ``・`[文字]{red}` はそのまま図に出る。⌘B / ⌘I / ⌘⇧X / ⌘E / ⌘⇧H で付けられる\n\n' +
         '**図の上での編集**\n\n' +
-        '- 箱を選んでそのまま入力すると名前が変わる。右クリックで名前・説明・形・色\n' +
-        '- 箱の端の丸から別の箱へドラッグで矢印。矢印を選ぶと両端の丸でつなぎ変え、右クリックで種類やラベル\n' +
-        '- 箱を枠や箱の上にドラッグすると中へ移る。Delete で削除、⌘Z で元に戻す',
+        '- 箱を選んで入力すると名前が変わる。右クリックで名前・説明と、形・塗り・文字・線\n' +
+        '- 箱の端の丸から別の箱へドラッグで矢印。矢印を右クリックで種類・色・ラベル\n' +
+        '- 箱を枠や箱の上へドラッグすると中へ移る。箱を選んで「選択した箱だけ」で、その部分だけを画像に',
       'Switch to “Diagram” to see it drawn. You can edit it there too.\n\n' +
-        '**Writing it**\n\n' +
-        '- Each row is a box. A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
-        '- A row with `shape: frame` is a frame around the rows under it; `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
-        '- `shape: row` / `column` / `grid` lines up the boxes in it in outline order: unseen alone, a named frame with a border word like `row dashed`\n' +
-        '- `shape` (actor / db / queue / external / process / store), `color`, `icon` and `border` (thick / double / dotted / round / shadow …) for the look, `note` for a description\n' +
-        '- Links under `async:` are dashed, under `both:` two-way, under `link:` plain lines; `{red}` beside a link colours that arrow. `direction: TB` draws it top to bottom\n' +
-        '- This row’s `description` goes above the diagram. A row with `shape: sticky` is a sticky note, beside the box it is joined to with `to:`\n\n' +
+        '**Boxes and frames**\n\n' +
+        '- Each row is a box. A row with `shape: frame` is a frame around the rows under it, `shape: container` a box with boxes inside (under any other row, the rows are listed in its box)\n' +
+        '- `shape: row` / `column` / `grid` lines up the boxes in it in outline order; with a line word, like `row dashed`, it is a named frame\n' +
+        '- `shape` (actor / db / queue / external / process / store / sticky), `color` for the fill, `font` for the text, `border` (thick / double / dotted / round / shadow …) and `icon`\n' +
+        '- `note` / `description` is written in the box; this row’s `description` goes above the whole diagram\n\n' +
+        '**Arrows**\n\n' +
+        '- A link in a field, like `to: [[API]] gRPC`, is an arrow labelled with the words after it\n' +
+        '- `async:` is dashed, `both:` two-way, `link:` a plain line; `lines` sets a look per field name (here `metrics: dotted gray none`)\n' +
+        '- `{blue}` beside a link colours that arrow\n\n' +
+        '**Text**\n\n' +
+        '- `**bold**`, `*italic*`, `~~struck~~`, `` `code` `` and `[words]{red}` in names and notes are drawn so; ⌘B / ⌘I / ⌘⇧X / ⌘E / ⌘⇧H put them in\n\n' +
         '**Editing on the diagram**\n\n' +
-        '- Select a box and type to rename it; right-click for its name, description, shape and colour\n' +
-        '- Drag from the dot on a box to another for an arrow. A selected arrow’s end dots join it elsewhere; right-click it for its kind and label\n' +
-        '- Drag a box onto a frame or a box to move it inside. Delete removes, ⌘Z undoes'
+        '- Select a box and type to rename it; right-click for its name, note, shape, fill, text and line\n' +
+        '- Drag from the dot on a box to another for an arrow; right-click an arrow for its kind, colour and label\n' +
+        '- Drag a box onto a frame or box to move it inside. With boxes selected, “Selected boxes only” saves just them as an image'
     )
   );
   const add = adder(s);
 
   // Rows first, arrows after: an arrow needs the id of the row it points at.
-  const user = add(sys.id, t('ユーザー', 'User'), { shape: 'actor' });
-  const cdn = add(sys.id, 'CDN', { icon: 'globe' });
+  const user = add(sys.id, t('お客さま', 'Shoppers'), { shape: 'actor' });
+  const staff = add(sys.id, t('運用担当', 'On-call staff'), { shape: 'actor', font: 'purple' });
+  const cdn = add(sys.id, 'CDN', {
+    icon: 'globe',
+    note: t('画像と静的ファイルは*ここで*返す', 'Images and static files are served *here*'),
+  });
   const vpc = add(sys.id, 'AWS VPC', { shape: 'frame solid', icon: 'cloud' });
   const pub = add(vpc, t('パブリック', 'Public'), { shape: 'frame' });
-  const alb = add(pub, t('ロードバランサー', 'Load balancer'));
+  const alb = add(pub, t('ロードバランサー', 'Load balancer'), { icon: 'shield', tech: 'ALB + WAF' });
   const app = add(vpc, t('アプリ', 'App'), { shape: 'row dashed' });
   const web = add(app, 'Web', { icon: 'browser', tech: 'Next.js' });
   // A box holding boxes: the API's parts.
   const api = add(app, 'API', {
     shape: 'container',
-    icon: 'code',
-    note: t('Go、3 台構成', 'Go, three instances'),
+    icon: 'api',
+    border: 'round shadow',
+    note: t('Go、`3` 台構成', 'Go, `3` instances'),
   });
   const members = add(api, t('会員', 'Members'));
-  const orders = add(api, t('注文', 'Orders'));
+  const orders = add(api, t('注文', 'Orders'), { border: 'thick', color: 'blue' });
   const stock = add(api, t('在庫', 'Stock'));
+  const search = add(api, t('検索', 'Search'));
   const worker = add(app, t('ワーカー', 'Worker'), {
     icon: 'gear',
-    note: t('メール送信や集計など、時間のかかる処理', 'Slow work: sending email, totals'),
+    note: t('メール送信・サムネイル作成など、**時間のかかる**処理', 'Slow work: **email**, thumbnails'),
     tech: 'Go',
   });
   const data = add(vpc, t('データ', 'Data'), { shape: 'column dashed', note: t('毎晩バックアップ', 'Backed up nightly') });
-  const db = add(data, t('データベース', 'Database'), { shape: 'db', tech: 'PostgreSQL 16', border: 'thick' });
+  const db = add(data, t('データベース', 'Database'), {
+    shape: 'db',
+    border: 'double',
+    note: t('[書き込みは primary だけ]{red}', '[Writes go to the primary only]{red}'),
+    tech: 'PostgreSQL 16',
+  });
   const cache = add(data, t('キャッシュ', 'Cache'), { shape: 'db', tech: 'Redis' });
+  const index = add(data, t('検索インデックス', 'Search index'), { shape: 'db', border: 'dotted', tech: 'OpenSearch' });
   const queue = add(data, t('ジョブキュー', 'Job queue'), { shape: 'queue', tech: 'SQS' });
-  const remark = add(vpc, t('キューが 1,000 件を超えたらワーカーを増やす', 'Add workers when the queue passes 1,000 jobs'), {
+  const files = add(data, t('画像', 'Images'), { shape: 'store', icon: 'storage', tech: 'S3' });
+  const remark = add(vpc, t('キューが **1,000 件**を超えたらワーカーを増やす', 'Add workers when the queue passes **1,000** jobs'), {
     shape: 'sticky',
   });
-  const pay = add(sys.id, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple', border: 'double shadow' });
-  const mail = add(sys.id, t('メール配信', 'Email'), { shape: 'external', icon: 'mail', tech: 'SendGrid' });
+  const outside = add(sys.id, t('外部サービス', 'Outside services'), { shape: 'column' });
+  const pay = add(outside, t('決済', 'Payments'), { shape: 'external', tech: 'Stripe', color: 'purple', border: 'double shadow' });
+  const mail = add(outside, t('メール配信', 'Email'), { shape: 'external', icon: 'mail', tech: 'SendGrid' });
+  const watch = add(sys.id, t('監視', 'Monitoring'), { icon: 'monitoring', color: 'gray', border: 'round', tech: 'Datadog' });
+  // Retired, kept on the drawing for now: struck through, in grey, on a dashed line.
+  const batch = add(sys.id, t('~~夜間バッチ~~', '~~Nightly batch~~'), {
+    font: 'gray',
+    border: 'dashed',
+    note: t('2026 年 3 月に廃止。ワーカーへ移行済み', 'Retired in March 2026; the worker does it now'),
+  });
 
-  s.addField(user, 'to', to(cdn, 'HTTPS'));
-  s.addField(cdn, 'to', to(alb));
-  s.addField(alb, 'to', to(web));
-  s.addField(web, 'to', to(api, 'gRPC'));
+  // The path of a request, in blue.
+  s.addField(user, 'to', to(cdn, 'HTTPS {blue}'));
+  s.addField(cdn, 'to', to(alb, '{blue}'));
+  s.addField(alb, 'to', to(web, '{blue}'));
+  s.addField(web, 'to', to(api, 'gRPC {blue}'));
   s.addField(members, 'to', to(db));
-  s.addField(orders, 'to', [to(db, 'SQL'), to(pay, '{purple}')].join(', '));
+  s.addField(orders, 'to', [to(db, 'SQL'), to(pay, t('決済 {purple}', 'charge {purple}'))].join(', '));
   s.addField(stock, 'to', to(cache));
+  s.addField(search, 'to', to(index));
   // `async` lines are dashed.
   s.addField(orders, 'async', to(queue, t('投入', 'enqueue')));
   s.addField(worker, 'async', to(queue, t('取得', 'poll')));
-  s.addField(worker, 'to', to(mail, 'API'));
+  s.addField(worker, 'to', [to(mail, 'API'), to(files, t('サムネイル', 'thumbnails'))].join(', '));
+  s.addField(cdn, 'link', to(files, t('配信元', 'origin')));
   s.addField(remark, 'to', to(queue));
+  // Lines of a kind set under `lines`.
+  s.addField(watch, 'metrics', to(app));
+  s.addField(staff, 'to', to(watch, t('アラート', 'alerts')));
+  s.addField(batch, 'link', to(worker, t('移行', 'moved to')));
   return sys.id;
 }
 

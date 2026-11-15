@@ -160,7 +160,7 @@ test('the samples draw without overlaps, and the guide embeds them and its own r
     return d;
   };
   const system = drawn(sys);
-  expect(system.edges.length).toBe(12);
+  expect(system.edges.length).toBe(18);
   // Each has a short description drawn above it, not its how-to block.
   expect(system.desc!.length).toBeLessThan(120);
   const flows = drawn(dfd);
