@@ -1032,6 +1032,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide li .rich, .slide li .rich > .mirror { display: inline; position: static; }
 .slide li .rich > textarea { position: absolute; }
 .slide-content { flex: 1; min-height: 0; display: flex; gap: 48px; }
+/* Shrunk to fit (SlidesView's useFitText): the text of the bullets and blocks, all in step. */
+.slide-content { --fit: 1; font-size: calc(30px * var(--fit)); }
 .slide-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
 .slide-image-box { flex: 0 0 40%; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .slide-image { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; cursor: pointer; }
@@ -1041,9 +1043,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide .block-editor { font-size: 20px; }
 .slide-data:not(.editing) { cursor: text; }
 .slide-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
-.slide-data { font-size: 24px; flex: 1; min-height: 0; overflow: hidden; }
+.slide-data { font-size: 0.8em; flex: 1; min-height: 0; overflow: hidden; }
 .slide pre code { background: none; padding: 0; font-size: inherit; }
-.slide-data pre { margin: 0; padding: 16px 24px; background: var(--s-code); border-radius: 8px; font-size: 22px; }
+.slide-data pre { margin: 0; padding: 16px 24px; background: var(--s-code); border-radius: 8px; font-size: 0.92em; }
 .slide-embed { position: relative; flex: 1; min-height: 0; overflow: auto; font-size: 13px; line-height: 1.4; cursor: default; color: var(--fg); background: var(--bg); border-radius: 8px; }
 /* Its tools over its top right corner while the pointer is over it, taking no room from the drawing. */
 .slide-embed .diagram-tools, .slide-embed .gantt-tools { position: absolute; top: 6px; right: 6px; z-index: 5; margin: 0; opacity: 0; transition: opacity 0.1s; }

@@ -8,6 +8,7 @@
  * next slide, and goes to it).
  */
 import { createPortal } from 'preact/compat';
+import type { RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BlockBody, NodeText } from './App';
 import { fText } from './focus';
@@ -208,6 +209,8 @@ export function SlidesView() {
 
 function SlideBody({ slide }: { slide: Slide }) {
   const { store } = useCtl();
+  const content = useRef<HTMLDivElement>(null);
+  useFitText(content);
   const n = store.node(slide.id);
   const title = <NodeText node={n} />;
 
@@ -258,7 +261,7 @@ function SlideBody({ slide }: { slide: Slide }) {
           <FieldText id={slide.id} name="subtitle" text={slide.subtitle} />
         </p>
       )}
-      <div class={'slide-content' + (slide.image ? ' with-image' : '')}>
+      <div ref={content} class={'slide-content' + (slide.image ? ' with-image' : '')}>
         <div class="slide-text">
           {body}
           {slide.embed && (
@@ -275,6 +278,39 @@ function SlideBody({ slide }: { slide: Slide }) {
       </div>
     </>
   );
+}
+
+/** How far the text on a slide may shrink to fit (past that, what does not fit is cut off). */
+const FIT_MIN = 0.5;
+
+/**
+ * Shrink the text of a slide's content until it fits, rather than having the
+ * slide cut it off: its bullets and blocks, as --fit times their size (the
+ * slide's own pixels, unchanged by how large it is shown). Worked out again
+ * on every render, so it grows back as text is taken out.
+ */
+function useFitText(ref: RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const over = (e: Element) => e.scrollHeight > e.clientHeight + 1;
+    const overflows = () => over(el) || [...el.querySelectorAll('.slide-text, .slide-data:not(.editing)')].some(over);
+    let fit = 1;
+    el.style.setProperty('--fit', '1');
+    // Halving the step each time: a few layouts find the size to within a percent or so.
+    if (overflows()) {
+      let [lo, hi] = [FIT_MIN, 1];
+      for (let i = 0; i < 6; i++) {
+        fit = (lo + hi) / 2;
+        el.style.setProperty('--fit', String(fit));
+        if (overflows()) hi = fit;
+        else lo = fit;
+      }
+      fit = lo;
+      el.style.setProperty('--fit', String(fit));
+    }
+    el.dataset.fit = fit < 1 ? String(Math.round(fit * 100)) : '';
+  });
 }
 
 function Bullets({ bullets }: { bullets: Bullet[] }) {
