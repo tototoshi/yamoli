@@ -764,7 +764,7 @@ const ZOOM_STEP = 1.25;
  * How large the drawing is shown, and moving about it: ⌘/Ctrl + the wheel (a
  * pinch on a trackpad) zooms around the pointer, the buttons around the middle
  * of what is in sight, and a drag on the empty background scrolls. Each item
- * opens at its own size.
+ * opens fitted (no larger than its own size).
  */
 function useZoom(id: string, scroller: RefObject<HTMLDivElement | null>, svg: RefObject<SVGSVGElement | null>, on: boolean) {
   const [scale, setScale] = useState(1);
@@ -792,7 +792,18 @@ function useZoom(id: string, scroller: RefObject<HTMLDivElement | null>, svg: Re
     w.scrollLeft += r.left + a.fx * r.width - a.x;
     window.scrollBy(0, r.top + a.fy * r.height - a.y);
   }, [scale]);
-  useEffect(() => setScale(1), [id]);
+  /** All of a drawing width × height in sight: no wider than the view, no taller than the window, no larger than its own size. */
+  const fitted = (width: number, height: number) =>
+    Math.max(ZOOM_MIN, Math.min(1, scroller.current!.clientWidth / width, (innerHeight - 120) / height));
+  // Opened (another item, or first drawn), it fits, before it is seen.
+  const opened = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!on || opened.current === id || !svg.current || !scroller.current) return;
+    opened.current = id;
+    const { width, height } = svg.current.viewBox.baseVal;
+    anchor.current = null;
+    setScale(fitted(width, height));
+  });
   useEffect(() => {
     const w = scroller.current;
     if (!on || !w) return;
@@ -810,12 +821,11 @@ function useZoom(id: string, scroller: RefObject<HTMLDivElement | null>, svg: Re
     panning,
     by: (k: number) => zoom(now.current * k),
     reset: () => zoom(1),
-    /** All of it in sight: no wider than the view, no taller than the window, and no larger than its own size. */
+    /** All of it in sight, and scrolled to. */
     fit: (width: number, height: number) => {
-      const w = scroller.current;
-      if (!w) return;
+      if (!scroller.current) return;
       anchor.current = null;
-      setScale(Math.max(ZOOM_MIN, Math.min(1, w.clientWidth / width, (innerHeight - 120) / height)));
+      setScale(fitted(width, height));
       requestAnimationFrame(() => svg.current?.scrollIntoView({ block: 'center', inline: 'center' }));
     },
     /** A press on the background: dragged, it scrolls; let go where it was, it is a click. */
