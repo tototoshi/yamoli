@@ -1607,18 +1607,27 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
           </button>
         </PopupMenu>
       )}
+      {/* How to work it, folded away until asked for. */}
       {!embedded && (
-        <p class="diagram-hint">
-          {kind === 'tree'
-            ? t(
-                'クリックで選択 ・ Tab で子、Enter で次の行を追加 ・ 矢印キーで移動 ・ ダブルクリックか F2 で名前を変更 ・ ドラッグで別の行の下へ ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ ⌘ + ホイールで拡大縮小、空いた所をドラッグでスクロール ・ この項目に direction: TB で縦に',
-                'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · ⌘C / ⌘V copy and paste · Delete removes · ⌘ + wheel zooms, drag the background to scroll · direction: TB on this item to grow down'
-              )
-            : t(
-                'クリックで選択、Shift+クリックで複数選択して右クリックで並べる ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ ⌘ + ホイールで拡大縮小、空いた所をドラッグでスクロール ・ shape: row / column / grid で並べる、この項目に direction: TB',
-                'Click to select, Shift+click more and right-click to line them up · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · ⌘ + wheel zooms, drag the background to scroll · shape: row / column / grid lines boxes up, direction: TB on this item'
-              )}
-        </p>
+        <details class="diagram-hint">
+          <summary>{t('操作方法', 'How to use it')}</summary>
+          <ul>
+            {(kind === 'tree'
+              ? t(
+                  'クリックで選択 ・ Tab で子、Enter で次の行を追加 ・ 矢印キーで移動 ・ ダブルクリックか F2 で名前を変更 ・ ドラッグで別の行の下へ ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ ⌘ + ホイールで拡大縮小、空いた所をドラッグでスクロール ・ この項目に direction: TB で縦に',
+                  'Click to select · Tab adds a row under it, Enter one after it · Arrow keys move · Double-click or F2 renames · Drag under another row · ⌘C / ⌘V copy and paste · Delete removes · ⌘ + wheel zooms, drag the background to scroll · direction: TB on this item to grow down'
+                )
+              : t(
+                  'クリックで選択、Shift+クリックで複数選択して右クリックで並べる ・ 選んで入力で名前を書き換え ・ 右クリックで形や色 ・ ドラッグで移動 ・ 箱の端の丸から矢印 ・ 矢印をダブルクリックでラベル ・ ⌘C / ⌘V でコピー・貼り付け ・ Delete で削除 ・ ⌘ + ホイールで拡大縮小、空いた所をドラッグでスクロール ・ shape: row / column / grid で並べる、この項目に direction: TB',
+                  'Click to select, Shift+click more and right-click to line them up · Type to rename · Right-click for shape and colour · Drag to move · Draw arrows from the dot on a box · Double-click an arrow for its label · ⌘C / ⌘V copy and paste · Delete removes · ⌘ + wheel zooms, drag the background to scroll · shape: row / column / grid lines boxes up, direction: TB on this item'
+                )
+            )
+              .split(/ [・·] /)
+              .map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+          </ul>
+        </details>
       )}
     </div>
   );

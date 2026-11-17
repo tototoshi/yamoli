@@ -1030,7 +1030,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .diagram-wrap.embedded .diagram { max-width: 100%; max-height: 100%; }
 .diagram-tools { display: flex; justify-content: flex-end; gap: 6px; margin: 0 0 8px; }
 .diagram-empty, .diagram-hint { color: var(--muted); font-size: 13px; }
-.diagram-hint { text-align: center; font-size: 12px; margin-top: 8px; }
+.diagram-hint { font-size: 12px; margin-top: 8px; }
+.diagram-hint summary { width: fit-content; cursor: pointer; }
+.diagram-hint summary:hover { color: var(--fg); }
+.diagram-hint ul { margin: 6px 0 0; padding-left: 20px; columns: 2 280px; }
 .dg-node, .dg-frame { cursor: pointer; }
 .diagram-wrap.embedded .dg-node, .diagram-wrap.embedded .dg-frame { cursor: default; }
 .dg-node rect, .dg-node ellipse, .dg-node > path:first-of-type { fill: var(--bg); stroke: #9aa3ae; stroke-width: 1.2; }
