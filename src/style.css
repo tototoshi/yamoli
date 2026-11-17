@@ -1026,6 +1026,11 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide ul ul { font-size: 0.8em; color: var(--s-muted); margin: 4px 0 8px; }
 .slide li { margin: 6px 0; }
 .slide li.done { text-decoration: line-through; color: var(--s-muted); }
+/* A title or bullet typed in where it is, in the slide's type (the textarea over a bullet placed by useFlowEditor). */
+.slide .text-view { display: inline; padding: 0; min-height: 0; line-height: inherit; cursor: text; }
+.slide .rich > .mirror, .slide .rich > textarea { padding: 0; font: inherit; line-height: inherit; color: inherit; }
+.slide li .rich, .slide li .rich > .mirror { display: inline; position: static; }
+.slide li .rich > textarea { position: absolute; }
 .slide-content { flex: 1; min-height: 0; display: flex; gap: 48px; }
 .slide-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
 .slide-image { flex: 0 0 40%; min-width: 0; max-height: 100%; object-fit: contain; }

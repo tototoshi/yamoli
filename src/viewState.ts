@@ -299,8 +299,8 @@ export class ViewState {
   /** Rows on screen in order. */
   visibleRows(): string[] {
     const out: string[] = [];
-    // The document shows every row, folded or not, and no fields.
-    const doc = this.view === 'doc';
+    // The document and the slides show every row, folded or not, and no fields.
+    const doc = this.view === 'doc' || this.view === 'slides';
     const kids = (id: string) =>
       doc ? this.store.items(id).filter((c) => this.prefs.showCompleted || !this.store.node(c).completed) : this.shownChildren(id);
     const walk = (id: string) => {

@@ -1,11 +1,16 @@
 /*
  * Slides view: the zoomed item as a deck (see slides.ts). Slides are laid out
  * at 1280×720 and scaled to fit, in the page or full screen, and printed one
- * to a page of that size (to save as a PDF).
+ * to a page of that size (to save as a PDF). A slide's title and bullets are
+ * typed in where they are, with the outline's keys; the slide on screen
+ * follows the row being typed in (Enter on a title with no bullets makes the
+ * next slide, and goes to it).
  */
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { NodeText } from './App';
 import { useCtl } from './context';
+import { useFlowEditor } from './flowEditor';
 import { t } from './i18n';
 import { renderFormat } from './formats';
 import { DiagramView } from './DiagramView';
@@ -23,9 +28,17 @@ export function SlidesView() {
   const { store } = ctl;
   const deck = buildDeck(store, ctl.zoomId);
   const count = deck.slides.length;
+  // The slide of the row being typed in, when that is another (moved to with the keys, or just made);
+  // not the deck's own, also the page's title above, nor a field (the deck's `views` above, say).
+  const typing = ctl.activeField?.startsWith('text:') ? ctl.activeField.slice(5) : null;
+  const row = typing && typing !== ctl.zoomId && store.get(typing) && store.node(typing).key === null;
+  const typed = row ? slideOf(deck.slides, store, typing) : -1;
+  if (typed >= 0) ctl.slide = typed;
   const index = Math.min(ctl.slide, Math.max(count - 1, 0));
   const slide = deck.slides[index];
   const stageRef = useRef<HTMLDivElement>(null);
+  /** Whether a press on the slide found a line being typed in: the click then only ends that, not turning the page. */
+  const wasTyping = useRef(false);
   const [fit, setFit] = useState({ scale: 1, x: 0, y: 0 });
   const [showNotes, setShowNotes] = useState(false);
   /** Every slide is laid out for printing, and the print dialog opened. */
@@ -121,7 +134,10 @@ export function SlidesView() {
         <div
           class={'slide-stage theme-' + deck.theme}
           ref={stageRef}
-          onClick={(e) => !(e.target as Element).closest('a, button, .gantt-wrap') && go(index + 1)}
+          onPointerDown={() => (wasTyping.current = !!document.activeElement?.closest('.slide .rich'))}
+          onClick={(e) =>
+            !wasTyping.current && !(e.target as Element).closest('a, button, .gantt-wrap, .diagram-wrap, .text, .rich') && go(index + 1)
+          }
         >
           <div class={`slide layout-${slide.layout}`} style={{ transform: `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` }}>
             <SlideBody slide={slide} />
@@ -187,7 +203,7 @@ export function SlidesView() {
 function SlideBody({ slide }: { slide: Slide }) {
   const { store } = useCtl();
   const n = store.node(slide.id);
-  const title = <InlineText text={n.text} />;
+  const title = <NodeText node={n} />;
 
   if (slide.layout === 'title') {
     return (
@@ -256,17 +272,34 @@ function SlideBody({ slide }: { slide: Slide }) {
 }
 
 function Bullets({ bullets }: { bullets: Bullet[] }) {
-  const { store } = useCtl();
   return (
     <ul>
       {bullets.map((b) => (
-        <li key={b.id} class={store.node(b.id).completed ? 'done' : ''}>
-          <InlineText text={store.node(b.id).text} />
-          {b.children.length > 0 && <Bullets bullets={b.children} />}
-        </li>
+        <BulletItem key={b.id} bullet={b} />
       ))}
     </ul>
   );
+}
+
+function BulletItem({ bullet }: { bullet: Bullet }) {
+  const { store } = useCtl();
+  const ref = useRef<HTMLLIElement>(null);
+  useFlowEditor(ref);
+  return (
+    <li ref={ref} class={store.node(bullet.id).completed ? 'done' : ''}>
+      <NodeText node={store.node(bullet.id)} />
+      {bullet.children.length > 0 && <Bullets bullets={bullet.children} />}
+    </li>
+  );
+}
+
+/** The slide showing id: the one of the row it is under the deck (or is), -1 when none. */
+function slideOf(slides: Slide[], store: ReturnType<typeof useCtl>['store'], id: string): number {
+  for (let r: string | undefined = id; r; r = store.parentOf(r)) {
+    const i = slides.findIndex((s) => s.id === r);
+    if (i >= 0) return i;
+  }
+  return -1;
 }
 
 function DataHtml({ format, content }: { format: string; content: string }) {

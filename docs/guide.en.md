@@ -169,6 +169,8 @@ You can edit the diagram where it is drawn. Each edit changes the outline's rows
 
 For items with `views: slides`: the zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content. ← → page through, F goes full screen, N shows the speaker notes. The **PDF** button below opens the print dialog with every slide on a 16:9 page of its own: choose Save as PDF for a PDF (without the notes).
 
+A slide's title and bullets can be clicked and typed in right there, with the outline's keys (Enter for the next row, Tab to indent, ↑↓ to the rows before and after); moving to a row of another slide goes to that slide (Enter on a title with no bullets makes the next slide). A click on the slide while typing ends that; the next turns the page.
+
 | Field | On | Meaning |
 | --- | --- | --- |
 | `subtitle` | deck, slide | Subtitle |

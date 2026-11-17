@@ -4,8 +4,7 @@
  * them. Clicking a line edits its row right there, as in the outline (Enter
  * a new row after it, Tab under the one above, and so on).
  */
-import type { RefObject } from 'preact';
-import { useLayoutEffect, useMemo, useRef } from 'preact/hooks';
+import { useMemo, useRef } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
@@ -14,6 +13,7 @@ import { GanttView } from './GanttView';
 import { t } from './i18n';
 import { BlockBody, NodeText } from './App';
 import { fText } from './focus';
+import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
 
 export function DocView() {
@@ -102,38 +102,6 @@ function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?
       <Text id={id} />
     </div>
   );
-}
-
-/**
- * Lay the row editor in a paragraph or list item (line) over its text where
- * it flows: the copy showing the text stays inline as it was, among other
- * sentences or after a checkbox, and the (unseen) textarea over it starts on
- * its line, indented to where it starts, and wraps across the line's width as
- * it does, so nothing moves when typing starts.
- */
-function useFlowEditor(ref: RefObject<HTMLElement | null>) {
-  useLayoutEffect(() => {
-    const line = ref.current;
-    const rich = line && [...line.querySelectorAll<HTMLElement>('.rich')].find((r) => r.parentElement?.closest('li, .doc-p') === line);
-    const mirror = rich?.querySelector<HTMLElement>(':scope > .mirror');
-    const ta = rich?.querySelector<HTMLTextAreaElement>(':scope > textarea');
-    if (!line || !mirror || !ta?.offsetParent) return;
-    const place = () => {
-      const first = mirror.getClientRects()[0];
-      if (!first) return;
-      const box = line.getBoundingClientRect();
-      const at = ta.offsetParent!.getBoundingClientRect();
-      const lineHeight = parseFloat(getComputedStyle(line).lineHeight);
-      ta.style.top = first.top - (lineHeight - first.height) / 2 - at.top + 'px';
-      ta.style.left = box.left - at.left + 'px';
-      ta.style.width = line.clientWidth + 'px';
-      ta.style.textIndent = first.left - box.left + 'px';
-    };
-    place();
-    const watch = new ResizeObserver(place);
-    watch.observe(line);
-    return () => watch.disconnect();
-  });
 }
 
 /** A task's checkbox, which completes it (or opens it again). */
