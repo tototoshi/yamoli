@@ -947,7 +947,20 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 .slides { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
 .slide-list { margin: 0; padding: 0 0 0 1.6em; font-size: 13px; color: var(--muted); max-height: 75vh; overflow-y: auto; }
-.slide-list li { padding: 3px 4px; border-radius: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slide-list li { position: relative; padding: 3px 4px; border-radius: 4px; cursor: pointer; } /* a list item still: numbered */
+.slide-list-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slide-list li:hover .slide-list-name { padding-right: 16px; }
+/* Delete: at the end of a slide's name while the pointer is over it. */
+.slide-list-del { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); padding: 0 4px; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; visibility: hidden; }
+.slide-list li:hover .slide-list-del { visibility: visible; }
+.slide-list-del:hover { color: var(--danger); }
+@media (hover: none) { .slide-list-del { visibility: visible; } }
+/* Where a slide dragged in the list would go. */
+.slide-list li.drop-before { box-shadow: inset 0 2px var(--accent); }
+.slide-list li.drop-after { box-shadow: inset 0 -2px var(--accent); }
+.slide-side { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.slide-side .slide-list { align-self: stretch; }
+.slide-add { margin-left: 1.6em; }
 .slide-list li:hover { background: var(--hover); color: var(--fg); }
 .slide-list li.current { color: var(--accent); font-weight: 600; }
 .slide-col { min-width: 0; }

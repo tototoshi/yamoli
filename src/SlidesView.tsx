@@ -3,7 +3,8 @@
  * at 1280×720 and scaled to fit, in the page or full screen, and printed one
  * to a page of that size (to save as a PDF). A slide's title, bullets,
  * subtitle, blocks, notes and picture's address are typed in where they are,
- * with the outline's keys; the slide on screen
+ * with the outline's keys; slides are added, dragged into another order and
+ * deleted in the list beside them; the slide on screen
  * follows the row being typed in (Enter on a title with no bullets makes the
  * next slide, and goes to it).
  */
@@ -115,26 +116,99 @@ export function SlidesView() {
     return () => document.removeEventListener('keydown', onKey);
   });
 
+  /** A new slide after the one on screen (after the title slide: the first), its title to type in. */
+  const addSlide = () => {
+    const cur = slide?.id;
+    const first = store.items(ctl.zoomId)[0];
+    const n = cur && cur !== ctl.zoomId ? store.addSiblingAfter(cur) : store.addChild(ctl.zoomId, first ? store.indexOf(first) : -1);
+    ctl.commit(fText(n.id, 0));
+  };
+  /** The slide being dragged in the list, and where it would go: before or after which. */
+  const dragging = useRef<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
+  const dropAt = (id: string, after: boolean) => {
+    const moved = dragging.current;
+    dragging.current = null;
+    setDrop(null);
+    if (!moved || moved === id) return;
+    const items = store.items(ctl.zoomId);
+    // Onto the title slide: first; else before the one dropped on, or the one after it (none: last).
+    const before = id === ctl.zoomId ? (items[0] ?? null) : after ? (items[items.indexOf(id) + 1] ?? null) : id;
+    if (before === moved || !store.moveTo(moved, ctl.zoomId, before)) return;
+    ctl.commit(null);
+    ctl.setSlide(buildDeck(store, ctl.zoomId).slides.findIndex((s) => s.id === moved));
+  };
+
   if (!slide) {
     return (
-      <p class="slides-empty">
-        {t(
-          'スライドがありません。この項目の下に行を追加すると、1 行が 1 枚のスライドになります（子の行は箇条書き）。',
-          'No slides yet. Each row under this item becomes a slide (rows under it are its bullets).'
-        )}
-      </p>
+      <div class="slides-empty">
+        <p>
+          {t(
+            'スライドがありません。この項目の下に行を追加すると、1 行が 1 枚のスライドになります（子の行は箇条書き）。',
+            'No slides yet. Each row under this item becomes a slide (rows under it are its bullets).'
+          )}
+        </p>
+        <button class="mini" onClick={addSlide}>
+          {t('+ スライドを追加', '+ Add a slide')}
+        </button>
+      </div>
     );
   }
 
   return (
     <div class="slides">
-      <ol class="slide-list">
-        {deck.slides.map((s, i) => (
-          <li key={s.id} class={i === index ? 'current' : ''} onClick={() => go(i)}>
-            {nodeLabel(store, s.id)}
-          </li>
-        ))}
-      </ol>
+      <div class="slide-side">
+        <ol class="slide-list">
+          {deck.slides.map((s, i) => {
+            const own = s.id !== ctl.zoomId; // the title slide is the deck itself: not moved nor deleted here
+            return (
+              <li
+                key={s.id}
+                class={(i === index ? 'current' : '') + (drop?.id === s.id ? (drop.after ? ' drop-after' : ' drop-before') : '')}
+                draggable={own}
+                onClick={() => go(i)}
+                onDragStart={(e) => {
+                  dragging.current = s.id;
+                  e.dataTransfer?.setData('text/plain', nodeLabel(store, s.id));
+                  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  if (!dragging.current) return;
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const after = own && e.clientY > r.top + r.height / 2;
+                  if (drop?.id !== s.id || drop.after !== after) setDrop({ id: s.id, after });
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (drop) dropAt(drop.id, drop.after);
+                }}
+                onDragEnd={() => {
+                  dragging.current = null;
+                  setDrop(null);
+                }}
+              >
+                <span class="slide-list-name">{nodeLabel(store, s.id) || t('無題', 'Untitled')}</span>
+                {own && (
+                  <button
+                    class="slide-list-del"
+                    title={t('このスライドを削除', 'Delete this slide')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ctl.deleteItem(s.id);
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        <button class="mini slide-add" onClick={addSlide} title={t('今のスライドの後に追加', 'Add one after the slide on screen')}>
+          {t('+ スライド', '+ Slide')}
+        </button>
+      </div>
       <div class="slide-col">
         <div
           class={'slide-stage theme-' + deck.theme}
