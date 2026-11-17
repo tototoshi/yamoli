@@ -19,6 +19,7 @@ The interface is in English or Japanese, following the browser's language; switc
 - **Copy tree** in a row's menu (right-click its ●) copies the item with everything under it, folded and hidden rows too.
 - Rows copied in Yamoli paste back as they were: fields, blocks, multi-line text, done or not. Elsewhere they paste as a Markdown list.
 - Pasted text with several lines becomes rows. A Markdown list keeps its nesting (`- name: value` becoming a field of the row above); YAML comes in as fields, nesting and blocks; a checklist (`- [ ]` / `- [x]`) as tasks.
+- Text copied from a web page keeps its links, as `[words](https://…)`. Each paragraph or heading becomes a row, and its lists rows nested as they were.
 
 ### Tasks
 

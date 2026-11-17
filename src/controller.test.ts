@@ -261,10 +261,10 @@ test('Tasks only shows tasks, the rows they are under (even collapsed) and their
   ctl.toggleTasksOnly(); // prefs are saved: leave them as they were
 });
 
-/** A paste of text into ta. */
-function paste(ctl: Ctl, ta: HTMLTextAreaElement, text: string) {
+/** A paste of text into ta (and of html, as copied from a page). */
+function paste(ctl: Ctl, ta: HTMLTextAreaElement, text: string, html = '') {
   const e = new Event('paste', { cancelable: true }) as ClipboardEvent;
-  Object.defineProperty(e, 'clipboardData', { value: { getData: () => text } });
+  Object.defineProperty(e, 'clipboardData', { value: { getData: (type: string) => (type === 'text/html' ? html : text) } });
   ctl.onTextPaste(e, ta);
   return e;
 }
@@ -461,4 +461,19 @@ test('a field added from the diagram is typed in the outline, which the view swi
   expect(ctl.view).toBe('outline');
   expect(ctl.activeField).toBe('fkey:' + f);
   location.hash = '';
+});
+
+test('text copied from a page pastes with its links, on one line or many', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'Read  first');
+  });
+  const ta = editor(ctl, a, 5);
+  const e = paste(ctl, ta, 'the guide', '<a href="https://example.com/guide">the guide</a>');
+  expect(e.defaultPrevented).toBe(true);
+  expect(ctl.store.node(a).text).toBe('Read [the guide](https://example.com/guide) first');
+
+  const b = ctl.store.addSiblingAfter(a, '').id;
+  paste(ctl, editor(ctl, b), 'One\nTwo', '<p><a href="https://one.example">One</a></p><p>Two</p>');
+  expect(texts(ctl, ctl.store.rootId).slice(1)).toEqual(['[One](https://one.example)', 'Two']);
 });

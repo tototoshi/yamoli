@@ -12,6 +12,7 @@ import { arrowOf, IS_MAC, isMod } from './keys';
 import { Editing } from './editing';
 import { filesIn } from './files';
 import { replaceRefs } from './links';
+import { linkedText } from './pasteHtml';
 
 /** A row as it was copied, with the rows under it. */
 interface Copied {
@@ -515,9 +516,12 @@ export class Controller extends Editing {
     this.commit(fText(last));
   }
 
-  /** Pasting multiple lines into a row creates one sibling per line (or rows, for indented text). */
+  /**
+   * Pasting multiple lines into a row creates one sibling per line (or rows,
+   * for indented text). Copied from a web page, its links come too.
+   */
   onTextPaste(e: ClipboardEvent, ta: HTMLTextAreaElement) {
-    const text = e.clipboardData?.getData('text') ?? '';
+    let text = e.clipboardData?.getData('text') ?? '';
     // Files alone (a screenshot) are kept; with text too (cells from a spreadsheet, with a picture of them), the text is what's meant.
     const files = text ? [] : filesIn(e.clipboardData);
     if (files.length) {
@@ -526,7 +530,9 @@ export class Controller extends Editing {
     }
     const lf = (t: string) => t.replace(/\r\n?/g, '\n').trimEnd();
     if (this.copied && lf(text) === lf(this.copied.text)) return this.pasteCopied(e, ta, this.copied.rows);
-    if (!text.includes('\n')) return;
+    const linked = linkedText(e.clipboardData?.getData('text/html') ?? '');
+    if (linked) text = linked;
+    if (!text.includes('\n') && !linked) return;
     const tree = parseOutlineText(text);
     if (tree.some((r) => r.key !== null || r.children.length || r.task)) return this.pasteTree(e, ta, tree);
     const lines = text
@@ -534,7 +540,7 @@ export class Controller extends Editing {
       .split('\n')
       .map((l) => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim())
       .filter(Boolean);
-    if (lines.length < 2) return;
+    if (lines.length < (linked ? 1 : 2)) return;
     e.preventDefault();
     const { store } = this;
     const id = ta.dataset.id!;
