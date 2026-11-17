@@ -164,7 +164,8 @@ function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): D
 /**
  * The chart for the zoomed item, or (embedded, e.g. in a slide) for rootId
  * with its expanded rows and without the toolbar; not editable but for edit
- * (in a document), where a click outside it lets go of the arrow picked.
+ * (in a document or a slide), where a click outside it lets go of the arrow
+ * picked (marked on it as data-holding, for the page around to leave keys to it).
  */
 export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedded?: boolean; edit?: boolean }) {
   const ctl = useCtl();
@@ -463,7 +464,7 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   );
 
   return (
-    <div class={'gantt-wrap' + (embedded ? ' embedded' : '')}>
+    <div class={'gantt-wrap' + (embedded ? ' embedded' : '')} data-holding={embedded && picked ? '' : undefined}>
       {own && <div class="gantt-tools">{zoomTools}</div>}
       {!embedded && (
         <div class="gantt-tools">

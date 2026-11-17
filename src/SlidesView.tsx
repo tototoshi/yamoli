@@ -95,6 +95,8 @@ export function SlidesView() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, [contenteditable]') || e.altKey || e.metaKey || e.ctrlKey) return;
+      // A box or arrow selected in a drawing on the slide: the keys are its (a mind map's arrows move through it).
+      if (document.querySelector('.slide [data-holding]')) return;
       const k = e.key;
       const at = Math.min(ctl.slide, count - 1); // not `index`: keys can arrive before the rerender
       if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === ' ') go(at + 1);
@@ -258,9 +260,9 @@ function SlideBody({ slide }: { slide: Slide }) {
           {slide.embed && (
             <div class="slide-embed">
               {slide.embedAs === 'gantt' ? (
-                <GanttView rootId={slide.embed} embedded />
+                <GanttView rootId={slide.embed} embedded edit />
               ) : (
-                <DiagramView rootId={slide.embed} embedded kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
+                <DiagramView rootId={slide.embed} embedded edit kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
               )}
             </div>
           )}

@@ -201,7 +201,7 @@ function ExtraView({ extra }: { extra: Extra }) {
       {extra.as === 'gantt' ? (
         <GanttView rootId={extra.id} embedded edit />
       ) : (
-        <DiagramView rootId={extra.id} embedded edit kind={extra.as === 'mindmap' ? 'tree' : 'flow'} />
+        <DiagramView rootId={extra.id} embedded edit zoomable kind={extra.as === 'mindmap' ? 'tree' : 'flow'} />
       )}
     </div>
   );

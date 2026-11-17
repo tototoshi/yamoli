@@ -875,20 +875,23 @@ function ZoomTools({ zoom, onFit }: { zoom: ReturnType<typeof useZoom>; onFit: (
 
 /**
  * The diagram (a flow, or a mind map) for the zoomed item, or (embedded, e.g.
- * in a slide) for rootId, without the hints and not editable but for edit (in
- * a document): then it is drawn and zoomed as in its own view, its keys and
- * paste act only on what is selected in it, and a click outside it lets go
- * of that.
+ * in a slide) for rootId, without the hints and not editable but for edit:
+ * then its keys and paste act only on what is selected in it (marked on it as
+ * data-holding, for the page around to leave keys to it), and a click outside
+ * it lets go of that. zoomable (in a document): drawn and zoomed as in its own
+ * view, rather than shrunk into the space given.
  */
 export function DiagramView({
   rootId,
   embedded,
   edit,
+  zoomable,
   kind = 'flow',
 }: {
   rootId?: string;
   embedded?: boolean;
   edit?: boolean;
+  zoomable?: boolean;
   kind?: 'flow' | 'tree';
 }) {
   const ctl = useCtl();
@@ -899,7 +902,7 @@ export function DiagramView({
   const svgRef = useRef<SVGSVGElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Shrunk into the space given (in a slide), not zoomed. */
-  const sized = embedded && !edit;
+  const sized = embedded && !zoomable;
   const zoom = useZoom(id, scrollRef, svgRef, !sized);
   /** The box or arrow clicked, which Delete removes (and Enter renames, for a box). */
   const [sel, setSel] = useState<{ box: string } | { edge: string } | null>(null);
@@ -1332,11 +1335,11 @@ export function DiagramView({
   const renamed = renaming ? L.boxes.get(renaming) : undefined;
 
   return (
-    <div ref={wrapRef} class={'diagram-wrap' + (sized ? ' embedded' : '')}>
+    <div ref={wrapRef} class={'diagram-wrap' + (sized ? ' embedded' : '')} data-holding={embedded && sel ? '' : undefined}>
       {embedded && edit && (
         <div class="diagram-tools">
           <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />
-          <ZoomTools zoom={zoom} onFit={() => zoom.fit(W, H)} />
+          {zoomable && <ZoomTools zoom={zoom} onFit={() => zoom.fit(W, H)} />}
         </div>
       )}
       {!embedded && (
