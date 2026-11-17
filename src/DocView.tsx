@@ -53,9 +53,9 @@ function Part({ part }: { part: DocPart }) {
 }
 
 /**
- * At the end of a line, while the pointer is over it: make its row a heading,
- * or a body line again (written as `doc` on it, unless that is what it would
- * be anyway: auto).
+ * In the margin before a line, while the pointer is over it: make its row a
+ * heading (H), or a body line again (¶); written as `doc` on it, unless that
+ * is what it would be anyway (auto).
  */
 function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole }) {
   const ctl = useCtl();
@@ -63,23 +63,23 @@ function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole
   return (
     <button
       class="mini doc-role"
+      title={to === 'heading' ? t('見出しにする', 'Make it a heading') : t('本文にする', 'Make it body text')}
       onClick={() => {
         setDoc(ctl.store, id, 'role', to === auto ? null : to);
         ctl.commit(null);
       }}
     >
-      {to === 'heading' ? t('見出しに', 'Make a heading') : t('本文に', 'Make body text')}
+      {to === 'heading' ? 'H' : '¶'}
     </button>
   );
 }
 
 function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocRole }) {
-  const { store } = useCtl();
   const H = `h${level}` as 'h2';
   return (
     <H class="doc-line">
-      <Text id={id} />
       <RoleSwitch id={id} now="heading" auto={auto} />
+      <Text id={id} />
     </H>
   );
 }
@@ -93,12 +93,12 @@ function Para({ id, auto = 'body', more }: { id: string; auto?: DocRole; more?: 
   const { store } = useCtl();
   const p = (
     <p class={'doc-line' + (store.node(id).completed ? ' done' : '')}>
+      <RoleSwitch id={id} now="body" auto={auto} />
       <Check id={id} />
       <Text id={id} />
       {more?.ids.map((m, i) => (
         <Sentence key={m} id={m} after={store.node(i ? more.ids[i - 1] : id).text} />
       ))}
-      <RoleSwitch id={id} now="body" auto={auto} />
     </p>
   );
   if (!more) return p;
@@ -194,9 +194,9 @@ function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boo
   return (
     <li class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
       <span class="doc-line">
+        {top && <RoleSwitch id={item.id} now="body" auto="body" />}
         <Check id={item.id} />
         <Text id={item.id} />
-        {top && <RoleSwitch id={item.id} now="body" auto="body" />}
       </span>
       {item.extras.map((x, i) => (
         <ExtraView key={i} extra={x} />
