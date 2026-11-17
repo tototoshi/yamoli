@@ -11,6 +11,9 @@
  *                  reveal: yes | no    its bullets shown one at a time (or not, whatever the deck says)
  *                  notes: …            speaker notes (also as a list)
  *                  image: https://…    picture beside the bullets
+ *                  image-at: right | left | below | full | background
+ *                                      where it goes (右 / 左 / 下 / 大きく / 背景): beside the
+ *                                      bullets, under them, alone under the title, behind it all
  *                  embed: [[item]]     that item's Gantt chart
  *                  embed: [[item]] diagram   …or its diagram (also `図`),
  *                                      or mind map (`mindmap` / `マインドマップ`)
@@ -21,6 +24,19 @@ import { refIds } from './links';
 import type { OutlineStore } from './model';
 
 export type Layout = 'default' | 'title' | 'center' | 'two-column';
+export type ImageAt = 'right' | 'left' | 'below' | 'full' | 'background';
+const IMAGE_AT: Record<string, ImageAt> = {
+  right: 'right',
+  left: 'left',
+  below: 'below',
+  full: 'full',
+  background: 'background',
+  右: 'right',
+  左: 'left',
+  下: 'below',
+  大きく: 'full',
+  背景: 'background',
+};
 const LAYOUTS: Layout[] = ['default', 'title', 'center', 'two-column'];
 
 export interface Bullet {
@@ -36,6 +52,8 @@ export interface Slide {
   subtitle?: string;
   notes?: string;
   image?: string;
+  /** Where the picture goes (with one, or its field). */
+  imageAt: ImageAt;
   embed?: string;
   /** What of the embedded item to show. */
   embedAs?: 'gantt' | 'diagram' | 'mindmap';
@@ -64,7 +82,14 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
   const revealAll = yes(value(deckId, 'reveal')) ?? false;
   const slides: Slide[] = [];
   if (deckId !== store.rootId) {
-    slides.push({ id: deckId, layout: 'title', bullets: [], subtitle: value(deckId, 'subtitle'), notes: value(deckId, 'notes') });
+    slides.push({
+      id: deckId,
+      layout: 'title',
+      bullets: [],
+      subtitle: value(deckId, 'subtitle'),
+      notes: value(deckId, 'notes'),
+      imageAt: 'right',
+    });
   }
   for (const id of store.items(deckId)) {
     const layout = value(id, 'layout') as Layout | undefined;
@@ -78,6 +103,7 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
       subtitle: value(id, 'subtitle'),
       notes: value(id, 'notes'),
       image: value(id, 'image'),
+      imageAt: IMAGE_AT[value(id, 'image-at')?.trim().toLowerCase() ?? ''] ?? 'right',
       embed: own ? id : embed ? refIds(embed).find((r) => store.get(r)) : undefined,
       embedAs: embed ? embedKind(embed.replace(/\[\[[^\]]*\]\]/g, '')) : undefined,
       reveal: yes(value(id, 'reveal')) ?? revealAll,

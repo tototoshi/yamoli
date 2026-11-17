@@ -22,7 +22,7 @@ import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
 import { nodeLabel } from './links';
-import { buildDeck, splitColumns, type Bullet, type Layout, type Slide } from './slides';
+import { buildDeck, splitColumns, type Bullet, type ImageAt, type Layout, type Slide } from './slides';
 import { fileUrl, filesIn } from './files';
 
 const W = 1280;
@@ -276,7 +276,9 @@ export function SlidesView() {
           onPointerDown={() => (wasTyping.current = !!document.activeElement?.closest('.slide .rich'))}
           onClick={(e) =>
             !wasTyping.current &&
-            !(e.target as Element).closest('a, button, .gantt-wrap, .diagram-wrap, .text, .rich, .slide-data, .block, .slide-image') &&
+            !(e.target as Element).closest(
+              'a, button, .gantt-wrap, .diagram-wrap, .text, .rich, .slide-data, .block, .slide-image, .slide-image-tools'
+            ) &&
             forward()
           }
         >
@@ -381,6 +383,7 @@ function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
   // A subtitle or picture field is shown even empty (just added, or emptied to be taken away with Backspace).
   const hasSubtitle = !!(slide.subtitle || store.field(slide.id, 'subtitle'));
   const hasImage = !!(slide.image || store.field(slide.id, 'image'));
+  const at = slide.imageAt;
 
   if (slide.layout === 'title') {
     return (
@@ -429,20 +432,24 @@ function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
           <FieldText id={slide.id} name="subtitle" text={slide.subtitle ?? ''} />
         </p>
       )}
-      <div ref={content} class={'slide-content' + (hasImage ? ' with-image' : '')}>
-        <div class="slide-text">
-          {body}
-          {slide.embed && (
-            <div class="slide-embed">
-              {slide.embedAs === 'gantt' ? (
-                <GanttView rootId={slide.embed} embedded edit={!still} />
-              ) : (
-                <DiagramView rootId={slide.embed} embedded edit={!still} kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
-              )}
-            </div>
-          )}
-        </div>
-        {hasImage && <SlideImage id={slide.id} src={slide.image ?? ''} />}
+      {hasImage && at === 'background' && <SlideImage id={slide.id} src={slide.image ?? ''} at={at} />}
+      <div ref={content} class={'slide-content' + (hasImage ? ' with-image image-' + at : '')}>
+        {/* A picture on its own under the title: nothing else. */}
+        {!(hasImage && at === 'full') && (
+          <div class="slide-text">
+            {body}
+            {slide.embed && (
+              <div class="slide-embed">
+                {slide.embedAs === 'gantt' ? (
+                  <GanttView rootId={slide.embed} embedded edit={!still} />
+                ) : (
+                  <DiagramView rootId={slide.embed} embedded edit={!still} kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {hasImage && at !== 'background' && <SlideImage id={slide.id} src={slide.image ?? ''} at={at} />}
       </div>
     </>
   );
@@ -798,11 +805,30 @@ function FieldText({ id, name, text }: { id: string; name: string; text: string 
 }
 
 /** The slide's picture; clicked, its address (`image:`) to type in under it. */
-function SlideImage({ id, src }: { id: string; src: string }) {
+function SlideImage({ id, src, at }: { id: string; src: string; at: ImageAt }) {
   const ctl = useCtl();
   const f = plainField(ctl.store, id, 'image');
   const still = useContext(Still);
   const editing = !!f && ctl.activeField === fText(f.id).key && !still;
+  const address = f && (editing || !src) && (
+    <div class="slide-image-src">
+      <NodeText node={f} />
+    </div>
+  );
+  // Behind the slide, the picture can't be pointed at: its menu and address sit over the slide's top right corner.
+  if (at === 'background') {
+    return (
+      <>
+        <div class="slide-bg">{src && <img src={fileUrl(src)} alt="" />}</div>
+        {!still && (
+          <div class={'slide-image-tools at-slide' + (address ? ' open' : '')}>
+            <ImageAtMenu id={id} at={at} address={f ? () => ctl.focus(fText(f.id, 'end')) : undefined} />
+            {address}
+          </div>
+        )}
+      </>
+    );
+  }
   return (
     <div class="slide-image-box">
       {src && (
@@ -814,12 +840,46 @@ function SlideImage({ id, src }: { id: string; src: string }) {
           onClick={() => f && ctl.focus(fText(f.id, 'end'))}
         />
       )}
-      {f && (editing || !src) && (
-        <div class="slide-image-src">
-          <NodeText node={f} />
+      {!still && (
+        <div class="slide-image-tools">
+          <ImageAtMenu id={id} at={at} />
         </div>
       )}
+      {address}
     </div>
+  );
+}
+
+const IMAGE_AT_NAMES: [ImageAt, string, string][] = [
+  ['right', '右', 'Right'],
+  ['left', '左', 'Left'],
+  ['below', '下', 'Below'],
+  ['full', '大きく', 'Large'],
+  ['background', '背景', 'Background'],
+];
+
+/** Where the picture goes, picked over it: its `image-at` field (none for beside the bullets on the right). */
+function ImageAtMenu({ id, at, address }: { id: string; at: ImageAt; address?: () => void }) {
+  const ctl = useCtl();
+  const set = (to: ImageAt) => {
+    const f = ctl.store.field(id, 'image-at');
+    if (to !== 'right') ctl.store.setField(id, 'image-at', to);
+    else if (f) ctl.store.remove(f.id);
+    ctl.commit(null);
+  };
+  return (
+    <span class="slide-image-menu" role="group" aria-label={t('画像の置き場所', 'Where the picture goes')}>
+      {IMAGE_AT_NAMES.map(([value, ja, en]) => (
+        <button key={value} class={'mini' + (at === value ? ' on' : '')} onClick={() => at !== value && set(value)}>
+          {t(ja, en)}
+        </button>
+      ))}
+      {address && (
+        <button class="mini" onClick={address} title={t('画像のアドレスを編集', "Edit the picture's address")}>
+          {t('アドレス', 'Address')}
+        </button>
+      )}
+    </span>
   );
 }
 

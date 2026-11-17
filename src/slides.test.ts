@@ -68,3 +68,12 @@ test('reveal on the deck shows every slide one bullet at a time, unless a slide 
   expect(buildDeck(s, deck).slides.map((x) => !!x.reveal)).toEqual([false, false, true, true]);
   expect(buildDeck(s, deck).slides[3].id).toBe(c);
 });
+
+test('image-at says where the picture goes, in English or Japanese; anything else, on the right', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const deck = add(s.rootId, 'Deck');
+  for (const v of ['left', '背景', 'Below', 'somewhere']) s.addField(add(deck, v), 'image-at', v);
+  add(deck, 'none');
+  expect(buildDeck(s, deck).slides.map((x) => x.imageAt)).toEqual(['right', 'left', 'background', 'below', 'right', 'right']);
+});

@@ -1069,7 +1069,24 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* Shrunk to fit (SlidesView's useFitText): the text of the bullets and blocks, all in step. */
 .slide-content { --fit: 1; font-size: calc(30px * var(--fit)); }
 .slide-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
-.slide-image-box { flex: 0 0 40%; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.slide-image-box { flex: 0 0 40%; min-width: 0; position: relative; display: flex; flex-direction: column; gap: 8px; }
+/* Where the picture goes (image-at): beside the bullets (right, the default, or left), under them, alone, behind the slide. */
+.slide-content.image-left { flex-direction: row-reverse; }
+.slide-content.image-below { flex-direction: column; gap: 24px; }
+.image-below .slide-text { flex: 0 1 auto; }
+.image-below .slide-image-box { flex: 1 1 0; min-height: 30%; }
+.image-full .slide-image-box { flex: 1 1 auto; }
+.slide { isolation: isolate; }
+.slide-bg { position: absolute; inset: 0; z-index: -1; }
+.slide-bg img { width: 100%; height: 100%; object-fit: cover; }
+/* A veil over it, so the text reads. */
+.slide-bg::after { content: ''; position: absolute; inset: 0; background: var(--s-bg); opacity: 0.6; }
+/* Its menu: over the picture's top right corner (behind the slide: the slide's), while the pointer is over it. */
+.slide-image-tools { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 1.4; opacity: 0; transition: opacity 0.1s; }
+.slide-image-tools.at-slide { top: 16px; right: 16px; max-width: 50%; }
+.slide-image-box:hover .slide-image-tools, .slide:hover > .slide-image-tools, .slide-image-tools.open { opacity: 1; }
+.slide-image-menu { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--faint); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.slide-image-tools .slide-image-src { padding: 4px 8px; border: 1px solid var(--faint); border-radius: 6px; background: var(--bg); color: var(--fg); }
 .slide-image { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; cursor: pointer; }
 /* The picture's address, typed in under it. */
 .slide-image-src { font-size: 18px; overflow-wrap: anywhere; }
