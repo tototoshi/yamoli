@@ -875,9 +875,21 @@ function ZoomTools({ zoom, onFit }: { zoom: ReturnType<typeof useZoom>; onFit: (
 
 /**
  * The diagram (a flow, or a mind map) for the zoomed item, or (embedded, e.g.
- * in a slide) for rootId, without the hints and not editable.
+ * in a slide) for rootId, without the hints and not editable but for edit (in
+ * a document): then its keys and paste act only on what is selected in it,
+ * and a click outside it lets go of that.
  */
-export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: string; embedded?: boolean; kind?: 'flow' | 'tree' }) {
+export function DiagramView({
+  rootId,
+  embedded,
+  edit,
+  kind = 'flow',
+}: {
+  rootId?: string;
+  embedded?: boolean;
+  edit?: boolean;
+  kind?: 'flow' | 'tree';
+}) {
   const ctl = useCtl();
   const { store } = ctl;
   const id = rootId ?? ctl.zoomId;
@@ -918,7 +930,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   // Built anew on each render: the store changes in place, and laying out a page of boxes is quick.
   const d = buildDiagram(store, id, { showCompleted, kind });
   const L = layout(d, measure);
-  const editable = !embedded;
+  const editable = !embedded || !!edit;
 
   const selectedEdge = sel && 'edge' in sel ? d.edges.find((e) => edgeKey(e) === sel.edge) : undefined;
   const selectedBox = sel && 'box' in sel && L.boxes.has(sel.box) ? sel.box : null;
@@ -943,7 +955,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       ))
         store.remove(c);
       ctl.commit();
-    } else if (selectedBox && selectedBox !== ctl.zoomId) ctl.deleteItem(selectedBox);
+    } else if (selectedBox && selectedBox !== id && selectedBox !== ctl.zoomId) ctl.deleteItem(selectedBox);
     select(null);
   };
   // Keys on the selection. The listener stays put and reads the latest render, so keys typed quickly one after another all count.
@@ -976,6 +988,7 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
     const target = e.target as Element;
     if (target.closest?.('input, textarea, [contenteditable]') && !target.classList.contains('dg-type-idle')) return;
     if (e.type !== 'paste' && !document.getSelection()?.isCollapsed) return;
+    if (embedded && !sel) return; // in a document, pasting elsewhere is the document's
     if (e.type === 'paste') {
       const text = e.clipboardData.getData('text');
       if (!text.trim()) return;
@@ -993,8 +1006,16 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
       if (e.type === 'cut' && (many || selectedBox !== id)) remove();
     }
   };
+  // In a document, a click anywhere else lets go of the selection, so keys there are the document's again.
+  const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (embedded) return;
+    if (!embedded || !edit) return;
+    const away = (e: PointerEvent) => !wrapRef.current?.contains(e.target as Node) && select(null);
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [embedded, edit]);
+  useEffect(() => {
+    if (embedded && !edit) return;
     const clip = (e: Event) => onClip.current(e as ClipboardEvent);
     const types = ['copy', 'cut', 'paste'];
     types.forEach((type) => window.addEventListener(type, clip));
@@ -1308,7 +1329,12 @@ export function DiagramView({ rootId, embedded, kind = 'flow' }: { rootId?: stri
   const renamed = renaming ? L.boxes.get(renaming) : undefined;
 
   return (
-    <div class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
+    <div ref={wrapRef} class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
+      {embedded && edit && (
+        <div class="diagram-tools">
+          <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />
+        </div>
+      )}
       {!embedded && (
         <div class="diagram-tools">
           <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />
