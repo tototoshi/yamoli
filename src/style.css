@@ -946,23 +946,25 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* ================================================================ slides */
 
 .slides { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
-.slide-list { margin: 0; padding: 0 0 0 1.6em; font-size: 13px; color: var(--muted); max-height: 75vh; overflow-y: auto; }
-.slide-list li { position: relative; padding: 3px 4px; border-radius: 4px; cursor: pointer; } /* a list item still: numbered */
-.slide-list-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slide-list li:hover .slide-list-name { padding-right: 16px; }
-/* Delete: at the end of a slide's name while the pointer is over it. */
-.slide-list-del { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); padding: 0 4px; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; visibility: hidden; }
-.slide-list li:hover .slide-list-del { visibility: visible; }
+.slide-list { margin: 0; padding: 0 0 0 2em; font-size: 12px; color: var(--muted); max-height: calc(100vh - 200px); overflow-y: auto; }
+/* A small picture of each slide, numbered (a list item still). */
+.slide-list > li { position: relative; padding: 4px; border-radius: 6px; cursor: pointer; }
+.slide-list > li::marker { font-variant-numeric: tabular-nums; }
+.slide-list .still-slide { border-radius: 4px; font-weight: 400; }
+.slide-list > li:hover { background: var(--hover); color: var(--fg); }
+.slide-list > li.current { color: var(--accent); font-weight: 600; }
+.slide-list > li.current .still-slide { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* Delete: over the picture's top right corner while the pointer is over it. */
+.slide-list-del { position: absolute; top: 8px; right: 8px; z-index: 1; padding: 0 5px; border: 1px solid var(--faint); border-radius: 4px; background: var(--bg); color: var(--muted); font-size: 13px; line-height: 18px; cursor: pointer; visibility: hidden; }
+.slide-list > li:hover .slide-list-del { visibility: visible; }
 .slide-list-del:hover { color: var(--danger); }
 @media (hover: none) { .slide-list-del { visibility: visible; } }
 /* Where a slide dragged in the list would go. */
-.slide-list li.drop-before { box-shadow: inset 0 2px var(--accent); }
-.slide-list li.drop-after { box-shadow: inset 0 -2px var(--accent); }
+.slide-list > li.drop-before { box-shadow: inset 0 3px var(--accent); }
+.slide-list > li.drop-after { box-shadow: inset 0 -3px var(--accent); }
 .slide-side { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
 .slide-side .slide-list { align-self: stretch; }
-.slide-add { margin-left: 1.6em; }
-.slide-list li:hover { background: var(--hover); color: var(--fg); }
-.slide-list li.current { color: var(--accent); font-weight: 600; }
+.slide-add { margin-left: 2em; }
 .slide-col { min-width: 0; }
 .slides-empty { color: var(--muted); }
 @media (max-width: 720px) {
@@ -999,9 +1001,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .presenter-main { display: flex; flex-direction: column; gap: 10px; }
 .presenter-controls { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .presenter-side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.presenter-slide { aspect-ratio: auto; flex: none; cursor: default; }
+.still-slide { aspect-ratio: auto; flex: none; cursor: default; }
 /* Only to be looked at: nothing on them is clicked or typed in. */
-.presenter-slide .slide { pointer-events: none; }
+.still-slide .slide { pointer-events: none; }
 .presenter-time { display: flex; align-items: center; gap: 10px; }
 .presenter-elapsed { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .presenter-clock { margin-left: auto; font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1051,7 +1053,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide .subtitle { margin: 0 0 20px; color: var(--s-muted); font-size: 32px; }
 .slide a { color: var(--s-accent); }
 .slide code { background: var(--s-code); padding: 0 0.3em; border-radius: 4px; font-size: 0.9em; }
-.slide ul { margin: 0; padding-left: 1.2em; }
+.slide ul { margin: 0; padding-left: 1.2em; list-style: disc; } /* disc even in the list of slides, a list itself */
+.slide ul ul { list-style: circle; }
 .slide ul ul { font-size: 0.8em; color: var(--s-muted); margin: 4px 0 8px; }
 .slide li { margin: 6px 0; }
 /* A bullet still to come (a slide showing them one at a time): its room kept, so the others don't move. */

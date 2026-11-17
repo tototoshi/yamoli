@@ -8,9 +8,10 @@
  * follows the row being typed in (Shift+Tab on a bullet makes it the next
  * slide, and goes to it; Enter on a title makes its first bullet).
  */
+import { createContext } from 'preact';
 import { createPortal } from 'preact/compat';
 import type { RefObject } from 'preact';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BlockBody, NodeText } from './App';
 import { fText } from './focus';
 import { useCtl } from './context';
@@ -214,6 +215,7 @@ export function SlidesView() {
                 key={s.id}
                 class={(i === index ? 'current' : '') + (drop?.id === s.id ? (drop.after ? ' drop-after' : ' drop-before') : '')}
                 draggable={own}
+                title={nodeLabel(store, s.id) || t('無題', 'Untitled')}
                 onClick={() => {
                   setRevealed(null); // from the start: none of its bullets yet
                   go(i);
@@ -239,7 +241,7 @@ export function SlidesView() {
                   setDrop(null);
                 }}
               >
-                <span class="slide-list-name">{nodeLabel(store, s.id) || t('無題', 'Untitled')}</span>
+                <SlideAt slide={s} width={THUMB} theme={deck.theme} />
                 {own && (
                   <button
                     class="slide-list-del"
@@ -332,7 +334,9 @@ export function SlidesView() {
               {deck.slides.map((s, i) => (
                 <div key={s.id} class={'slide-stage slide-page theme-' + deck.theme}>
                   <div class={`slide layout-${s.layout}`}>
-                    <SlideBody slide={s} />
+                    <Still.Provider value={true}>
+                      <SlideBody slide={s} />
+                    </Still.Provider>
                     <div class="slide-number">
                       {i + 1} / {count}
                     </div>
@@ -372,7 +376,8 @@ function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
   const content = useRef<HTMLDivElement>(null);
   useFitText(content);
   const n = store.node(slide.id);
-  const title = <NodeText node={n} />;
+  const still = useContext(Still);
+  const title = <SlideText node={n} />;
   // A subtitle or picture field is shown even empty (just added, or emptied to be taken away with Backspace).
   const hasSubtitle = !!(slide.subtitle || store.field(slide.id, 'subtitle'));
   const hasImage = !!(slide.image || store.field(slide.id, 'image'));
@@ -430,9 +435,9 @@ function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
           {slide.embed && (
             <div class="slide-embed">
               {slide.embedAs === 'gantt' ? (
-                <GanttView rootId={slide.embed} embedded edit />
+                <GanttView rootId={slide.embed} embedded edit={!still} />
               ) : (
-                <DiagramView rootId={slide.embed} embedded edit kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
+                <DiagramView rootId={slide.embed} embedded edit={!still} kind={slide.embedAs === 'mindmap' ? 'tree' : 'flow'} />
               )}
             </div>
           )}
@@ -599,14 +604,38 @@ function Presenter(props: {
   );
 }
 
+/** How wide a slide is drawn in the list beside it. */
+const THUMB = 152;
+
+/**
+ * Slides only to be looked at (in the list, the presenter's window, printed):
+ * their text drawn, never its editor, which the row being typed in has once,
+ * on the slide on screen.
+ */
+const Still = createContext(false);
+
+/** A row's text on a slide: edited in place when clicked, or (still) only drawn. */
+function SlideText({ node }: { node: ReturnType<ReturnType<typeof useCtl>['store']['node']> }) {
+  if (useContext(Still)) {
+    return (
+      <span class="text text-view">
+        <InlineText text={node.text} />
+      </span>
+    );
+  }
+  return <NodeText node={node} />;
+}
+
 /** A slide drawn width pixels wide, only to be looked at. */
 function SlideAt(props: { slide: Slide; hidden?: Set<string>; width: number; theme: string; number?: string }) {
   const { slide, hidden, width, theme, number } = props;
   const k = width / W;
   return (
-    <div class={'slide-stage presenter-slide theme-' + theme} style={{ width, height: H * k }}>
+    <div class={'slide-stage still-slide theme-' + theme} style={{ width, height: H * k }}>
       <div class={`slide layout-${slide.layout}`} style={{ transform: `scale(${k})` }}>
-        <SlideBody slide={slide} hidden={hidden} />
+        <Still.Provider value={true}>
+          <SlideBody slide={slide} hidden={hidden} />
+        </Still.Provider>
         {number && <div class="slide-number">{number}</div>}
       </div>
     </div>
@@ -717,7 +746,7 @@ function BulletItem({ bullet, hidden }: { bullet: Bullet; hidden?: boolean }) {
   useFlowEditor(ref);
   return (
     <li ref={ref} class={(store.node(bullet.id).completed ? 'done' : '') + (hidden ? ' unrevealed' : '')}>
-      <NodeText node={store.node(bullet.id)} />
+      <SlideText node={store.node(bullet.id)} />
       {bullet.children.length > 0 && <Bullets bullets={bullet.children} />}
     </li>
   );
@@ -737,7 +766,8 @@ function SlideBlock({ id }: { id: string }) {
   const ctl = useCtl();
   const n = ctl.store.node(id);
   const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
-  if (ctl.activeField === fText(id).key) {
+  const still = useContext(Still);
+  if (ctl.activeField === fText(id).key && !still) {
     return (
       <div class="slide-data editing">
         <BlockBody node={n} />
@@ -764,14 +794,15 @@ function plainField(store: ReturnType<typeof useCtl>['store'], id: string, name:
 function FieldText({ id, name, text }: { id: string; name: string; text: string }) {
   const { store } = useCtl();
   const f = plainField(store, id, name);
-  return f ? <NodeText node={f} /> : <InlineText text={text} />;
+  return f ? <SlideText node={f} /> : <InlineText text={text} />;
 }
 
 /** The slide's picture; clicked, its address (`image:`) to type in under it. */
 function SlideImage({ id, src }: { id: string; src: string }) {
   const ctl = useCtl();
   const f = plainField(ctl.store, id, 'image');
-  const editing = !!f && ctl.activeField === fText(f.id).key;
+  const still = useContext(Still);
+  const editing = !!f && ctl.activeField === fText(f.id).key && !still;
   return (
     <div class="slide-image-box">
       {src && (
