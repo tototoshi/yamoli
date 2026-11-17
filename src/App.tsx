@@ -14,6 +14,7 @@ import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { SlidesView } from './SlidesView';
 import { DataView } from './DataView';
+import { DocView } from './DocView';
 import { DocsView } from './DocsView';
 import { SegView } from './InlineText';
 import { formatDate, parseDate, today } from './calendar';
@@ -145,6 +146,8 @@ export function App() {
           <GanttView />
         ) : ctl.view === 'diagram' || ctl.view === 'mindmap' ? (
           <DiagramView key={ctl.view} kind={ctl.view === 'mindmap' ? 'tree' : 'flow'} />
+        ) : ctl.view === 'doc' ? (
+          <DocView />
         ) : ctl.view === 'slides' ? (
           <SlidesView />
         ) : ctl.view === 'text' || ctl.view === 'yaml' || ctl.view === 'json' ? (

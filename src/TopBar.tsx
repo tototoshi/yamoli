@@ -452,6 +452,7 @@ export function ViewSwitch() {
   );
   const off = DRAWN_VIEWS.filter((v) => !on.has(v));
   const hint: Record<DrawnView, string> = {
+    doc: t('行を見出しと文章で', 'The rows as headings and prose'),
     gantt: t('日程をチャートで', 'The schedule as a chart'),
     diagram: t('行を箱と矢印で', 'The rows as boxes and arrows'),
     mindmap: t('行の入れ子を枝分かれで', 'The rows branching from the item'),
@@ -499,7 +500,7 @@ export function ViewSwitch() {
 export function ViewToggles() {
   const ctl = useCtl();
   const { view, prefs } = ctl;
-  if (view !== 'outline' && view !== 'gantt' && view !== 'diagram' && view !== 'mindmap' && view !== 'text') return null;
+  if (view !== 'outline' && view !== 'doc' && view !== 'gantt' && view !== 'diagram' && view !== 'mindmap' && view !== 'text') return null;
   return (
     <div class="view-toggles">
       {(view === 'outline' || view === 'text') && (

@@ -673,7 +673,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 @media (max-width: 600px) {
   .row-actions { display: none; }
-  .zoom-header { margin-left: 0; }
+  .zoom-header, .doc { margin-left: 0; }
 }
 
 /* ---------------------------------------------------------------- views */
@@ -699,6 +699,42 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* As wide as its longest line: in the small box of the + button, it would otherwise wrap. */
 .view-add { width: max-content; }
 .view-add kbd { font-family: inherit; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- document */
+.doc { max-width: 720px; margin: 8px 0 48px 28px; font-size: 16px; line-height: 1.8; }
+.doc-empty { color: var(--muted); font-size: 14px; }
+.doc-lead { color: var(--muted); font-size: 17px; margin: 0 0 24px; }
+.doc h2, .doc h3, .doc h4 { line-height: 1.4; margin: 1.8em 0 0.5em; }
+.doc h2 { font-size: 22px; padding-bottom: 4px; border-bottom: 1px solid var(--faint); }
+.doc h3 { font-size: 18px; }
+.doc h4 { font-size: 16px; }
+.doc p { margin: 0 0 0.8em; }
+.doc ul { margin: 0 0 0.8em; padding-left: 1.4em; }
+.doc ul ul { margin: 0.1em 0 0.2em; }
+.doc ul.doc-tasks, .doc li.task { list-style: none; }
+.doc ul.doc-tasks { padding-left: 0.2em; }
+.doc .done { color: var(--muted); text-decoration: line-through; }
+.doc-check { margin: 0 6px 0 0; vertical-align: -1px; }
+/* Each line opens its row in the outline. */
+.doc-line, .doc-block { cursor: text; border-radius: 4px; }
+.doc-line:hover, .doc-block:hover { background: var(--hover); }
+.doc-block { margin: 0 0 1em; }
+.doc-embed { margin: 0 0 1.2em; padding: 12px; border: 1px solid var(--faint); border-radius: 8px; }
+.doc-embed.gantt { height: 420px; }
+/* A diagram as tall as it is drawn across the page's width (or no taller than so much). */
+.doc-embed .diagram-wrap.embedded, .doc-embed .diagram-wrap.embedded .diagram-scroll { height: auto; }
+.doc-embed .diagram-wrap.embedded .diagram { width: 100%; height: auto; max-height: 560px; }
+/* The list or paragraphs switch, at the side of the rows it is for, while the pointer is over them. */
+.doc-rows { position: relative; }
+.doc-style { position: absolute; top: 0; right: 100%; display: flex; gap: 2px; margin-right: 8px; opacity: 0; transition: opacity 0.1s; }
+.doc-style .mini { font-size: 11px; white-space: nowrap; }
+.doc-rows:hover > .doc-style, .doc-style:focus-within { opacity: 1; }
+@media (max-width: 1100px), (hover: none) {
+  .doc-style { position: static; justify-content: flex-end; margin: 0 0 2px; }
+}
+@media (hover: none) {
+  .doc-style { opacity: 1; }
+}
 
 /* ---------------------------------------------------------------- gantt */
 

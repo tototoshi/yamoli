@@ -10,6 +10,7 @@ import { ownViews, viewName, type DrawnView } from './views';
 
 /** A small picture of each drawn view, on a 12×12 grid. */
 const VIEW_PICTURES: Record<DrawnView, string> = {
+  doc: 'M2.5 1.5h5l2 2v7h-7zM4 5h4M4 7h4M4 9h2.5',
   gantt: 'M2 3h5M4 6h6M3 9h4',
   diagram: 'M1.5 2.5h4v3h-4zM6.5 6.5h4v3h-4zM3.5 5.5v2.5h3',
   mindmap: 'M5 6h2M7 6 9.5 2.5M7 6h3M7 6l2.5 3.5M1.5 4.5h3.5v3H1.5z',

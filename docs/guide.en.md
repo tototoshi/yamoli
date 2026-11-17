@@ -204,6 +204,12 @@ Switch with the view bar; each item remembers the view last used for it (except 
 Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map and Slides only make sense for rows written for them, so they are turned on per item: pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `mindmap` / `slides`, or `ガント` / `図` / `マインドマップ` / `スライド`).
 
 - **Outline**: where every kind of editing can be done. An item with a `views` field has a badge before its name for each (“Diagram”, “Gantt” …), opening it in that view.
+- **Document**: the rows as headings and prose, read top to bottom. Turned on with `views: doc`.
+  - A row with rows under it (or blocks, or an `embed`) is a heading (three levels; deeper, a paragraph), unless it ends in `。` or `:`, when it is a paragraph leading into its rows, listed under it.
+  - Rows with nothing under them are a bulleted list when none of them ends a sentence (`.` `!` `?` `。` …), else a paragraph each. Tasks have checkboxes.
+  - Where that reads wrong, hover over the rows and pick “List” or “Paragraphs” (this writes `doc: list` / `doc: text` on the row above them; “Auto” takes it off).
+  - Blocks show where they are, and `embed: [[item]] diagram` draws that item's diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item's `description` leads the document.
+  - Click a line to edit its row in the outline.
 - **Gantt**: the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
 - **Diagram**: the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
 - **Mind map**: the rows branching out from the zoomed item, as they are nested. No frames or arrows: every row is a node. Turned on with `views: mindmap` (`マインドマップ`). Select a row: Tab adds a row under it and Enter one after it, named as you type. The arrow keys go along the branches; F2, Space or a double-click renames, Delete removes, and dragging moves a row under another.
