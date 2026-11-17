@@ -127,7 +127,7 @@ export function SlidesView() {
   // Pictures pasted (alone: not with text) or dropped anywhere on the view are added to the slide's.
   const imagesIn = (dt: DataTransfer | null) =>
     dt && !dt.getData('text') ? filesIn(dt).filter((f) => /^image\/(png|jpeg|gif|webp)$/.test(f.type)) : [];
-  const canHaveImage = slide && slide.id !== ctl.zoomId && slide.layout !== 'title';
+  const canHaveImage = slide && slide.id !== ctl.zoomId && slide.layout !== 'title' && slide.layout !== 'section'; // those two show none
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const files = imagesIn(e.clipboardData);
@@ -385,9 +385,9 @@ function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
   const hasImage = !!store.field(slide.id, 'image');
   const at = slide.imageAt;
 
-  if (slide.layout === 'title') {
+  if (slide.layout === 'title' || slide.layout === 'section') {
     return (
-      <div class="slide-title-only">
+      <div class={slide.layout === 'title' ? 'slide-title-only' : 'slide-section'}>
         <h1>{title}</h1>
         {hasSubtitle && (
           <p class="subtitle">
@@ -417,6 +417,16 @@ function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
           <Bullets key={i} bullets={col} hidden={hidden} />
         ))}
       </div>
+    ) : slide.layout === 'cards' || slide.layout === 'steps' || slide.layout === 'numbers' ? (
+      <>
+        {slide.bullets.length > 0 && <Groups kind={slide.layout} bullets={slide.bullets} hidden={hidden} />}
+        {data}
+      </>
+    ) : slide.layout === 'statement' ? (
+      <>
+        {slide.bullets.length > 0 && <Statement bullets={slide.bullets} hidden={hidden} />}
+        {data}
+      </>
     ) : (
       <>
         {slide.bullets.length > 0 && <Bullets bullets={slide.bullets} hidden={hidden} />}
@@ -678,6 +688,11 @@ const LAYOUT_NAMES: [Layout, string, string][] = [
   ['center', '中央', 'Centred'],
   ['two-column', '2 段組', 'Two columns'],
   ['title', 'タイトルのみ', 'Title only'],
+  ['section', '区切り', 'Section'],
+  ['cards', 'カード', 'Cards'],
+  ['steps', 'ステップ', 'Steps'],
+  ['numbers', '数字', 'Numbers'],
+  ['statement', 'ひとこと', 'Statement'],
 ];
 
 /** The slide's layout, chosen from a menu: written as its `layout` field (none for the standard one). */
@@ -702,6 +717,46 @@ function LayoutPick({ slide }: { slide: Slide }) {
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * Each bullet as a card, a step (numbered, an arrow to the next) or a big
+ * number, the rows under it inside; side by side up to four, then in rows.
+ */
+function Groups({ kind, bullets, hidden }: { kind: 'cards' | 'steps' | 'numbers'; bullets: Bullet[]; hidden?: Set<string> }) {
+  const { store } = useCtl();
+  const n = bullets.length;
+  const cols = n <= 4 ? n : Math.ceil(n / Math.ceil(n / 4));
+  return (
+    <div class={'slide-groups slide-' + kind} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      {bullets.map((b, i) => (
+        <div key={b.id} class={'slide-group' + (hidden?.has(b.id) ? ' unrevealed' : '')}>
+          {kind === 'steps' && <span class="slide-step-no">{i + 1}</span>}
+          <div class="slide-group-head">
+            <SlideText node={store.node(b.id)} />
+          </div>
+          {b.children.length > 0 && <Bullets bullets={b.children} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The first bullet large in the middle, the rows under it small below (a source, a remark); any others after, as bullets. */
+function Statement({ bullets, hidden }: { bullets: Bullet[]; hidden?: Set<string> }) {
+  const { store } = useCtl();
+  const [first, ...rest] = bullets;
+  return (
+    <div class="slide-statement">
+      <div class={'slide-statement-main' + (hidden?.has(first.id) ? ' unrevealed' : '')}>
+        <div class="slide-statement-text">
+          <SlideText node={store.node(first.id)} />
+        </div>
+        {first.children.length > 0 && <Bullets bullets={first.children} />}
+      </div>
+      {rest.length > 0 && <Bullets bullets={rest} hidden={hidden} />}
+    </div>
   );
 }
 

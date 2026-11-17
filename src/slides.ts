@@ -6,8 +6,12 @@
  *   on the deck:   subtitle: …         shown on the title slide
  *                  theme: light | dark
  *                  reveal: yes         every slide's bullets shown one at a time
- *   on a slide:    layout: default | center | two-column | title
- *                    (two-column: bullets beside the data, or split in half)
+ *   on a slide:    layout: default | center | two-column | title | section
+ *                          | cards | steps | numbers | statement
+ *                    (two-column: bullets beside the data, or split in half;
+ *                    section: a chapter's first page; cards, steps, numbers:
+ *                    each bullet a card, a step, a big number, the rows under
+ *                    it inside; statement: the first bullet large, alone)
  *                  reveal: yes | no    its bullets shown one at a time (or not, whatever the deck says)
  *                  notes: …            speaker notes (also as a list)
  *                  image: https://…    picture beside the bullets (pictures: a list under it)
@@ -23,7 +27,7 @@
 import { refIds } from './links';
 import type { OutlineNode, OutlineStore } from './model';
 
-export type Layout = 'default' | 'title' | 'center' | 'two-column';
+export type Layout = 'default' | 'title' | 'center' | 'two-column' | 'section' | 'cards' | 'steps' | 'numbers' | 'statement';
 export type ImageAt = 'right' | 'left' | 'below' | 'full' | 'background';
 const IMAGE_AT: Record<string, ImageAt> = {
   right: 'right',
@@ -37,7 +41,7 @@ const IMAGE_AT: Record<string, ImageAt> = {
   大きく: 'full',
   背景: 'background',
 };
-const LAYOUTS: Layout[] = ['default', 'title', 'center', 'two-column'];
+const LAYOUTS: Layout[] = ['default', 'title', 'center', 'two-column', 'section', 'cards', 'steps', 'numbers', 'statement'];
 
 export interface Bullet {
   id: string;

@@ -1058,7 +1058,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide ul ul { font-size: 0.8em; color: var(--s-muted); margin: 4px 0 8px; }
 .slide li { margin: 6px 0; }
 /* A bullet still to come (a slide showing them one at a time): its room kept, so the others don't move. */
-.slide li.unrevealed { visibility: hidden; }
+.slide .unrevealed { visibility: hidden; }
 .slide li.done { text-decoration: line-through; color: var(--s-muted); }
 /* A title or bullet typed in where it is, in the slide's type (the textarea over a bullet placed by useFlowEditor). */
 .slide .text-view { display: inline; padding: 0; min-height: 0; line-height: inherit; cursor: text; }
@@ -1117,6 +1117,30 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .layout-center h2 { border: none; font-size: 60px; }
 .layout-center ul { list-style: none; padding: 0; }
 .layout-center .slide-content { flex: none; justify-content: center; }
+/* Section: a chapter's first page, its name large on the left behind a bar. */
+.layout-section { justify-content: center; }
+.slide-section h1 { padding-left: 36px; border-left: 14px solid var(--s-accent); }
+.slide-section .subtitle { margin: 24px 0 0 50px; }
+/* Cards, steps, numbers: each bullet one, side by side, the rows under it inside. */
+.slide-groups { display: grid; gap: 28px; align-content: start; }
+.slide-group { min-width: 0; }
+.slide-group-head { font-weight: 700; line-height: 1.3; }
+.slide-group ul { margin-top: 10px; font-size: 0.8em; color: var(--s-muted); }
+.slide-cards .slide-group { padding: 24px 28px; border-radius: 14px; background: var(--s-code); border-top: 6px solid var(--s-accent); }
+.slide-steps { gap: 56px; }
+.slide-steps .slide-group { position: relative; }
+.slide-steps .slide-group:not(:last-child)::after { content: '→'; position: absolute; top: 0.2em; right: -1.45em; font-size: 1.3em; color: var(--s-accent); }
+.slide-step-no { display: inline-flex; align-items: center; justify-content: center; width: 1.8em; height: 1.8em; margin-bottom: 12px; border-radius: 50%; background: var(--s-accent); color: var(--s-bg); font-weight: 700; }
+.slide-numbers { text-align: center; }
+.slide-numbers .slide-group-head { font-size: 2.6em; font-weight: 800; line-height: 1.1; color: var(--s-accent); }
+.slide-numbers ul { list-style: none; padding: 0; }
+/* Statement: one line large in the middle, the title above it small. */
+.layout-statement h2 { font-size: 28px; color: var(--s-muted); border: none; padding: 0; margin-bottom: 0; }
+.slide-statement { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 28px; text-align: center; }
+.slide-statement-text { font-size: 2em; font-weight: 700; line-height: 1.3; }
+.slide-statement-main ul { margin-top: 20px; padding: 0; list-style: none; font-size: 0.8em; color: var(--s-muted); }
+.layout-statement .slide-text { flex: 1; }
+.slide-statement > ul { text-align: left; } /* the bullets after it: as bullets */
 
 .slide-controls { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); }
 .slide-count { min-width: 4em; text-align: center; font-variant-numeric: tabular-nums; }
