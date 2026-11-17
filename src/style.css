@@ -701,7 +701,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .view-add kbd { font-family: inherit; white-space: nowrap; }
 
 /* ---------------------------------------------------------------- document */
-.doc { max-width: 720px; margin: 8px 0 48px 28px; font-size: 16px; line-height: 1.8; }
+.doc { margin: 8px 0 48px 28px; font-size: 16px; line-height: 1.8; }
 .doc-empty { color: var(--muted); font-size: 14px; }
 .doc-lead { color: var(--muted); font-size: 17px; margin: 0 0 24px; }
 .doc h2, .doc h3, .doc h4 { line-height: 1.4; margin: 1.8em 0 0.5em; }
