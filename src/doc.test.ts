@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDoc, joinedParagraph, splitParagraph, setDoc, type DocPart } from './doc';
+import { buildDoc, joinedParagraph, joinParagraph, paragraphBefore, splitParagraph, setDoc, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
 /** The parts in short: `h2 Text`, `p Text`, `list[A, B]`, `text[A, B]`, `data`, `embed diagram`. */
@@ -153,4 +153,40 @@ test('a paragraph written on from rows breaks before a sentence, those after it 
   splitParagraph(s, a, x);
   expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['text[A。]', 'p B。', 'p C。D。', 'text[E。]']);
   expect(s.fieldValue(x, 'doc')).toBe('body');
+});
+
+test('a paragraph joins on to the one right before it, which stays a paragraph', () => {
+  const s = OutlineStore.create();
+  const add = (p: string, text: string) => s.addChild(p, -1, text).id;
+  add(s.rootId, 'Z。');
+  const a = add(s.rootId, '短い'); // a paragraph, beside Z。
+  const b = add(s.rootId, 'B。');
+  const c = add(b, 'C');
+  const h = add(s.rootId, '見出し');
+  const d = add(h, 'D。');
+  expect(paragraphBefore(s, s.rootId, b)).toBe(a);
+  expect(paragraphBefore(s, s.rootId, c)).toBe(null); // no paragraph's start
+  expect(paragraphBefore(s, s.rootId, d)).toBe(null); // a heading between
+  expect(joinParagraph(s, s.rootId, a, b)).toEqual({ id: b, at: 0 });
+  // 短い holds rows now, and is no sentence: no heading, but set as body.
+  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['text[Z。]', 'p 短いB。C', 'h2 見出し', 'text[D。]']);
+  expect(s.fieldValue(a, 'doc')).toBe('body');
+
+  // An empty row goes, its rows moved for it; the caret to the end of the sentence before.
+  const x = add(s.rootId, '');
+  add(s.rootId, 'E。');
+  s.moveTo(s.items(s.rootId).at(-1)!, x, null);
+  s.moveTo(x, s.rootId, h);
+  expect(joinParagraph(s, s.rootId, a, x)).toEqual({ id: c, at: 'end' });
+  expect(s.get(x)).toBeFalsy();
+  expect(sketch(s, buildDoc(s, s.rootId).parts)[1]).toBe('p 短いB。CE。');
+});
+
+test('joined on, a phrase is written on in the paragraph, not listed under it', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P。').id;
+  const q = s.addChild(s.rootId, -1, 'Q').id;
+  joinParagraph(s, s.rootId, p, q);
+  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['p P。Q']);
+  expect(s.fieldValue(p, 'doc')).toBe('text');
 });

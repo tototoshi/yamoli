@@ -138,6 +138,47 @@ export function splitParagraph(store: OutlineStore, head: string, at: string) {
   if (store.items(at).length && !LEADS_IN.test(store.node(at).text) && !docRoleOf(store, at)) setDoc(store, at, 'role', 'body');
 }
 
+/**
+ * The row of the paragraph right before the one id's row starts, nothing
+ * between them (no heading, list or block); null when there is none, or id
+ * starts no paragraph.
+ */
+export function paragraphBefore(store: OutlineStore, rootId: string, id: string, opts: { showCompleted?: boolean } = {}): string | null {
+  let prev: string | null = null;
+  for (const p of buildDoc(store, rootId, opts).parts) {
+    const heads = p.kind === 'para' ? [p.id] : p.kind === 'rows' && p.style === 'text' ? p.items.map((it) => it.id) : null;
+    if (!heads) {
+      prev = null;
+      continue;
+    }
+    for (const h of heads) {
+      if (h === id) return prev;
+      prev = h;
+    }
+  }
+  return null;
+}
+
+/**
+ * Join id's paragraph on to prev's (Backspace at its start): its row, and the
+ * rows under it, go last under prev's, written on in it. An empty row goes,
+ * its rows moved for it. prev's paragraph stays one (not a heading for the
+ * rows it now holds, nor a list of them). Returns the row the caret goes to,
+ * at its start, or (id gone) the sentence it went on from, at its end.
+ */
+export function joinParagraph(store: OutlineStore, rootId: string, prev: string, id: string, opts: { showCompleted?: boolean } = {}) {
+  let last = prev;
+  while (store.items(last).length) last = store.items(last).at(-1)!;
+  const empty = !store.node(id).text;
+  for (const r of empty ? store.items(id) : [id]) store.moveTo(r, prev, null);
+  if (empty) store.remove(id);
+  else if (docRoleOf(store, id) === 'body') setDoc(store, id, 'role', null);
+  const part = () => buildDoc(store, rootId, opts).parts.find((p) => (p.kind === 'heading' || p.kind === 'para') && p.id === prev);
+  if (part()?.kind === 'heading') setDoc(store, prev, 'role', 'body');
+  if (store.items(prev).length && joinedParagraph(store, rootId, prev, opts) !== prev) setDoc(store, prev, 'style', 'text');
+  return empty ? { id: last, at: 'end' as const } : { id, at: 0 };
+}
+
 export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = true } = {}): Doc {
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
   const embedOf = (id: string): Extra | null => {

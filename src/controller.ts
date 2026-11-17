@@ -13,7 +13,7 @@ import { Editing } from './editing';
 import { filesIn } from './files';
 import { replaceRefs } from './links';
 import { linkedText } from './pasteHtml';
-import { joinedParagraph, splitParagraph } from './doc';
+import { joinedParagraph, joinParagraph, paragraphBefore, splitParagraph } from './doc';
 
 /** A row as it was copied, with the rows under it. */
 interface Copied {
@@ -249,6 +249,16 @@ export class Controller extends Editing {
     if (e.key === 'Backspace' && start === 0 && end === 0 && n.key !== null) {
       e.preventDefault();
       return this.unfield(id);
+    }
+    if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && this.view === 'doc') {
+      // A paragraph's first sentence: the paragraph goes on from the one before it.
+      const opts = { showCompleted: this.prefs.showCompleted };
+      const prev = paragraphBefore(store, zoomId, id, opts);
+      if (prev) {
+        e.preventDefault();
+        const to = joinParagraph(store, zoomId, prev, id, opts);
+        return this.commit(fText(to.id, to.at));
+      }
     }
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && !n.children.length) {
       const prev = vis[idx - 1];
