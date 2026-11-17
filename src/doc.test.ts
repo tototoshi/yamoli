@@ -1,15 +1,15 @@
 import { expect, test } from 'vitest';
-import { buildDoc, joinedParagraph, joinParagraph, paragraphBefore, splitParagraph, setDoc, type DocPart } from './doc';
+import { buildDoc, setDoc, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
-/** The parts in short: `h2 Text`, `p Text`, `list[A, B]`, `text[A, B]`, `data`, `embed diagram`. */
+/** The parts in short: `h2 Text`, `p Text`, `list[A, B(C)]`, `text[A, B]`, `data`, `embed diagram`. */
 function sketch(s: OutlineStore, parts: DocPart[]): string[] {
   const label = (id: string) => s.node(id).text;
   return parts.map((p) =>
     p.kind === 'heading'
       ? `h${p.level} ${label(p.id)}`
       : p.kind === 'para'
-        ? `p ${[p.id, ...(p.more?.ids ?? [])].map(label).join('')}`
+        ? `p ${label(p.id)}`
         : p.kind === 'rows'
           ? `${p.style}[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
           : p.kind === 'data'
@@ -104,7 +104,7 @@ test('doc: heading or body on a row makes it one, whatever it would be; setDoc k
   setDoc(s, sec, 'role', 'body');
   expect(s.fieldValue(sec, 'doc')).toBe('body, text');
   const d = buildDoc(s, doc);
-  expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ結論', 'list[最後の行]']);
+  expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ', 'text[結論]', 'list[最後の行]']);
   // What each would be with nothing set: the switch writes only a change from that.
   expect(d.parts.filter((p) => p.kind === 'heading' || p.kind === 'para').map((p) => 'auto' in p && p.auto)).toEqual(['body', 'heading']);
 
@@ -115,7 +115,7 @@ test('doc: heading or body on a row makes it one, whatever it would be; setDoc k
   expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し]', 'h2 まとめ', 'list[結論]', 'list[最後の行]']);
 });
 
-test('sentences under a paragraph are its next sentences, all one paragraph; words, a list under it', () => {
+test('a row is one paragraph; sentences under it, paragraphs after it (not joined on, not indented); words, a list under it', () => {
   const s = OutlineStore.create();
   const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
   const doc = add(s.rootId, 'Doc');
@@ -128,65 +128,24 @@ test('sentences under a paragraph are its next sentences, all one paragraph; wor
   add(ask, '検索');
   add(ask, '通知');
 
-  expect(sketch(s, buildDoc(s, doc).parts)).toEqual([
+  const parts = buildDoc(s, doc).parts;
+  expect(sketch(s, parts)).toEqual([
     'h2 背景',
-    'p 今のポータルは古い。スマホで見づらい。特に表が崩れる。検索も弱い',
+    'p 今のポータルは古い。',
+    'text[スマホで見づらい。(特に表が崩れる。), 検索も弱い]',
     'text[問い合わせが増えている。]',
     'p 要望は次のとおり：',
     'list[検索, 通知]',
   ]);
+  // 特に表が崩れる。 is a paragraph after the one it is under, too.
+  const under = parts[2].kind === 'rows' ? parts[2].items[0] : null;
+  expect(under?.text).toBe(true);
 });
 
-test('a paragraph written on from rows breaks before a sentence, those after it going with it', () => {
+test('under a sentence, rows are paragraphs, even one being typed in; after a lead-in, a list', () => {
   const s = OutlineStore.create();
   const add = (p: string, text: string) => s.addChild(p, -1, text).id;
-  const a = add(s.rootId, 'A。');
-  const b = add(a, 'B。');
-  const c = add(b, 'C。');
-  const d = add(a, 'D。');
-  add(s.rootId, 'E。');
-  splitParagraph(s, a, c);
-  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['p A。B。', 'p C。D。', 'text[E。]']);
-  expect(joinedParagraph(s, s.rootId, d)).toBe(c);
-  // Made at the caret to type in, it is a paragraph before it ends a sentence.
-  const x = s.addChild(a, 0, '').id;
-  splitParagraph(s, a, x);
-  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['text[A。]', 'p B。', 'p C。D。', 'text[E。]']);
-  expect(s.fieldValue(x, 'doc')).toBe('body');
-});
-
-test('a paragraph joins on to the one right before it, which stays a paragraph', () => {
-  const s = OutlineStore.create();
-  const add = (p: string, text: string) => s.addChild(p, -1, text).id;
-  add(s.rootId, 'Z。');
-  const a = add(s.rootId, '短い'); // a paragraph, beside Z。
-  const b = add(s.rootId, 'B。');
-  const c = add(b, 'C');
-  const h = add(s.rootId, '見出し');
-  const d = add(h, 'D。');
-  expect(paragraphBefore(s, s.rootId, b)).toBe(a);
-  expect(paragraphBefore(s, s.rootId, c)).toBe(null); // no paragraph's start
-  expect(paragraphBefore(s, s.rootId, d)).toBe(null); // a heading between
-  expect(joinParagraph(s, s.rootId, a, b)).toEqual({ id: b, at: 0 });
-  // 短い holds rows now, and is no sentence: no heading, but set as body.
-  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['text[Z。]', 'p 短いB。C', 'h2 見出し', 'text[D。]']);
-  expect(s.fieldValue(a, 'doc')).toBe('body');
-
-  // An empty row goes, its rows moved for it; the caret to the end of the sentence before.
-  const x = add(s.rootId, '');
-  add(s.rootId, 'E。');
-  s.moveTo(s.items(s.rootId).at(-1)!, x, null);
-  s.moveTo(x, s.rootId, h);
-  expect(joinParagraph(s, s.rootId, a, x)).toEqual({ id: c, at: 'end' });
-  expect(s.get(x)).toBeFalsy();
-  expect(sketch(s, buildDoc(s, s.rootId).parts)[1]).toBe('p 短いB。CE。');
-});
-
-test('joined on, a phrase is written on in the paragraph, not listed under it', () => {
-  const s = OutlineStore.create();
-  const p = s.addChild(s.rootId, -1, 'P。').id;
-  const q = s.addChild(s.rootId, -1, 'Q').id;
-  joinParagraph(s, s.rootId, p, q);
-  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['p P。Q']);
-  expect(s.fieldValue(p, 'doc')).toBe('text');
+  add(add(s.rootId, '前置き。'), '書きかけ');
+  add(add(s.rootId, '次のとおり：'), '一つ目。');
+  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['p 前置き。', 'text[書きかけ]', 'p 次のとおり：', 'list[一つ目。]']);
 });
