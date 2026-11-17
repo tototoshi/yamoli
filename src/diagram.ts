@@ -599,8 +599,8 @@ export interface Layout {
   branches: [string, string][];
 }
 
-/** Width of text in px at a font size; the view measures, tests estimate. */
-export type Measure = (text: string, size: number) => number;
+/** Width of text in px at a font size (bold, as code …, if marked so); the view measures, tests estimate. */
+export type Measure = (text: string, size: number, kinds?: MarkKind[]) => number;
 
 export const estimate: Measure = (text, size) => {
   let w = 0;
@@ -610,6 +610,10 @@ export const estimate: Measure = (text, size) => {
 
 export const LABEL_SIZE = 13;
 export const PROP_SIZE = 11;
+
+/** Width of an arrow's label as drawn, its bold or code stretches as wide as they are. */
+export const edgeLabelWidth = (e: DiagramEdge, measure: Measure) =>
+  markedLines(e.label, [e.label], e.labelMarks)[0].reduce((w, r) => w + measure(r.text, PROP_SIZE, r.kinds), 0);
 export const PAD = 10;
 const LINE = 16;
 const PROP_LINE = 14;
@@ -839,7 +843,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const a = liftTo(e.from, set);
       const b = liftTo(e.to, set);
       if (!a || !b || a === b || onBox.has(a) || onBox.has(b)) continue;
-      if (e.label) labelAfter.set(a, Math.max(labelAfter.get(a) ?? 0, measure(e.label, PROP_SIZE)));
+      if (e.label) labelAfter.set(a, Math.max(labelAfter.get(a) ?? 0, edgeLabelWidth(e, measure)));
       if (!succ.get(a)!.includes(b)) {
         succ.get(a)!.push(b);
         pred.get(b)!.push(a);
@@ -907,7 +911,7 @@ function flowLayout(d: Diagram, measure: Measure): Layout {
       const [a, b] = [liftTo(e.from, set), liftTo(e.to, set)].map((u) => (u ? units.indexOf(u) : -1));
       if (a < 0 || b < 0 || Math.floor(a / cols) !== Math.floor(b / cols) || Math.abs((a % cols) - (b % cols)) !== 1) continue;
       const c = Math.min(a % cols, b % cols);
-      colGap[c] = Math.max(colGap[c], measure(e.label, PROP_SIZE) + 40);
+      colGap[c] = Math.max(colGap[c], edgeLabelWidth(e, measure) + 40);
     }
     const starts = (sizes: number[], gaps: number[]) => sizes.map((_, i) => sizes.slice(0, i).reduce((s, x, j) => s + x + gaps[j], 0));
     const [colX, rowY] = [starts(colW, colGap), starts(rowH, rowGap)];

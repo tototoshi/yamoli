@@ -3,6 +3,7 @@ import {
   arrangeOf,
   borderOf,
   buildDiagram,
+  edgeLabelWidth,
   diagramDesc,
   sidesOf,
   splitSides,
@@ -623,4 +624,19 @@ test("an arrow's label is drawn with its marks, and a colour in it is not taken 
     { from: 4, to: 8, kind: 'color', color: colorValue('red') },
   ]);
   expect(d.edges.find((e) => e.to === c)!.labelMarks).toEqual([{ from: 0, to: 4, kind: 'code' }]);
+});
+
+test("an arrow's label is measured as drawn: its bold or code stretches as such", () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'P').id;
+  const [a, b] = ['A', 'B'].map((n) => s.addChild(p, -1, n).id);
+  s.addField(a, 'to', `[[${b}]] **SQL** read`);
+  const e = buildDiagram(s, p).edges[0];
+  const kindsSeen: string[] = [];
+  const width = edgeLabelWidth(
+    e,
+    (text, _size, kinds = []) => (kindsSeen.push(kinds.join()), text.length * (kinds.includes('strong') ? 2 : 1))
+  );
+  expect(width).toBe(3 * 2 + ' read'.length);
+  expect(kindsSeen).toEqual(['strong', '']);
 });

@@ -1021,10 +1021,12 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .jump-list li.done .pick-label { color: var(--muted); text-decoration: line-through; }
 
 /* diagram */
-.diagram-wrap { overflow-x: auto; padding: 4px 0 16px; }
+.diagram-wrap { padding: 4px 0 16px; }
+.diagram-scroll { overflow-x: auto; }
 /* Full size in its view (scrolling sideways when wide), shrunk to fit when embedded. */
 .diagram { display: block; height: auto; margin: 0 auto; font-size: 13px; user-select: none; }
 .diagram-wrap.embedded { overflow: hidden; height: 100%; padding: 0; }
+.diagram-wrap.embedded .diagram-scroll { overflow: hidden; height: 100%; }
 .diagram-wrap.embedded .diagram { max-width: 100%; max-height: 100%; }
 .diagram-tools { display: flex; justify-content: flex-end; gap: 6px; margin: 0 0 8px; }
 .diagram-empty, .diagram-hint { color: var(--muted); font-size: 13px; }
@@ -1139,7 +1141,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 /* Editing the diagram: the selection, arrows drawn and picked, boxes dragged, names typed, the box menu. */
 .diagram-tools .dg-add { margin-right: auto; }
-.diagram-export { display: flex; gap: 6px; }
+.diagram-export, .dg-zoom { display: flex; gap: 6px; }
+.dg-zoom { gap: 2px; }
+.dg-zoom .dg-zoom-level { min-width: 48px; font-variant-numeric: tabular-nums; }
+.diagram.panning, .diagram.panning * { cursor: grabbing !important; }
 .diagram-part { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .diagram.editable .dg-node, .diagram.editable .dg-frame { cursor: grab; touch-action: none; }
 .dg-selected { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
@@ -1173,9 +1178,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .dg-type-at .dg-rename { pointer-events: auto; }
 .dg-type-at .dg-rename.dg-type-idle { opacity: 0; pointer-events: none; }
 .dg-label-input { font-size: 12px; font-weight: 400; }
+.cell-marked .dg-label-input { display: block; width: 180px; margin: 0 auto; }
 .dg-menu { min-width: 240px; max-height: calc(100vh - 16px); overflow-y: auto; }
 /* A field in the menu, the colour bubble of its shortcut (⌘⇧H) under it. */
-.dg-menu-field { position: relative; }
+.dg-menu-field, .cell-marked { position: relative; }
 .color-pick { gap: 2px; }
 .color-pick button { width: 22px; font-weight: 700; }
 /* A name, description or label typed in the menu. */
