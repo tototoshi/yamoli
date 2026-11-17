@@ -194,3 +194,9 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
   const lead = rootId !== store.rootId ? store.fieldValue(rootId, 'description') : undefined;
   return { ...(lead && { lead }), parts };
 }
+
+/** A document's contents: its headings two levels deep, in order, their text without markup. */
+export const docContents = (store: OutlineStore, parts: DocPart[]): { id: string; level: 2 | 3; text: string }[] =>
+  parts.flatMap((p) =>
+    p.kind === 'heading' && p.level < 4 ? [{ id: p.id, level: p.level as 2 | 3, text: store.node(p.id).text.replace(/[`*~]/g, '') }] : []
+  );

@@ -3,13 +3,14 @@
  * paragraphs and lists from its rows, its blocks and embedded drawings among
  * them. Clicking a line edits its row right there, as in the outline (Enter
  * a new row after it, Tab under the one above, and so on). It can also show
- * an outline of its own, only to be read (the guide).
+ * an outline of its own, only to be read (the guide). With a few headings,
+ * their contents go at the side, the one being read marked.
  */
-import { createContext } from 'preact';
-import { useContext, useMemo, useRef } from 'preact/hooks';
+import { createContext, type ComponentChildren } from 'preact';
+import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
-import { buildDoc, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
+import { buildDoc, docContents, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
@@ -29,12 +30,79 @@ function useSource() {
   return { store: src?.store ?? ctl.store, readOnly: !!src?.readOnly, ctl };
 }
 
-/** A document, written out from the zoomed item; or from rootId of store, only to be read. */
-export function DocView({ store, rootId }: { store?: OutlineStore; rootId?: string } = {}) {
+/** Contents at the side from this many headings; fewer, the document alone. */
+const CONTENTS_FROM = 3;
+
+/**
+ * A document, written out from the zoomed item; or from rootId of store, only
+ * to be read, under a title of its own and with aside above its contents.
+ */
+export function DocView({
+  store,
+  rootId,
+  title,
+  aside,
+}: { store?: OutlineStore; rootId?: string; title?: string; aside?: ComponentChildren } = {}) {
   const ctl = useCtl();
-  const doc = buildDoc(store ?? ctl.store, rootId ?? ctl.zoomId, { showCompleted: store ? true : ctl.prefs.showCompleted });
-  const body = <DocBody lead={doc.lead} parts={doc.parts} />;
+  const from = store ?? ctl.store;
+  const doc = buildDoc(from, rootId ?? ctl.zoomId, { showCompleted: store ? true : ctl.prefs.showCompleted });
+  const contents = docContents(from, doc.parts);
+  const withContents = contents.length >= CONTENTS_FROM;
+  const body = (
+    <div class={'doc-page' + (withContents || aside ? ' with-contents' : '') + (store ? ' read-only' : '')}>
+      {(withContents || aside) && (
+        <nav class="doc-toc" aria-label={t('目次', 'Contents')}>
+          {aside}
+          {withContents && <Contents items={contents} />}
+        </nav>
+      )}
+      <div class="doc-main">
+        {title && <h1 class="doc-title">{title}</h1>}
+        <DocBody lead={doc.lead} parts={doc.parts} />
+      </div>
+    </div>
+  );
   return store ? <Source.Provider value={{ store, readOnly: true }}>{body}</Source.Provider> : body;
+}
+
+/** The headings to go to, the one being read marked. */
+function Contents({ items }: { items: { id: string; level: 2 | 3; text: string }[] }) {
+  const [at, setAt] = useState<string | null>(null);
+  const ids = items.map((h) => h.id).join(' ');
+  useEffect(() => {
+    // The section being read: the last heading above the top of the window (under the top bar).
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      let now: string | null = null;
+      for (const id of ids.split(' ')) {
+        const el = document.querySelector(`[data-doc-id="${id}"]`);
+        if (el && el.getBoundingClientRect().top <= 96) now = id;
+        else if (el) break;
+      }
+      setAt(now);
+    };
+    const onScroll = () => (frame ||= requestAnimationFrame(update));
+    update();
+    addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [ids]);
+  return (
+    <>
+      {items.map((h) => (
+        <button
+          key={h.id}
+          class={'doc-toc-item level-' + h.level + (h.id === at ? ' at' : '')}
+          onClick={() => document.querySelector(`[data-doc-id="${h.id}"]`)?.scrollIntoView({ behavior: 'smooth' })}
+        >
+          {h.text}
+        </button>
+      ))}
+    </>
+  );
 }
 
 function DocBody({ lead, parts }: { lead?: string; parts: DocPart[] }) {
