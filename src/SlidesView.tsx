@@ -46,6 +46,34 @@ export function SlidesView() {
   const [fit, setFit] = useState({ scale: 1, x: 0, y: 0 });
   const [showNotes, setShowNotes] = useState(false);
   const [presenter, openPresenter] = usePresenterWindow();
+  // A slide with its bullets shown one at a time: how many are, on which slide (another: none yet). Typing in it, all are.
+  const [revealed, setRevealedState] = useState<{ id: string; n: number } | null>(null);
+  // Also kept here, for keys pressed faster than the view is drawn again.
+  const revealedNow = useRef(revealed);
+  const setRevealed = (r: { id: string; n: number } | null) => {
+    revealedNow.current = r;
+    setRevealedState(r);
+  };
+  const steps = slide?.reveal ? slide.bullets.length : 0;
+  const shownOf = (r: { id: string; n: number } | null) =>
+    !steps || typed === index ? steps : r?.id === slide.id ? Math.min(r.n, steps) : 0;
+  const shown = shownOf(revealed);
+  const hidden = shown < steps ? new Set(slide.bullets.slice(shown).map((b) => b.id)) : undefined;
+  /** The next bullet, else the next slide (its bullets still to come). */
+  const forward = (at = index) => {
+    const n = shownOf(revealedNow.current);
+    if (at === index && n < steps) setRevealed({ id: slide.id, n: n + 1 });
+    else go(at + 1);
+  };
+  /** The last bullet shown taken away, else the slide before with all of its. */
+  const back = (at = index) => {
+    const n = shownOf(revealedNow.current);
+    if (at === index && n > 0) return setRevealed({ id: slide.id, n: n - 1 });
+    const prev = deck.slides[at - 1];
+    if (!prev) return;
+    setRevealed({ id: prev.id, n: Infinity });
+    go(at - 1);
+  };
   /** Every slide is laid out for printing, and the print dialog opened. */
   const [printing, setPrinting] = useState(false);
 
@@ -121,8 +149,8 @@ export function SlidesView() {
       if (document.querySelector('.slide [data-holding]')) return;
       const k = e.key;
       const at = Math.min(ctl.slide, count - 1); // not `index`: keys can arrive before the rerender
-      if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === ' ') go(at + 1);
-      else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') go(at - 1);
+      if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === ' ') forward(at);
+      else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') back(at);
       else if (k === 'Home') go(0);
       else if (k === 'End') go(count - 1);
       else if (k === 'f') fullscreen();
@@ -186,7 +214,10 @@ export function SlidesView() {
                 key={s.id}
                 class={(i === index ? 'current' : '') + (drop?.id === s.id ? (drop.after ? ' drop-after' : ' drop-before') : '')}
                 draggable={own}
-                onClick={() => go(i)}
+                onClick={() => {
+                  setRevealed(null); // from the start: none of its bullets yet
+                  go(i);
+                }}
                 onDragStart={(e) => {
                   dragging.current = s.id;
                   e.dataTransfer?.setData('text/plain', nodeLabel(store, s.id));
@@ -244,27 +275,28 @@ export function SlidesView() {
           onClick={(e) =>
             !wasTyping.current &&
             !(e.target as Element).closest('a, button, .gantt-wrap, .diagram-wrap, .text, .rich, .slide-data, .block, .slide-image') &&
-            go(index + 1)
+            forward()
           }
         >
           <div class={`slide layout-${slide.layout}`} style={{ transform: `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` }}>
-            <SlideBody slide={slide} />
+            <SlideBody slide={slide} hidden={hidden} />
             <div class="slide-number">
               {index + 1} / {count}
             </div>
           </div>
         </div>
         <div class="slide-controls">
-          <button class="mini" disabled={index === 0} onClick={() => go(index - 1)} title={t('前へ (←)', 'Previous (←)')}>
+          <button class="mini" disabled={index === 0 && !shown} onClick={() => back()} title={t('前へ (←)', 'Previous (←)')}>
             ◀
           </button>
           <span class="slide-count">
             {index + 1} / {count}
           </span>
-          <button class="mini" disabled={index === count - 1} onClick={() => go(index + 1)} title={t('次へ (→)', 'Next (→)')}>
+          <button class="mini" disabled={index === count - 1 && shown >= steps} onClick={() => forward()} title={t('次へ (→)', 'Next (→)')}>
             ▶
           </button>
           {slide.id !== ctl.zoomId && <LayoutPick slide={slide} />}
+          {slide.bullets.length > 1 && <RevealSwitch slide={slide} />}
           <AddToSlide slide={slide} canHaveImage={!!canHaveImage} />
           <button class={'mini' + (showNotes ? ' on' : '')} onClick={() => setShowNotes(!showNotes)} title={t('ノート (N)', 'Notes (N)')}>
             {t('ノート', 'Notes')}
@@ -312,7 +344,16 @@ export function SlidesView() {
           )}
         {presenter &&
           createPortal(
-            <Presenter win={presenter} slides={deck.slides} index={index} theme={deck.theme} go={go} />,
+            <Presenter
+              win={presenter}
+              slides={deck.slides}
+              index={index}
+              shown={shown}
+              steps={steps}
+              theme={deck.theme}
+              forward={() => forward()}
+              back={() => back()}
+            />,
             presenter.document.body
           )}
         {showNotes && (
@@ -325,7 +366,8 @@ export function SlidesView() {
   );
 }
 
-function SlideBody({ slide }: { slide: Slide }) {
+/** A slide's content; hidden: bullets not shown yet (a slide showing them one at a time), keeping their room. */
+function SlideBody({ slide, hidden }: { slide: Slide; hidden?: Set<string> }) {
   const { store } = useCtl();
   const content = useRef<HTMLDivElement>(null);
   useFitText(content);
@@ -358,18 +400,18 @@ function SlideBody({ slide }: { slide: Slide }) {
   const body =
     twoColumn && data.length ? (
       <div class="slide-columns">
-        <Bullets bullets={slide.bullets} />
+        <Bullets bullets={slide.bullets} hidden={hidden} />
         <div class="slide-text">{data}</div>
       </div>
     ) : twoColumn ? (
       <div class="slide-columns">
         {splitColumns(slide.bullets).map((col, i) => (
-          <Bullets key={i} bullets={col} />
+          <Bullets key={i} bullets={col} hidden={hidden} />
         ))}
       </div>
     ) : (
       <>
-        {slide.bullets.length > 0 && <Bullets bullets={slide.bullets} />}
+        {slide.bullets.length > 0 && <Bullets bullets={slide.bullets} hidden={hidden} />}
         {data}
       </>
     );
@@ -483,19 +525,18 @@ const clockText = (ms: number) => {
 };
 
 /** In the presenter's window: the slide on screen, the next one, the notes, the time taken and the time of day. */
-function Presenter({
-  win,
-  slides,
-  index,
-  theme,
-  go,
-}: {
+function Presenter(props: {
   win: Window;
   slides: Slide[];
   index: number;
+  /** Of the slide's bullets shown one at a time, how many are (steps: of how many). */
+  shown: number;
+  steps: number;
   theme: string;
-  go: (i: number) => void;
+  forward: () => void;
+  back: () => void;
 }) {
+  const { win, slides, index, shown, steps, theme, forward, back } = props;
   const [size, setSize] = useState({ w: win.innerWidth, h: win.innerHeight });
   const [start, setStart] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
@@ -510,21 +551,25 @@ function Presenter({
   }, [win]);
   const slide = slides[index];
   const next = slides[index + 1];
+  const hide = (s: Slide, n: number) => (s.reveal && n < s.bullets.length ? new Set(s.bullets.slice(n).map((b) => b.id)) : undefined);
+  // Next: the slide on screen with one more bullet, while it has any to come; else the next slide.
+  const more = shown < steps;
   // The slide on screen as wide as it can be beside the next one's column, and under the controls' height.
   const big = Math.max(200, Math.min((size.w - 72) * 0.64, ((size.h - 96) * W) / H));
   const small = Math.max(160, size.w - 72 - big);
   return (
     <div class="presenter">
       <div class="presenter-main">
-        <SlideAt slide={slide} width={big} theme={theme} number={`${index + 1} / ${slides.length}`} />
+        <SlideAt slide={slide} hidden={hide(slide, shown)} width={big} theme={theme} number={`${index + 1} / ${slides.length}`} />
         <div class="presenter-controls">
-          <button class="mini" disabled={index === 0} onClick={() => go(index - 1)}>
+          <button class="mini" disabled={index === 0 && !shown} onClick={back}>
             ◀
           </button>
           <span>
             {index + 1} / {slides.length}
+            {steps > 0 && ` · ${t('箇条書き', 'bullets')} ${shown} / ${steps}`}
           </span>
-          <button class="mini" disabled={index === slides.length - 1} onClick={() => go(index + 1)}>
+          <button class="mini" disabled={index === slides.length - 1 && !more} onClick={forward}>
             ▶
           </button>
         </div>
@@ -539,9 +584,11 @@ function Presenter({
           </button>
           <span class="presenter-clock">{new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
-        <div class="presenter-label">{t('次のスライド', 'Next slide')}</div>
-        {next ? (
-          <SlideAt slide={next} width={small} theme={theme} />
+        <div class="presenter-label">{more ? t('次の箇条書き', 'Next bullet') : t('次のスライド', 'Next slide')}</div>
+        {more ? (
+          <SlideAt slide={slide} hidden={hide(slide, shown + 1)} width={small} theme={theme} />
+        ) : next ? (
+          <SlideAt slide={next} hidden={hide(next, 0)} width={small} theme={theme} />
         ) : (
           <div class="presenter-end">{t('最後のスライドです', 'This is the last slide')}</div>
         )}
@@ -553,15 +600,39 @@ function Presenter({
 }
 
 /** A slide drawn width pixels wide, only to be looked at. */
-function SlideAt({ slide, width, theme, number }: { slide: Slide; width: number; theme: string; number?: string }) {
+function SlideAt(props: { slide: Slide; hidden?: Set<string>; width: number; theme: string; number?: string }) {
+  const { slide, hidden, width, theme, number } = props;
   const k = width / W;
   return (
     <div class={'slide-stage presenter-slide theme-' + theme} style={{ width, height: H * k }}>
       <div class={`slide layout-${slide.layout}`} style={{ transform: `scale(${k})` }}>
-        <SlideBody slide={slide} />
+        <SlideBody slide={slide} hidden={hidden} />
         {number && <div class="slide-number">{number}</div>}
       </div>
     </div>
+  );
+}
+
+/** Whether the slide's bullets come one at a time: its `reveal` field (yes, or no against the deck's yes; none when it is as the deck says). */
+function RevealSwitch({ slide }: { slide: Slide }) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const toggle = () => {
+    const f = store.field(slide.id, 'reveal');
+    if (f) store.remove(f.id);
+    if (buildDeck(store, ctl.zoomId).slides.find((s) => s.id === slide.id)?.reveal === slide.reveal) {
+      store.setField(slide.id, 'reveal', slide.reveal ? 'no' : 'yes');
+    }
+    ctl.commit(null);
+  };
+  return (
+    <button
+      class={'mini' + (slide.reveal ? ' on' : '')}
+      onClick={toggle}
+      title={t('箇条書きを → で 1 つずつ出す', 'Show the bullets one at a time with →')}
+    >
+      {t('1 つずつ', 'One by one')}
+    </button>
   );
 }
 
@@ -630,22 +701,22 @@ function useFitText(ref: RefObject<HTMLDivElement | null>) {
   });
 }
 
-function Bullets({ bullets }: { bullets: Bullet[] }) {
+function Bullets({ bullets, hidden }: { bullets: Bullet[]; hidden?: Set<string> }) {
   return (
     <ul>
       {bullets.map((b) => (
-        <BulletItem key={b.id} bullet={b} />
+        <BulletItem key={b.id} bullet={b} hidden={hidden?.has(b.id)} />
       ))}
     </ul>
   );
 }
 
-function BulletItem({ bullet }: { bullet: Bullet }) {
+function BulletItem({ bullet, hidden }: { bullet: Bullet; hidden?: boolean }) {
   const { store } = useCtl();
   const ref = useRef<HTMLLIElement>(null);
   useFlowEditor(ref);
   return (
-    <li ref={ref} class={store.node(bullet.id).completed ? 'done' : ''}>
+    <li ref={ref} class={(store.node(bullet.id).completed ? 'done' : '') + (hidden ? ' unrevealed' : '')}>
       <NodeText node={store.node(bullet.id)} />
       {bullet.children.length > 0 && <Bullets bullets={bullet.children} />}
     </li>

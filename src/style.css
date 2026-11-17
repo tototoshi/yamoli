@@ -1054,6 +1054,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide ul { margin: 0; padding-left: 1.2em; }
 .slide ul ul { font-size: 0.8em; color: var(--s-muted); margin: 4px 0 8px; }
 .slide li { margin: 6px 0; }
+/* A bullet still to come (a slide showing them one at a time): its room kept, so the others don't move. */
+.slide li.unrevealed { visibility: hidden; }
 .slide li.done { text-decoration: line-through; color: var(--s-muted); }
 /* A title or bullet typed in where it is, in the slide's type (the textarea over a bullet placed by useFlowEditor). */
 .slide .text-view { display: inline; padding: 0; min-height: 0; line-height: inherit; cursor: text; }

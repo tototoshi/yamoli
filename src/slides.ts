@@ -5,8 +5,10 @@
  *
  *   on the deck:   subtitle: …         shown on the title slide
  *                  theme: light | dark
+ *                  reveal: yes         every slide's bullets shown one at a time
  *   on a slide:    layout: default | center | two-column | title
  *                    (two-column: bullets beside the data, or split in half)
+ *                  reveal: yes | no    its bullets shown one at a time (or not, whatever the deck says)
  *                  notes: …            speaker notes (also as a list)
  *                  image: https://…    picture beside the bullets
  *                  embed: [[item]]     that item's Gantt chart
@@ -37,6 +39,8 @@ export interface Slide {
   embed?: string;
   /** What of the embedded item to show. */
   embedAs?: 'gantt' | 'diagram' | 'mindmap';
+  /** Its bullets shown one at a time, each with those under it. */
+  reveal?: boolean;
 }
 
 export interface Deck {
@@ -56,6 +60,8 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
   };
   const bullets = (id: string): Bullet[] => store.items(id).map((c) => ({ id: c, children: bullets(c) }));
 
+  const yes = (v: string | undefined) => (v === undefined ? undefined : !/^(no|false|off|いいえ|しない)$/i.test(v.trim()));
+  const revealAll = yes(value(deckId, 'reveal')) ?? false;
   const slides: Slide[] = [];
   if (deckId !== store.rootId) {
     slides.push({ id: deckId, layout: 'title', bullets: [], subtitle: value(deckId, 'subtitle'), notes: value(deckId, 'notes') });
@@ -74,6 +80,7 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
       image: value(id, 'image'),
       embed: own ? id : embed ? refIds(embed).find((r) => store.get(r)) : undefined,
       embedAs: embed ? embedKind(embed.replace(/\[\[[^\]]*\]\]/g, '')) : undefined,
+      reveal: yes(value(id, 'reveal')) ?? revealAll,
     });
   }
   return { theme: value(deckId, 'theme') === 'dark' ? 'dark' : 'light', slides };

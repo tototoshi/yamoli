@@ -52,3 +52,19 @@ test('two columns split by length', () => {
   expect(splitColumns([b('a', 3), b('b'), b('c')]).map((c) => c.map((x) => x.id))).toEqual([['a'], ['b', 'c']]);
   expect(splitColumns([b('a')]).map((c) => c.length)).toEqual([1, 0]);
 });
+
+test('reveal on the deck shows every slide one bullet at a time, unless a slide says no; on a slide, that one', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const deck = add(s.rootId, 'Deck');
+  const a = add(deck, 'A');
+  const b = add(deck, 'B');
+  s.addField(b, 'reveal', 'yes');
+  expect(buildDeck(s, deck).slides.map((x) => !!x.reveal)).toEqual([false, false, true]);
+  s.addField(deck, 'reveal', 'yes');
+  const c = add(deck, 'C');
+  s.addField(a, 'reveal', 'no');
+  // The title slide, with no bullets, never.
+  expect(buildDeck(s, deck).slides.map((x) => !!x.reveal)).toEqual([false, false, true, true]);
+  expect(buildDeck(s, deck).slides[3].id).toBe(c);
+});
