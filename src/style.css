@@ -755,7 +755,6 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc-line:hover, .doc-block:hover { background: var(--hover); }
 .doc-block { margin: 0 0 1em; }
 .doc-embed { margin: 0 0 1.2em; padding: 12px; border: 1px solid var(--faint); border-radius: 8px; }
-.doc-embed.gantt { height: 420px; }
 /* A diagram as tall as it is drawn across the page's width (or no taller than so much). */
 .doc-embed .diagram-wrap.embedded, .doc-embed .diagram-wrap.embedded .diagram-scroll { height: auto; }
 .doc-embed .diagram-wrap.embedded .diagram { width: 100%; height: auto; max-height: 560px; }

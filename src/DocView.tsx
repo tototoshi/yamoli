@@ -229,9 +229,9 @@ function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boo
 function ExtraView({ extra }: { extra: Extra }) {
   if (extra.kind === 'data') return <Block id={extra.id} />;
   return (
-    <div class={'doc-embed ' + extra.as}>
+    <div class={'doc-embed embed-' + extra.as}>
       {extra.as === 'gantt' ? (
-        <GanttView rootId={extra.id} embedded />
+        <GanttView rootId={extra.id} embedded edit />
       ) : (
         <DiagramView rootId={extra.id} embedded edit kind={extra.as === 'mindmap' ? 'tree' : 'flow'} />
       )}

@@ -4,7 +4,7 @@
  * their ends dragged, and names and dates typed in (written back as fields:
  * ganttEdit.ts). A dependency is drawn from the dot after a bar to another
  * row, and an arrow clicked can be deleted (deps.ts). A chart embedded in a
- * slide is only shown.
+ * slide is only shown; in a document (edit), it is edited as here.
  * The dates above stay in view while the page scrolls (a header of their
  * own, moved along with the timeline's horizontal scroll); rows are striped
  * so a name can be followed to its bar, and dependency lines stay faint
@@ -163,9 +163,10 @@ function ganttDrawing(gantt: HTMLElement, names: ExportRow[], chartW: number): D
 
 /**
  * The chart for the zoomed item, or (embedded, e.g. in a slide) for rootId
- * with its expanded rows and without the toolbar.
+ * with its expanded rows and without the toolbar; not editable but for edit
+ * (in a document), where a click outside it lets go of the arrow picked.
  */
-export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: boolean }) {
+export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedded?: boolean; edit?: boolean }) {
   const ctl = useCtl();
   const { store, schedule } = ctl;
   const zoomId = rootId ?? ctl.zoomId;
@@ -182,6 +183,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   const [link, setLink] = useState<{ from: string; px: number; py: number; to: string | null } | null>(null);
   /** The arrow clicked (`from>to`), which Delete or its × removes. */
   const [picked, setPicked] = useState<string | null>(null);
+  const editable = !embedded || !!edit;
 
   const unlink = (key: string) => {
     const [from, to] = key.split('>');
@@ -202,6 +204,12 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [picked]);
+  useEffect(() => {
+    if (!picked || !embedded) return;
+    const away = (e: PointerEvent) => !ganttRef.current?.contains(e.target as Node) && setPicked(null);
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
   }, [picked]);
   // The zoomed item itself heads the chart (its span, or its own bar).
   const isRoot = zoomId === store.rootId;
@@ -277,11 +285,11 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
   };
   const dateRows = new Map(showDates ? rows.map((id) => [id, dates(id)]) : []);
 
-  // ---- editing (not in a chart embedded in a slide)
+  // ---- editing (not in a chart embedded in a slide; in a document, yes)
 
   const canEdit = (id: string, col: number) => {
     const s = schedule.byId.get(id);
-    return !embedded && (col < 0 || (s?.kind !== 'summary' && !(s?.kind === 'milestone' && col === 1)));
+    return editable && (col < 0 || (s?.kind !== 'summary' && !(s?.kind === 'milestone' && col === 1)));
   };
   /** What a name or date cell holds when typed in. */
   const editText = (id: string, col: number) => {
@@ -584,7 +592,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                 >
                   {canToggle ? (ctl.isExpanded(id) ? '▾' : '▸') : ''}
                 </button>
-                {embedded ? (
+                {!editable ? (
                   <a href={ctl.hashFor(id, 'gantt')} title={nodeLabel(store, id)}>
                     {nodeLabel(store, id)}
                   </a>
@@ -681,7 +689,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                     }
                     marker-end={`url(#${l.critical ? 'gantt-arrow-crit' : 'gantt-arrow'})`}
                   />
-                  {!embedded && (
+                  {editable && (
                     <path d={l.d} class="dep-hit" onClick={() => setPicked(l.key)}>
                       <title>
                         {`${nodeLabel(store, l.from)} → ${nodeLabel(store, l.to)}\n` +
@@ -705,7 +713,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
                   </text>
                 ) : null;
               }
-              const movable = !embedded && s.kind !== 'summary';
+              const movable = editable && s.kind !== 'summary';
               const d = drag?.id === id ? drag : null;
               const shown = d ? dragged(s, d) : s;
               return (
@@ -738,7 +746,7 @@ export function GanttView({ rootId, embedded }: { rootId?: string; embedded?: bo
             })}
 
             {/* drawing dependencies: the dot after the hovered bar, the line being drawn, the arrow picked */}
-            {!embedded && !drag && !link && hover !== null && schedule.byId.has(hover) && index.has(hover) && (
+            {editable && !drag && !link && hover !== null && schedule.byId.has(hover) && index.has(hover) && (
               <circle
                 cx={barEnd(schedule.byId.get(hover)!) + 10}
                 cy={rowY(index.get(hover)!) + ROW / 2}
