@@ -3,9 +3,9 @@
  *
  *   a row with rows under it (or      a heading (H2 to H4; deeper, a paragraph
  *     blocks, or an embed)            with its rows listed under it)
- *   …ending in 。 or ： (a sentence    a paragraph, its rows under it: a list,
- *     leading into what is under it)   or (are any of them sentences) paragraphs
- *                                     indented under it, and so on down
+ *   …ending in 。 or ： (a sentence    a paragraph: its rows listed under it, or
+ *     leading into what is under it)   (are any of them sentences) its next
+ *                                     sentences, all one paragraph
  *   rows with nothing under them      side by side, a bulleted list when none
  *                                     ends a sentence (。.!? …), else a
  *                                     paragraph each
@@ -58,15 +58,18 @@ export interface DocItem {
 export type DocPart =
   /** auto: what the row would be with no `heading` or `body` on it. */
   | { kind: 'heading'; id: string; level: 2 | 3 | 4; auto: DocRole }
-  | { kind: 'para'; id: string; auto: DocRole }
+  /**
+   * A paragraph; more: the rows under it (and theirs) written on in it, as
+   * the sentences after its own, which `doc` on it can make a list instead
+   * (auto: as nothing set there says).
+   */
+  | { kind: 'para'; id: string; auto: DocRole; more?: { ids: string[]; auto: boolean } }
   /**
    * Rows written out as a list (or paragraphs, as style says); under is the
    * item whose rows they are, which `doc` is set on. Listed under a lead-in,
    * they stay in its list (a heading among them would not be one).
    */
   | { kind: 'rows'; under: string; style: DocStyle; auto: boolean; items: DocItem[]; listed?: true }
-  /** The rows under a paragraph as paragraphs, indented under it (each with its own, further in). */
-  | { kind: 'indent'; under: string; auto: boolean; parts: DocPart[] }
   | Extra;
 
 export interface Doc {
@@ -138,15 +141,21 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
 
   /** Whether rows read as sentences, rather than as a list of words. */
   const sentences = (ids: string[]) => ids.some((r) => ENDS_SENTENCE.test(store.node(r).text));
-  /** The rows under a paragraph (which put no headings there): a list, or paragraphs indented under it. */
-  const under = (parent: string): DocPart[] => {
-    const kids = drawsOwnRows(parent) ? [] : rows(parent);
-    if (!kids.length) return [];
-    const set = docStyleOf(store, parent);
+  /** The rows under id and theirs, in order (but those an embed draws). */
+  const within = (id: string): string[] => (drawsOwnRows(id) ? [] : rows(id).flatMap((k) => [k, ...within(k)]));
+  /** A row as a paragraph (no headings in it): the rows under it listed under it, or written on in it as its sentences. */
+  const paragraph = (id: string, auto: DocRole): DocPart[] => {
+    const kids = drawsOwnRows(id) ? [] : rows(id);
+    const set = docStyleOf(store, id);
+    if (!kids.length) return [{ kind: 'para', id, auto }, ...extrasOf(id)];
     if ((set ?? (sentences(kids) ? 'text' : 'list')) === 'list')
-      return [{ kind: 'rows', under: parent, style: 'list', auto: !set, items: kids.map(item), listed: true }];
-    const inner = kids.flatMap((k): DocPart[] => [{ kind: 'para', id: k, auto: 'body' }, ...extrasOf(k), ...under(k)]);
-    return [{ kind: 'indent', under: parent, auto: !set, parts: inner }];
+      return [
+        { kind: 'para', id, auto },
+        ...extrasOf(id),
+        { kind: 'rows', under: id, style: 'list', auto: !set, items: kids.map(item), listed: true },
+      ];
+    const more = within(id);
+    return [{ kind: 'para', id, auto, more: { ids: more, auto: !set } }, ...[id, ...more].flatMap(extrasOf)];
   };
 
   const parts: DocPart[] = [];
@@ -172,7 +181,7 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
       flush();
       if ((role ?? auto) === 'body') {
         // A sentence leading into its rows, or deeper than headings go: they are under it.
-        parts.push({ kind: 'para', id: c, auto }, ...extrasOf(c), ...under(c));
+        parts.push(...paragraph(c, auto));
         continue;
       }
       parts.push({ kind: 'heading', id: c, level: Math.min(depth + 2, 4) as 2 | 3 | 4, auto });

@@ -43,6 +43,7 @@ function useEdit(id: string) {
     'data-id': id,
     title: t('クリックでアウトラインで編集', 'Click to edit in the outline'),
     onClick: (e: MouseEvent) => {
+      e.stopPropagation(); // a sentence's own row, not the paragraph's it is written on in
       if ((e.target as Element).closest('a, input, button') || document.getSelection()?.toString()) return;
       ctl.openRow(id);
     },
@@ -51,9 +52,8 @@ function useEdit(id: string) {
 
 function Part({ part }: { part: DocPart }) {
   if (part.kind === 'heading') return <Heading id={part.id} level={part.level} auto={part.auto} />;
-  if (part.kind === 'para') return <Para id={part.id} auto={part.auto} />;
+  if (part.kind === 'para') return <Para id={part.id} auto={part.auto} more={part.more} />;
   if (part.kind === 'rows') return <Rows part={part} />;
-  if (part.kind === 'indent') return <Indent part={part} />;
   return <ExtraView extra={part} />;
 }
 
@@ -91,17 +91,40 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
 
 /**
  * A paragraph; auto is what its row would be with nothing set on it (else it
- * is a row as one of many, and stays one). Indented under another, it stays
- * a paragraph (no heading there).
+ * is a row as one of many, and stays one). more: the rows under it, written
+ * on in it as its next sentences (or, by the switch beside it, listed).
  */
-function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?: boolean }) {
+function Para({ id, auto = 'body', more }: { id: string; auto?: DocRole; more?: Extract<DocPart, { kind: 'para' }>['more'] }) {
   const { store } = useCtl();
-  return (
+  const p = (
     <p class={'doc-line' + (store.node(id).completed ? ' done' : '')} {...useEdit(id)}>
       <Check id={id} />
       <InlineText text={store.node(id).text} />
-      {!fixed && <RoleSwitch id={id} now="body" auto={auto} />}
+      {more?.ids.map((m, i) => (
+        <Sentence key={m} id={m} after={store.node(i ? more.ids[i - 1] : id).text} />
+      ))}
+      <RoleSwitch id={id} now="body" auto={auto} />
     </p>
+  );
+  if (!more) return p;
+  return (
+    <div class="doc-rows">
+      <StyleSwitch under={id} style="text" auto={more.auto} />
+      {p}
+    </div>
+  );
+}
+
+/** A row written on in a paragraph: a space after text ending in a letter (none after 。), and its own row to edit. */
+function Sentence({ id, after }: { id: string; after: string }) {
+  const { store } = useCtl();
+  return (
+    <>
+      {/[!-~]$/.test(after.trimEnd()) && ' '}
+      <span class={'doc-line' + (store.node(id).completed ? ' done' : '')} {...useEdit(id)}>
+        <InlineText text={store.node(id).text} />
+      </span>
+    </>
   );
 }
 
@@ -143,16 +166,6 @@ function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
     <div class="doc-rows">
       <StyleSwitch under={part.under} style={part.style} auto={part.auto} />
       {part.style === 'list' ? <List items={part.items} top={!part.listed} /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
-    </div>
-  );
-}
-
-/** Paragraphs under a paragraph, indented under it. */
-function Indent({ part }: { part: Extract<DocPart, { kind: 'indent' }> }) {
-  return (
-    <div class="doc-rows doc-indent">
-      <StyleSwitch under={part.under} style="text" auto={part.auto} />
-      {part.parts.map((p, i) => (p.kind === 'para' ? <Para key={p.id} id={p.id} fixed /> : <Part key={i} part={p} />))}
     </div>
   );
 }
