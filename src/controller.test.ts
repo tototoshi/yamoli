@@ -443,3 +443,22 @@ test('undo puts back the whole outline from the steps', () => {
   ctl.redo();
   expect(top()).toEqual(['A', '']);
 });
+
+test('a field added from the diagram is typed in the outline, which the view switches to', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'A');
+    s.addField(a, 'views', 'diagram');
+    add(a, 'box');
+  });
+  ctl.bind(() => {});
+  location.hash = `#/${a}?view=diagram`;
+  ctl.onHashChange();
+  expect(ctl.view).toBe('diagram');
+  ctl.addAttribute(a);
+  const f = ctl.store.node(a).children.find((c) => ctl.store.node(c).key === '')!;
+  ctl.onHashChange();
+  expect(ctl.view).toBe('outline');
+  expect(ctl.activeField).toBe('fkey:' + f);
+  location.hash = '';
+});

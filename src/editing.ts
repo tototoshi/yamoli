@@ -171,6 +171,17 @@ export class Editing extends ViewState {
     if (this.prefs.fields === 'hide') this.setFieldsMode('fold');
   }
 
+  /**
+   * Commit a field just added, the caret going to focus: in the outline,
+   * switched to from another view (the diagram …), which draws no fields to type in.
+   */
+  private commitField(focus: Focus) {
+    if (this.view === 'outline') return this.commit(focus);
+    this.commit();
+    this.focusAfterHash = focus;
+    this.setView('outline');
+  }
+
   /** Make rows tasks, or (when they all are) plain rows again; a row no longer a task is not completed either. */
   toggleTask(ids: string[]) {
     const { store } = this;
@@ -284,7 +295,7 @@ export class Editing extends ViewState {
   addAttribute(id: string) {
     this.revealFields();
     const f = this.store.addField(id, '');
-    this.commit(fKey(f.id));
+    this.commitField(fKey(f.id));
     this.suggestKeys(f.id);
     this.rerender();
   }
@@ -423,7 +434,7 @@ export class Editing extends ViewState {
   addBlock(id: string, format = 'markdown') {
     this.revealFields();
     const f = this.store.addBlock(id, this.store.freeKey(id, 'note'), format);
-    this.commit(fText(f.id, 0));
+    this.commitField(fText(f.id, 0));
   }
 
   /** Start adding a dependency: focus the `after` value with the link picker open. */
@@ -437,7 +448,7 @@ export class Editing extends ViewState {
       f = this.store.addField(id, DEP_KEY, '[[');
     }
     const key = 'text:' + f.id;
-    this.commit({ key, start: 'end' });
+    this.commitField({ key, start: 'end' });
     this.picker = { key, from: f.text.length - 2, candidates: linkCandidates(this.store, '', id, { deps: true }), selected: 0 };
     this.rerender();
   }

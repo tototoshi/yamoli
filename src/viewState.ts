@@ -506,8 +506,8 @@ export class ViewState {
     this.rerender();
   }
 
-  /** Where the caret goes once the outline is shown again (from openRow). */
-  private focusAfterHash: Focus | null = null;
+  /** Where the caret goes once the outline is shown again (from openRow, or a field added in another view). */
+  protected focusAfterHash: Focus | null = null;
 
   /** From another view (the diagram): edit id's row in the outline, opening the rows it is under. */
   openRow(id: string) {
