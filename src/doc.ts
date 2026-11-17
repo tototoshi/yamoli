@@ -112,6 +112,32 @@ export function setDoc(store: OutlineStore, id: string, kind: 'role' | 'style', 
   else if (f) store.remove(f.id);
 }
 
+/** The row whose paragraph id's sentence is written in, when rows under it are written on in it (else null). */
+export function joinedParagraph(store: OutlineStore, rootId: string, id: string, opts: { showCompleted?: boolean } = {}): string | null {
+  const p = buildDoc(store, rootId, opts).parts.find((p) => p.kind === 'para' && p.more && (p.id === id || p.more.ids.includes(id)));
+  return p?.kind === 'para' ? p.id : null;
+}
+
+/**
+ * Break head's paragraph before at, one of the rows written on in it: at
+ * becomes a paragraph of its own right after head, the sentences after it
+ * written on in it (the rows they are moved under it, as they hang). It is
+ * made body text, unless it ends a sentence anyway: else, holding rows and
+ * not yet ending in 。 (as when just made to type in), it would be a heading.
+ */
+export function splitParagraph(store: OutlineStore, head: string, at: string) {
+  const later: string[] = [];
+  for (let r = at; r !== head; r = store.parentOf(r)!) {
+    const sibs = store.items(store.parentOf(r)!);
+    later.push(...sibs.slice(sibs.indexOf(r) + 1));
+  }
+  const parent = store.parentOf(head)!;
+  const kids = store.node(parent).children;
+  store.moveTo(at, parent, kids[kids.indexOf(head) + 1] ?? null);
+  for (const r of later) store.moveTo(r, at, null);
+  if (store.items(at).length && !LEADS_IN.test(store.node(at).text) && !docRoleOf(store, at)) setDoc(store, at, 'role', 'body');
+}
+
 export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = true } = {}): Doc {
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
   const embedOf = (id: string): Extra | null => {

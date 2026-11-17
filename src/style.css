@@ -708,7 +708,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc h2 { font-size: 22px; padding-bottom: 4px; border-bottom: 1px solid var(--faint); }
 .doc h3 { font-size: 18px; }
 .doc h4 { font-size: 16px; }
-.doc p { margin: 0 0 0.8em; }
+.doc p, .doc .doc-p { margin: 0 0 0.8em; }
 .doc ul { margin: 0 0 0.8em; padding-left: 1.4em; }
 .doc ul ul { margin: 0.1em 0 0.2em; }
 .doc ul.doc-tasks, .doc li.task { list-style: none; }
@@ -741,7 +741,11 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* A row's text in the flow of its line (a sentence among others); typed in, the outline's editor in the document's type. */
 .doc .text-view { display: inline; padding: 0; min-height: 0; line-height: inherit; }
 .doc .rich > .mirror, .doc .rich > textarea { padding: 0; font: inherit; line-height: inherit; }
-.doc p .rich, .doc li .rich { display: inline-grid; min-width: 4em; vertical-align: top; }
+/* An empty row stays something to click on (and type in, or take away with Backspace). */
+.doc .text-view:empty::before { content: '…'; color: var(--faint); }
+/* In a line, the text shown sizes the editor (a textarea's own width would leave a gap after a sentence). */
+.doc .doc-p .rich, .doc li .rich { display: inline-block; position: relative; min-width: 1em; vertical-align: top; }
+.doc .doc-p .rich > textarea, .doc li .rich > textarea { position: absolute; inset: 0; width: calc(100% + 2px); height: 100% !important; }
 .doc .block { margin: 0 0 1em; }
 /* Each line can be typed in where it is. */
 .doc-line, .doc-block { cursor: text; border-radius: 4px; }

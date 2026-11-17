@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDoc, setDoc, type DocPart } from './doc';
+import { buildDoc, joinedParagraph, splitParagraph, setDoc, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
 /** The parts in short: `h2 Text`, `p Text`, `list[A, B]`, `text[A, B]`, `data`, `embed diagram`. */
@@ -135,4 +135,22 @@ test('sentences under a paragraph are its next sentences, all one paragraph; wor
     'p 要望は次のとおり：',
     'list[検索, 通知]',
   ]);
+});
+
+test('a paragraph written on from rows breaks before a sentence, those after it going with it', () => {
+  const s = OutlineStore.create();
+  const add = (p: string, text: string) => s.addChild(p, -1, text).id;
+  const a = add(s.rootId, 'A。');
+  const b = add(a, 'B。');
+  const c = add(b, 'C。');
+  const d = add(a, 'D。');
+  add(s.rootId, 'E。');
+  splitParagraph(s, a, c);
+  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['p A。B。', 'p C。D。', 'text[E。]']);
+  expect(joinedParagraph(s, s.rootId, d)).toBe(c);
+  // Made at the caret to type in, it is a paragraph before it ends a sentence.
+  const x = s.addChild(a, 0, '').id;
+  splitParagraph(s, a, x);
+  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['text[A。]', 'p B。', 'p C。D。', 'text[E。]']);
+  expect(s.fieldValue(x, 'doc')).toBe('body');
 });

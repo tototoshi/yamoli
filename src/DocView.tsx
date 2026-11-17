@@ -92,14 +92,15 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
 function Para({ id, auto = 'body', more }: { id: string; auto?: DocRole; more?: Extract<DocPart, { kind: 'para' }>['more'] }) {
   const { store } = useCtl();
   const p = (
-    <p class={'doc-line' + (store.node(id).completed ? ' done' : '')}>
+    // A div, not a p: the row editor in it is one.
+    <div class={'doc-line doc-p' + (store.node(id).completed ? ' done' : '')}>
       <RoleSwitch id={id} now="body" auto={auto} />
       <Check id={id} />
       <Text id={id} />
       {more?.ids.map((m, i) => (
         <Sentence key={m} id={m} after={store.node(i ? more.ids[i - 1] : id).text} />
       ))}
-    </p>
+    </div>
   );
   if (!more) return p;
   return (

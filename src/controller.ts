@@ -13,6 +13,7 @@ import { Editing } from './editing';
 import { filesIn } from './files';
 import { replaceRefs } from './links';
 import { linkedText } from './pasteHtml';
+import { joinedParagraph, splitParagraph } from './doc';
 
 /** A row as it was copied, with the rows under it. */
 interface Copied {
@@ -205,6 +206,22 @@ export class Controller extends Editing {
       if (isTitle) return this.commit(fText(store.addChild(id, 0).id, 0));
       const before = ta.value.slice(0, start);
       const after = ta.value.slice(end);
+      if (this.view === 'doc') {
+        // A sentence of a paragraph written on from rows: Enter starts a new paragraph, the sentences after the caret in it.
+        const head = joinedParagraph(store, zoomId, id, { showCompleted: this.prefs.showCompleted });
+        if (head && start === 0 && end === 0 && id !== head) {
+          splitParagraph(store, head, id);
+          return this.commit(fText(id, 0));
+        }
+        if (head) {
+          store.setText(id, before);
+          const next = store.items(id).length
+            ? store.addChild(id, store.indexOf(store.items(id)[0]), after)
+            : store.addSiblingAfter(id, after);
+          splitParagraph(store, head, next.id);
+          return this.commit(fText(next.id, 0));
+        }
+      }
       if (start === 0 && end === 0 && after) {
         store.addSiblingBefore(id);
         return this.commit(fText(id, 0));
