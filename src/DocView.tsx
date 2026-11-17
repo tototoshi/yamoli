@@ -143,7 +143,6 @@ function Text({ id }: { id: string }) {
 
 function Part({ part }: { part: DocPart }) {
   if (part.kind === 'heading') return <Heading id={part.id} level={part.level} auto={part.auto} />;
-  if (part.kind === 'para') return <Para id={part.id} auto={part.auto} />;
   if (part.kind === 'rows') return <Rows part={part} />;
   return <ExtraView extra={part} />;
 }
@@ -186,9 +185,8 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
 }
 
 /**
- * A paragraph; auto is what its row would be with nothing set on it (else it
- * is a row as one of many, and stays one). fixed: among rows under a
- * paragraph, which stay paragraphs (no switch to a heading).
+ * A paragraph; auto is what its row would be with nothing set on it. fixed:
+ * among rows under a paragraph, which stay paragraphs (no switch to a heading).
  */
 function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?: boolean }) {
   const { store } = useSource();
@@ -250,11 +248,7 @@ function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
   return (
     <div class="doc-rows">
       <StyleSwitch under={part.under} style={part.style} auto={part.auto} />
-      {part.style === 'list' ? (
-        <List items={part.items} top={!part.listed} />
-      ) : (
-        part.items.map((it) => <Paragraph key={it.id} item={it} fixed={part.listed} />)
-      )}
+      {part.style === 'list' ? <List items={part.items} top /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
     </div>
   );
 }
@@ -263,7 +257,7 @@ function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
 function Paragraph({ item, fixed }: { item: DocItem; fixed?: boolean }) {
   return (
     <>
-      <Para id={item.id} fixed={fixed} />
+      <Para id={item.id} auto={item.auto} fixed={fixed} />
       {item.extras.map((x, i) => (
         <ExtraView key={i} extra={x} />
       ))}
@@ -290,7 +284,7 @@ function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boo
   return (
     <li ref={ref} class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
       <span class="doc-line">
-        {top && <RoleSwitch id={item.id} now="body" auto="body" />}
+        {top && <RoleSwitch id={item.id} now="body" auto={item.auto} />}
         <Check id={item.id} />
         <Text id={item.id} />
       </span>

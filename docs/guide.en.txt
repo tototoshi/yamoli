@@ -1,5 +1,6 @@
 Using Yamoli
   views: doc
+  doc: text
   description: Yamoli is an outline editor whose rows can carry fields, like YAML. Write rows, nest them with indentation, and organize them by folding and zooming; give them fields and the same outline becomes a Gantt chart, a diagram or a slide deck.
   The interface is in English or Japanese, following the browser's language; switch it from the **⋯** menu. The **?** at the top right lists the keyboard shortcuts and opens this guide.
   This guide is an outline too, shown in the Document view. **Open as an outline** on the left adds it to your outline, to see how it is written or to make slides of it.
@@ -224,6 +225,7 @@ Using Yamoli
     Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map, Slides and Document only make sense for rows written for them, so they are turned on per item.
     Pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `mindmap` / `slides` / `doc`, or `ガント` / `図` / `マインドマップ` / `スライド`).
     The views are:
+      doc: body
       **Outline** — where every kind of editing can be done. An item with a `views` field has a badge before its name for each (“Diagram”, “Gantt” …), opening it in that view.
       **Document** — the rows as headings and prose, read top to bottom. Turned on with `views: doc` (this guide is shown in it).
       **Gantt** — the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
@@ -233,16 +235,14 @@ Using Yamoli
       **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
       **YAML / JSON** — the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
     The Document view
-      The Document view decides what is a heading, a paragraph or a list from how the rows are written:
-        A row with rows under it (or blocks, or an `embed`) is a heading (three levels; deeper, a paragraph).
-        But when the rows beside it with nothing under them are phrases (none ends a sentence), they are all a list, and the row is one of its items, the rows under it a list nested in it.
-        Unless it ends in `。` or a colon, when it is a paragraph with its rows under it. After `。`, or when any of them is a sentence, they are paragraphs after it, not indented; after a colon or when all are phrases, they are listed under it.
-        Rows with nothing under them are a bulleted list when none of them ends a sentence (`.` `!` `?` `。` …), else a paragraph each. Tasks have checkboxes.
-        A row is one paragraph: write the sentences of a paragraph on in one row.
+      The Document view decides what is a heading, a paragraph or a list from how the rows are laid out. It doesn't go by their wording (full stops, colons and the like), so nothing changes as you type a sentence. It goes like this:
+        A row with rows (or an `embed`) under it is a heading (two levels). Unless rows with nothing under them come after it: then it is a line of the body, the rows under it a list nested in it. Rows before a heading open its section.
+        Rows that aren't headings are a bulleted list. With `doc: text` (paragraphs) on a row, the rows under it are a paragraph each, and so are those in the sections under it (this guide has it on its top row). Rows under a paragraph are a list nested in it.
+        A row is one paragraph: write the sentences of a paragraph on in one row. No empty rows are needed between paragraphs. Tasks have checkboxes.
         Blocks show where they are, and `embed: [[item]] diagram` draws that item's diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item's `description` leads the document.
       Where that reads wrong, hover over the rows and pick “List” or “Paragraphs” (this writes `doc: list` / `doc: text` on the row above them; “Auto” takes it off). Which rows are headings can be picked too: hover over a line for **H** (make it a heading) or **¶** (make it body text) in the margin left of it (this writes `doc: heading` / `doc: body` on its row; pressing again undoes it). On the line being typed in, **⌘⌥1** makes it a heading and **⌘⌥0** body text (Ctrl+Alt outside macOS).
       A document with three headings or more has its contents on the left (two levels deep): click one to go to it, and the section being read is marked. A narrow window leaves them out.
-      Click a line or block to edit it right there. The keys are the outline's: Enter for the next row, Tab / Shift+Tab to indent, ↑↓ to the rows before and after. Headings, paragraphs and lists are drawn again as you go (a row given rows under it becomes a heading, and so on).
+      Click a line or block to edit it right there. The keys are the outline's: Enter for the next row, Tab / Shift+Tab to indent, ↑↓ to the rows before and after. Headings, paragraphs and lists are drawn again as you go (the last row given rows under it becomes a heading, and so on).
       Enter starts a new paragraph (a new row); Backspace at the start of a line joins its text on to the line before (the two rows become one). Headings and lines with rows under them join too, their rows staying in order a level up (a heading’s section running on from the one before). An empty row shows as a faint “…” to click and type in, or remove with Backspace.
       An embedded drawing (`embed: diagram` / `mindmap`) or Gantt chart can be edited right there as in its own view. A drawing zooms with − / + / Fit at its top right or ⌘ + wheel, and a chart sets its days' width with − / + / Fit / Today above it (both fitted when opened). Keys act only on what is selected in it; a click outside it lets go.
     The Mind map view

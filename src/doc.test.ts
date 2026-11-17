@@ -1,24 +1,22 @@
 import { expect, test } from 'vitest';
-import { buildDoc, setDoc, type DocPart } from './doc';
+import { buildDoc, docRoleAt, setDoc, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
-/** The parts in short: `h2 Text`, `p Text`, `list[A, B(C)]`, `text[A, B]`, `data`, `embed diagram`. */
+/** The parts in short: `h2 Text`, `list[A, B(C)]`, `text[A, B]`, `data`, `embed diagram`. */
 function sketch(s: OutlineStore, parts: DocPart[]): string[] {
   const label = (id: string) => s.node(id).text;
   return parts.map((p) =>
     p.kind === 'heading'
       ? `h${p.level} ${label(p.id)}`
-      : p.kind === 'para'
-        ? `p ${label(p.id)}`
-        : p.kind === 'rows'
-          ? `${p.style}[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
-          : p.kind === 'data'
-            ? 'data'
-            : `embed ${p.as}`
+      : p.kind === 'rows'
+        ? `${p.style}[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
+        : p.kind === 'data'
+          ? 'data'
+          : `embed ${p.as}`
   );
 }
 
-test('rows with rows under them are headings; rows without, a list of phrases or paragraphs of sentences', () => {
+test('rows holding rows, with only such rows after them, are headings two levels deep; the others a list', () => {
   const s = OutlineStore.create();
   const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
   const doc = add(s.rootId, 'Doc');
@@ -30,10 +28,10 @@ test('rows with rows under them are headings; rows without, a list of phrases or
   const why = add(doc, '背景');
   add(why, '前のサイトは古くなった。');
   add(why, '問い合わせが増えている');
-  const plan = add(why, '進め方は次のとおり：');
+  const plan = add(why, '進め方');
   add(plan, '調査');
   add(add(plan, '設計'), '画面');
-  const deep = add(add(why, '詳細'), '深い見出し');
+  const deep = add(add(why, '詳細'), '深い行');
   add(add(deep, 'もっと深い'), '一番下');
 
   const d = buildDoc(s, doc);
@@ -42,14 +40,26 @@ test('rows with rows under them are headings; rows without, a list of phrases or
     'h2 チーム',
     'list[田中, 佐藤]',
     'h2 背景',
-    'text[前のサイトは古くなった。, 問い合わせが増えている]',
-    'p 進め方は次のとおり：',
-    'list[調査, 設計(画面)]',
+    'list[前のサイトは古くなった。, 問い合わせが増えている]', // the section's opening
+    'h3 進め方',
+    'list[調査, 設計(画面)]', // 設計 holds a row, but among others: a nested list
     'h3 詳細',
-    'h4 深い見出し',
-    'p もっと深い',
-    'list[一番下]',
+    'list[深い行(もっと深い)]', // three levels down: no heading
   ]);
+});
+
+test('a row holding rows with rows holding nothing after it is a line of the body: lists nest, headings do not break them', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const doc = add(s.rootId, 'Doc');
+  add(doc, '検索を中心にする');
+  add(add(doc, 'よく使うリンクを上に'), '部署ごとに選べる');
+  const last = add(doc, '通知をまとめる');
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[検索を中心にする, よく使うリンクを上に(部署ごとに選べる), 通知をまとめる]']);
+  // The wording does not matter: a sentence or a colon changes nothing.
+  s.node(last).text = '通知をまとめる。';
+  s.node(s.node(doc).children[1]).text = 'リンクは次のとおり：';
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[検索を中心にする, リンクは次のとおり：(部署ごとに選べる), 通知をまとめる。]']);
 });
 
 test('doc: list or text on a row decides for the rows under it, and tasks are marked as such', () => {
@@ -97,60 +107,55 @@ test('doc: heading or body on a row makes it one, whatever it would be; setDoc k
   const lone = add(doc, '単独の見出し');
   const sec = add(doc, 'まとめ');
   add(sec, '結論');
-  add(doc, '最後の行');
+  const end = add(doc, '最後の行');
 
   setDoc(s, lone, 'role', 'heading');
   setDoc(s, sec, 'style', 'text');
   setDoc(s, sec, 'role', 'body');
   expect(s.fieldValue(sec, 'doc')).toBe('body, text');
-  const d = buildDoc(s, doc);
-  expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ', 'text[結論]', 'list[最後の行]']);
-  // What each would be with nothing set (among a list, not a heading): the switch writes only a change from that.
-  expect(d.parts.filter((p) => p.kind === 'heading' || p.kind === 'para').map((p) => 'auto' in p && p.auto)).toEqual(['body', 'body']);
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['h2 単独の見出し', 'list[まとめ(結論), 最後の行]']);
+  // What each would be with nothing set: the switch writes only a change from that.
+  expect(docRoleAt(s, doc, lone)).toEqual({ now: 'heading', auto: 'body' });
+  expect(docRoleAt(s, doc, sec)).toEqual({ now: 'body', auto: 'body' });
 
   setDoc(s, sec, 'role', null);
   setDoc(s, sec, 'style', null);
   setDoc(s, lone, 'role', null);
   expect(s.field(sec, 'doc')).toBeUndefined();
-  // Among phrases, a row with rows under it is an item with its own list: a nested list, no heading in it.
   expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し, まとめ(結論), 最後の行]']);
-  // Among sections, a loose sentence leaves them headings.
-  s.node(lone).text = '前置きの文。';
-  s.node(s.node(doc).children.at(-1)!).text = '最後の文。';
-  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['text[前置きの文。]', 'h2 まとめ', 'list[結論]', 'text[最後の文。]']);
+  // With nothing after it, it is a heading of itself, the rows before it the opening.
+  s.remove(end);
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し]', 'h2 まとめ', 'list[結論]']);
+  setDoc(s, sec, 'role', 'body');
+  expect(docRoleAt(s, doc, sec)).toEqual({ now: 'body', auto: 'heading' });
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し, まとめ(結論)]']);
 });
 
-test('a row is one paragraph; sentences under it, paragraphs after it (not joined on, not indented); words, a list under it', () => {
+test('doc: text makes paragraphs of the rows under the row, and of those in the sections under it; rows under a paragraph are a list', () => {
   const s = OutlineStore.create();
   const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
   const doc = add(s.rootId, 'Doc');
+  s.addField(doc, 'doc', '段落');
+  add(doc, '前書き');
   const why = add(doc, '背景');
-  const old = add(why, '今のポータルは古い。');
-  add(add(old, 'スマホで見づらい。'), '特に表が崩れる。');
+  const old = add(why, '今のポータルは古い');
+  add(old, 'スマホで見づらい');
   add(old, '検索も弱い');
-  add(why, '問い合わせが増えている。');
-  const ask = add(why, '要望は次のとおり：');
+  add(why, '問い合わせが増えている');
+  const ask = add(doc, '要望');
+  s.addField(ask, 'doc', 'list');
   add(ask, '検索');
   add(ask, '通知');
 
   const parts = buildDoc(s, doc).parts;
   expect(sketch(s, parts)).toEqual([
+    'text[前書き]',
     'h2 背景',
-    'p 今のポータルは古い。',
-    'text[スマホで見づらい。(特に表が崩れる。), 検索も弱い]',
-    'text[問い合わせが増えている。]',
-    'p 要望は次のとおり：',
+    'text[今のポータルは古い(スマホで見づらい, 検索も弱い), 問い合わせが増えている]',
+    'h2 要望',
     'list[検索, 通知]',
   ]);
-  // 特に表が崩れる。 is a paragraph after the one it is under, too.
-  const under = parts[2].kind === 'rows' ? parts[2].items[0] : null;
-  expect(under?.text).toBe(true);
-});
-
-test('under a sentence, rows are paragraphs, even one being typed in; after a lead-in, a list', () => {
-  const s = OutlineStore.create();
-  const add = (p: string, text: string) => s.addChild(p, -1, text).id;
-  add(add(s.rootId, '前置き。'), '書きかけ');
-  add(add(s.rootId, '次のとおり：'), '一つ目。');
-  expect(sketch(s, buildDoc(s, s.rootId).parts)).toEqual(['p 前置き。', 'text[書きかけ]', 'p 次のとおり：', 'list[一つ目。]']);
+  const rows = parts.filter((p) => p.kind === 'rows');
+  expect(rows.map((p) => p.auto)).toEqual([false, true, false]);
+  expect(rows[1].items[0].text).toBe(false); // listed under it
 });

@@ -1,19 +1,19 @@
 /*
- * A document from an outline: the zoomed item read top to bottom as prose.
+ * A document from an outline: the zoomed item read top to bottom as prose,
+ * from how its rows are laid out and what `doc` says, not from their wording
+ * (no punctuation read, no empty rows needed).
  *
- *   a row with rows under it (or      a heading (H2 to H4; deeper, a paragraph
- *     blocks, or an embed)            with its rows listed under it)
- *   …ending in 。 or ： (a sentence    a paragraph: its rows paragraphs after it,
- *     leading into what is under it)   not indented (after 。, or if any of them
- *                                     is a sentence), else listed under it
- *   a row                             one paragraph at most: its sentences are
- *                                     written in it, not in rows of their own
- *   rows with nothing under them      side by side, a bulleted list when none
- *                                     ends a sentence (。.!? …), else a
- *                                     paragraph each
- *   a task                            a checkbox in a list, either way
- *   a block (Markdown, CSV, image …)  drawn where it is
- *   embed: [[item]] diagram           that item's diagram there (or `mindmap`,
+ *   a row with rows (or an embed)    a heading (two levels; deeper, or with
+ *     under it, only such after it     rows holding nothing after it, a line
+ *                                      of the body). Rows before it in the
+ *                                      same place are its section's opening
+ *   the other rows side by side      a bulleted list; a paragraph each under
+ *                                     `doc: text`, which holds for the
+ *                                     sections under that row too
+ *   rows under a line of the body    a list nested under it
+ *   a task                           a checkbox, either way
+ *   a block (Markdown, CSV, image …) drawn where it is
+ *   embed: [[item]] diagram          that item's diagram there (or `mindmap`,
  *                                     else its Gantt chart; no link: the row's own)
  *
  * A row's `doc` field decides instead: `heading` (`見出し`) or `body`
@@ -57,18 +57,15 @@ export interface DocItem {
   /** Its items are paragraphs after it (else a list under it). */
   text: boolean;
   extras: Extra[];
+  /** What the row would be with no `heading` or `body` on it (said of the rows side by side, not nested ones). */
+  auto: DocRole;
 }
 
 export type DocPart =
   /** auto: what the row would be with no `heading` or `body` on it. */
   | { kind: 'heading'; id: string; level: 2 | 3 | 4; auto: DocRole }
-  | { kind: 'para'; id: string; auto: DocRole }
-  /**
-   * Rows written out as a list (or paragraphs, as style says); under is the
-   * item whose rows they are, which `doc` is set on. Listed under a lead-in,
-   * they stay in its list (a heading among them would not be one).
-   */
-  | { kind: 'rows'; under: string; style: DocStyle; auto: boolean; items: DocItem[]; listed?: true }
+  /** Rows side by side, as a list or as paragraphs (as style says); under is the item `doc` is set on for them. */
+  | { kind: 'rows'; under: string; style: DocStyle; auto: boolean; items: DocItem[] }
   | Extra;
 
 export interface Doc {
@@ -77,11 +74,6 @@ export interface Doc {
   parts: DocPart[];
 }
 
-/** Text ending a sentence, or leading into what follows (`…は次のとおり：`). */
-const ENDS_SENTENCE = /[。．.!?！？]\s*$/;
-const LEADS_IN = /[。．:：]\s*$/;
-/** Text leading into a list (`…は次のとおり：`). */
-const LEADS_TO = /[:：]\s*$/;
 /** Fields that set up the views, not what the document says. */
 const QUIET = new Set(['views', DOC_KEY, 'description']);
 
@@ -133,63 +125,47 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
     return embed ? [...blocks, embed] : blocks;
   };
   const drawsOwnRows = (id: string) => embedOf(id)?.id === id;
-  /** Whether rows read as sentences, rather than as a list of words. */
-  const sentences = (ids: string[]) => ids.some((r) => ENDS_SENTENCE.test(store.node(r).text));
-  /**
-   * How the rows under id are written: as `doc` on it says; else a list
-   * after a lead-in (`…次のとおり：`), paragraphs under a sentence or when any
-   * of them is one (so a row does not turn a list item while typed in).
-   */
-  const styleUnder = (id: string, kids: string[]): DocStyle => {
-    const text = store.node(id).text;
-    return docStyleOf(store, id) ?? (!LEADS_TO.test(text) && (ENDS_SENTENCE.test(text) || sentences(kids)) ? 'text' : 'list');
-  };
-  const item = (id: string): DocItem => {
-    const kids = drawsOwnRows(id) ? [] : rows(id);
-    return { id, task: store.isTask(id), items: kids.map(item), text: styleUnder(id, kids) === 'text', extras: extrasOf(id) };
-  };
-  /** A row as a paragraph (no headings in it): the rows under it listed under it, or paragraphs after it. */
-  const paragraph = (id: string, auto: DocRole): DocPart[] => {
-    const kids = drawsOwnRows(id) ? [] : rows(id);
-    const own: DocPart[] = [{ kind: 'para', id, auto }, ...extrasOf(id)];
-    if (!kids.length) return own;
-    const style = styleUnder(id, kids);
-    return [...own, { kind: 'rows', under: id, style, auto: !docStyleOf(store, id), items: kids.map(item), listed: true }];
-  };
+  const rowsOf = (id: string) => (drawsOwnRows(id) ? [] : rows(id));
+  /** A row as a line of the body, the rows under it a list nested in it (or paragraphs after it, as `doc` says). */
+  const item = (id: string, auto: DocRole = 'body'): DocItem => ({
+    id,
+    task: store.isTask(id),
+    items: rowsOf(id).map((c) => item(c)),
+    text: docStyleOf(store, id) === 'text',
+    extras: extrasOf(id),
+    auto,
+  });
 
   const parts: DocPart[] = [];
-  /** The rows under parent, from depth (0: right under the document). */
-  const write = (parent: string, depth: number) => {
+  /** The rows under parent, from depth (0: right under the document); styled: a `doc` style from a row above. */
+  const write = (parent: string, depth: number, styled?: DocStyle) => {
     const set = docStyleOf(store, parent);
-    let run: string[] = [];
+    const kids = rows(parent);
+    // Headings of themselves: the rows holding rows (or a drawing) at the end, with nothing but such rows after them,
+    // two levels deep. A row holding only blocks is a paragraph with them.
+    const auto = new Map<string, DocRole>();
+    // (What comes after a heading is its section's, so only what a row is followed by in its own place counts.)
+    const can = depth <= 1 && set !== 'list';
+    let sections = can;
+    for (const c of [...kids].reverse()) {
+      const own: DocRole = sections && (rowsOf(c).length > 0 || embedOf(c) !== null) ? 'heading' : 'body';
+      auto.set(c, own);
+      sections = can && (docRoleOf(store, c) ?? own) === 'heading';
+    }
+    let run: DocItem[] = [];
     const flush = () => {
-      if (!run.length) return;
-      const style = set ?? (sentences(run) ? 'text' : 'list');
-      parts.push({ kind: 'rows', under: parent, style, auto: !set, items: run.map(item) });
+      if (run.length) parts.push({ kind: 'rows', under: parent, style: set ?? styled ?? 'list', auto: !set, items: run });
       run = [];
     };
-    const holds = (c: string) => (!drawsOwnRows(c) && rows(c).length > 0) || extrasOf(c).length > 0;
-    // Rows among which those holding nothing are phrases, not sentences, are a list: the ones holding rows are
-    // items with their own lists under them (a nested list), not headings in the middle of it.
-    const loose = rows(parent).filter((c) => !holds(c) && !docRoleOf(store, c));
-    const listed = set === 'list' || (!set && loose.length > 0 && !sentences(loose));
-    for (const c of rows(parent)) {
-      const role = docRoleOf(store, c);
-      // Of itself: a heading when it holds more, in its own place (not one of a list), and is no lead-in or too deep.
-      const auto: DocRole = holds(c) && !listed && !LEADS_IN.test(store.node(c).text) && depth <= 2 ? 'heading' : 'body';
-      if (role !== 'heading' && (!holds(c) || (!role && listed))) {
-        run.push(c);
+    for (const c of kids) {
+      if ((docRoleOf(store, c) ?? auto.get(c)) !== 'heading') {
+        run.push(item(c, auto.get(c)));
         continue;
       }
       flush();
-      if ((role ?? auto) === 'body') {
-        // A sentence leading into its rows, or deeper than headings go: they are under it.
-        parts.push(...paragraph(c, auto));
-        continue;
-      }
-      parts.push({ kind: 'heading', id: c, level: Math.min(depth + 2, 4) as 2 | 3 | 4, auto });
+      parts.push({ kind: 'heading', id: c, level: Math.min(depth + 2, 4) as 2 | 3 | 4, auto: auto.get(c)! });
       parts.push(...extrasOf(c));
-      if (!drawsOwnRows(c)) write(c, depth + 1);
+      if (!drawsOwnRows(c)) write(c, depth + 1, set ?? styled);
     }
     flush();
   };
@@ -208,12 +184,13 @@ export const docContents = (store: OutlineStore, parts: DocPart[]): { id: string
 /**
  * Whether id, written out in the document of rootId, is a heading or body text
  * now and with no `doc` on it; null where it can't be made either (a row
- * listed inside another, or one not in the document).
+ * nested in another, or one not in the document).
  */
 export function docRoleAt(store: OutlineStore, rootId: string, id: string): { now: DocRole; auto: DocRole } | null {
   for (const p of buildDoc(store, rootId).parts) {
-    if ((p.kind === 'heading' || p.kind === 'para') && p.id === id) return { now: p.kind === 'heading' ? 'heading' : 'body', auto: p.auto };
-    if (p.kind === 'rows' && !p.listed && p.items.some((it) => it.id === id)) return { now: 'body', auto: 'body' };
+    if (p.kind === 'heading' && p.id === id) return { now: 'heading', auto: p.auto };
+    const it = p.kind === 'rows' ? p.items.find((i) => i.id === id) : undefined;
+    if (it) return { now: 'body', auto: it.auto };
   }
   return null;
 }
