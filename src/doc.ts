@@ -13,9 +13,10 @@
  *   embed: [[item]] diagram           that item's diagram there (or `mindmap`,
  *                                     else its Gantt chart; no link: the row's own)
  *
- * `doc: list` (`箇条書き`) or `doc: text` (`段落`) on a row decides for the
- * rows under it instead. Other fields are left out, but for the zoomed
- * item's `description`, which leads the document.
+ * A row's `doc` field decides instead: `heading` (`見出し`) or `body`
+ * (`本文`) for the row itself, `list` (`箇条書き`) or `text` (`段落`) for the
+ * rows under it, one of each at most (`doc: heading, list`). Other fields are
+ * left out, but for the zoomed item's `description`, which leads the document.
  */
 import { refIds } from './links';
 import type { OutlineStore } from './model';
@@ -24,7 +25,20 @@ export const DOC_KEY = 'doc';
 
 /** How the rows under an item are written out: as a list, or as paragraphs. */
 export type DocStyle = 'list' | 'text';
-const STYLES: Record<string, DocStyle> = { list: 'list', 箇条書き: 'list', text: 'text', 段落: 'text' };
+/** Whether a row is a heading, or a line of the body under one. */
+export type DocRole = 'heading' | 'body';
+type DocWord = DocStyle | DocRole;
+const WORDS: Record<string, DocWord> = {
+  list: 'list',
+  箇条書き: 'list',
+  text: 'text',
+  段落: 'text',
+  heading: 'heading',
+  見出し: 'heading',
+  body: 'body',
+  本文: 'body',
+};
+const STYLE_WORDS: DocWord[] = ['list', 'text'];
 
 /** What an `embed` draws. */
 export type EmbedAs = 'gantt' | 'diagram' | 'mindmap';
@@ -41,10 +55,15 @@ export interface DocItem {
 }
 
 export type DocPart =
-  | { kind: 'heading'; id: string; level: 2 | 3 | 4 }
-  | { kind: 'para'; id: string }
-  /** Rows written out as a list (or paragraphs, as style says); under is the item whose rows they are, which `doc` is set on. */
-  | { kind: 'rows'; under: string; style: DocStyle; auto: boolean; items: DocItem[] }
+  /** auto: what the row would be with no `heading` or `body` on it. */
+  | { kind: 'heading'; id: string; level: 2 | 3 | 4; auto: DocRole }
+  | { kind: 'para'; id: string; auto: DocRole }
+  /**
+   * Rows written out as a list (or paragraphs, as style says); under is the
+   * item whose rows they are, which `doc` is set on. Listed under a lead-in,
+   * they stay in its list (a heading among them would not be one).
+   */
+  | { kind: 'rows'; under: string; style: DocStyle; auto: boolean; items: DocItem[]; listed?: true }
   | Extra;
 
 export interface Doc {
@@ -59,9 +78,33 @@ const LEADS_IN = /[。．:：]\s*$/;
 /** Fields that set up the views, not what the document says. */
 const QUIET = new Set(['views', DOC_KEY, 'description']);
 
+/** What id's `doc` field says. */
+const docWords = (store: OutlineStore, id: string): DocWord[] =>
+  (store.fieldValue(id, DOC_KEY) ?? '')
+    .toLowerCase()
+    .split(/[\s,、]+/)
+    .flatMap((w) => WORDS[w] ?? []);
+
 /** The style `doc` sets on id, if it does. */
 export const docStyleOf = (store: OutlineStore, id: string): DocStyle | undefined =>
-  STYLES[store.fieldValue(id, DOC_KEY)?.toLowerCase() ?? ''];
+  docWords(store, id).find((w): w is DocStyle => STYLE_WORDS.includes(w));
+
+/** Whether `doc` makes id a heading or a body line, if it does. */
+export const docRoleOf = (store: OutlineStore, id: string): DocRole | undefined =>
+  docWords(store, id).find((w): w is DocRole => !STYLE_WORDS.includes(w));
+
+/**
+ * Write what `doc` says of id: its role (heading or body) or the style of its
+ * rows, the other kept; null takes it off (and the field, left empty).
+ */
+export function setDoc(store: OutlineStore, id: string, kind: 'role' | 'style', word: DocWord | null) {
+  const kept = kind === 'role' ? docStyleOf(store, id) : docRoleOf(store, id);
+  const words = kind === 'role' ? [word, kept] : [kept, word];
+  const value = words.filter(Boolean).join(', ');
+  const f = store.field(id, DOC_KEY);
+  if (value) store.setField(id, DOC_KEY, value);
+  else if (f) store.remove(f.id);
+}
 
 export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = true } = {}): Doc {
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
@@ -103,21 +146,25 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
     };
     for (const c of rows(parent)) {
       const under = drawsOwnRows(c) ? [] : rows(c);
-      if ((!under.length && !extrasOf(c).length) || set === 'list') {
+      const holds = under.length > 0 || extrasOf(c).length > 0;
+      const role = docRoleOf(store, c);
+      // Of itself: a heading when it holds more, in its own place (not one of a list), and is no lead-in or too deep.
+      const auto: DocRole = holds && set !== 'list' && !LEADS_IN.test(store.node(c).text) && depth <= 2 ? 'heading' : 'body';
+      if (role !== 'heading' && (!holds || (!role && set === 'list'))) {
         run.push(c);
         continue;
       }
       flush();
-      const text = store.node(c).text;
-      if (LEADS_IN.test(text) || depth > 2) {
+      if ((role ?? auto) === 'body') {
         // A sentence leading into its rows, or deeper than headings go: they are listed under it.
-        parts.push({ kind: 'para', id: c });
+        parts.push({ kind: 'para', id: c, auto });
         parts.push(...extrasOf(c));
         if (docStyleOf(store, c) === 'text' && !drawsOwnRows(c)) write(c, depth + 1);
-        else if (under.length) parts.push({ kind: 'rows', under: c, style: 'list', auto: !docStyleOf(store, c), items: under.map(item) });
+        else if (under.length)
+          parts.push({ kind: 'rows', under: c, style: 'list', auto: !docStyleOf(store, c), items: under.map(item), listed: true });
         continue;
       }
-      parts.push({ kind: 'heading', id: c, level: (depth + 2) as 2 | 3 | 4 });
+      parts.push({ kind: 'heading', id: c, level: Math.min(depth + 2, 4) as 2 | 3 | 4, auto });
       parts.push(...extrasOf(c));
       if (!drawsOwnRows(c)) write(c, depth + 1);
     }

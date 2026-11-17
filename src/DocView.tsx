@@ -6,7 +6,7 @@
 import { useMemo } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
-import { buildDoc, DOC_KEY, type DocItem, type DocPart, type DocStyle, type Extra } from './doc';
+import { buildDoc, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
@@ -43,35 +43,59 @@ function useEdit(id: string) {
     'data-id': id,
     title: t('クリックでアウトラインで編集', 'Click to edit in the outline'),
     onClick: (e: MouseEvent) => {
-      if ((e.target as Element).closest('a, input') || document.getSelection()?.toString()) return;
+      if ((e.target as Element).closest('a, input, button') || document.getSelection()?.toString()) return;
       ctl.openRow(id);
     },
   };
 }
 
 function Part({ part }: { part: DocPart }) {
-  if (part.kind === 'heading') return <Heading id={part.id} level={part.level} />;
-  if (part.kind === 'para') return <Para id={part.id} />;
+  if (part.kind === 'heading') return <Heading id={part.id} level={part.level} auto={part.auto} />;
+  if (part.kind === 'para') return <Para id={part.id} auto={part.auto} />;
   if (part.kind === 'rows') return <Rows part={part} />;
   return <ExtraView extra={part} />;
 }
 
-function Heading({ id, level }: { id: string; level: 2 | 3 | 4 }) {
+/**
+ * At the end of a line, while the pointer is over it: make its row a heading,
+ * or a body line again (written as `doc` on it, unless that is what it would
+ * be anyway: auto).
+ */
+function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole }) {
+  const ctl = useCtl();
+  const to: DocRole = now === 'heading' ? 'body' : 'heading';
+  return (
+    <button
+      class="mini doc-role"
+      onClick={() => {
+        setDoc(ctl.store, id, 'role', to === auto ? null : to);
+        ctl.commit(null);
+      }}
+    >
+      {to === 'heading' ? t('見出しに', 'Make a heading') : t('本文に', 'Make body text')}
+    </button>
+  );
+}
+
+function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocRole }) {
   const { store } = useCtl();
   const H = `h${level}` as 'h2';
   return (
     <H class="doc-line" {...useEdit(id)}>
       <InlineText text={store.node(id).text} />
+      <RoleSwitch id={id} now="heading" auto={auto} />
     </H>
   );
 }
 
-function Para({ id }: { id: string }) {
+/** A paragraph; auto is what its row would be with nothing set on it (else it is a row as one of many, and stays one). */
+function Para({ id, auto = 'body' }: { id: string; auto?: DocRole }) {
   const { store } = useCtl();
   return (
     <p class={'doc-line' + (store.node(id).completed ? ' done' : '')} {...useEdit(id)}>
       <Check id={id} />
       <InlineText text={store.node(id).text} />
+      <RoleSwitch id={id} now="body" auto={auto} />
     </p>
   );
 }
@@ -87,9 +111,7 @@ function Check({ id }: { id: string }) {
 function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
   const ctl = useCtl();
   const set = (style: DocStyle | null) => {
-    const { store } = ctl;
-    if (style) store.setField(part.under, DOC_KEY, style);
-    else store.remove(store.field(part.under, DOC_KEY)!.id);
+    setDoc(ctl.store, part.under, 'style', style);
     ctl.commit(null);
   };
   const choice = (style: DocStyle, label: string) => (
@@ -108,7 +130,7 @@ function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
           </button>
         )}
       </span>
-      {part.style === 'list' ? <List items={part.items} /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
+      {part.style === 'list' ? <List items={part.items} top={!part.listed} /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
     </div>
   );
 }
@@ -125,24 +147,26 @@ function Paragraph({ item }: { item: DocItem }) {
   );
 }
 
-function List({ items }: { items: DocItem[] }) {
+/** A list; top: of rows each in their own place, which can be made headings (not rows inside others). */
+function List({ items, top }: { items: DocItem[]; top?: boolean }) {
   const { store } = useCtl();
   return (
     <ul class={items.every((it) => it.task) ? 'doc-tasks' : undefined}>
       {items.map((it) => (
-        <ListItem key={it.id} item={it} done={store.node(it.id).completed} />
+        <ListItem key={it.id} item={it} done={store.node(it.id).completed} top={top} />
       ))}
     </ul>
   );
 }
 
-function ListItem({ item, done }: { item: DocItem; done: boolean }) {
+function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boolean }) {
   const { store } = useCtl();
   return (
     <li class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
       <span class="doc-line" {...useEdit(item.id)}>
         <Check id={item.id} />
         <InlineText text={store.node(item.id).text} />
+        {top && <RoleSwitch id={item.id} now="body" auto="body" />}
       </span>
       {item.extras.map((x, i) => (
         <ExtraView key={i} extra={x} />

@@ -715,6 +715,12 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc ul.doc-tasks { padding-left: 0.2em; }
 .doc .done { color: var(--muted); text-decoration: line-through; }
 .doc-check { margin: 0 6px 0 0; vertical-align: -1px; }
+/* Make a line a heading, or body text again: at its end while the pointer is over it. */
+.doc .doc-role { margin-left: 10px; font-size: 11px; font-weight: 400; vertical-align: 2px; opacity: 0; transition: opacity 0.1s; }
+.doc-line:hover > .doc-role, .doc-role:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .doc .doc-role { display: none; }
+}
 /* Each line opens its row in the outline. */
 .doc-line, .doc-block { cursor: text; border-radius: 4px; }
 .doc-line:hover, .doc-block:hover { background: var(--hover); }

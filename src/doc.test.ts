@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDoc, type DocPart } from './doc';
+import { buildDoc, setDoc, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
 /** The parts in short: `h2 Text`, `p Text`, `list[A, B]`, `text[A, B]`, `data`, `embed diagram`. */
@@ -88,4 +88,29 @@ test('blocks are drawn where they are, and an embed draws its item (or the row i
   // A row holding only a drawing is a heading over it, as one holding rows.
   expect(sketch(s, d.parts)).toEqual(['h2 A', 'data', 'embed diagram', 'list[x]', 'h2 Flow', 'embed mindmap']);
   expect(d.parts.at(-1)).toEqual({ kind: 'embed', id: own, as: 'mindmap' });
+});
+
+test('doc: heading or body on a row makes it one, whatever it would be; setDoc keeps the style beside it', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const doc = add(s.rootId, 'Doc');
+  const lone = add(doc, '単独の見出し');
+  const sec = add(doc, 'まとめ');
+  add(sec, '結論');
+  add(doc, '最後の行');
+
+  setDoc(s, lone, 'role', 'heading');
+  setDoc(s, sec, 'style', 'text');
+  setDoc(s, sec, 'role', 'body');
+  expect(s.fieldValue(sec, 'doc')).toBe('body, text');
+  const d = buildDoc(s, doc);
+  expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ', 'text[結論]', 'list[最後の行]']);
+  // What each would be with nothing set: the switch writes only a change from that.
+  expect(d.parts.filter((p) => p.kind === 'heading' || p.kind === 'para').map((p) => 'auto' in p && p.auto)).toEqual(['body', 'heading']);
+
+  setDoc(s, sec, 'role', null);
+  setDoc(s, sec, 'style', null);
+  setDoc(s, lone, 'role', null);
+  expect(s.field(sec, 'doc')).toBeUndefined();
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し]', 'h2 まとめ', 'list[結論]', 'list[最後の行]']);
 });
