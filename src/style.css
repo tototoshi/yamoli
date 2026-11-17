@@ -732,6 +732,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc-embed .diagram-wrap.embedded .diagram { width: 100%; height: auto; max-height: 560px; }
 /* The list or paragraphs switch, at the side of the rows it is for, while the pointer is over them. */
 .doc-rows { position: relative; }
+/* Paragraphs under a paragraph: a step in, each further step further. */
+.doc-indent { padding-left: 1.5em; }
 .doc-style { position: absolute; top: 0; right: 100%; display: flex; gap: 2px; margin-right: 8px; opacity: 0; transition: opacity 0.1s; }
 .doc-style .mini { font-size: 11px; white-space: nowrap; }
 .doc-rows:hover > .doc-style, .doc-style:focus-within { opacity: 1; }

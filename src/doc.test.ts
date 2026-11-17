@@ -12,9 +12,11 @@ function sketch(s: OutlineStore, parts: DocPart[]): string[] {
         ? `p ${label(p.id)}`
         : p.kind === 'rows'
           ? `${p.style}[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
-          : p.kind === 'data'
-            ? 'data'
-            : `embed ${p.as}`
+          : p.kind === 'indent'
+            ? `indent[${sketch(s, p.parts).join(', ')}]`
+            : p.kind === 'data'
+              ? 'data'
+              : `embed ${p.as}`
   );
 }
 
@@ -104,7 +106,7 @@ test('doc: heading or body on a row makes it one, whatever it would be; setDoc k
   setDoc(s, sec, 'role', 'body');
   expect(s.fieldValue(sec, 'doc')).toBe('body, text');
   const d = buildDoc(s, doc);
-  expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ', 'text[結論]', 'list[最後の行]']);
+  expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ', 'indent[p 結論]', 'list[最後の行]']);
   // What each would be with nothing set: the switch writes only a change from that.
   expect(d.parts.filter((p) => p.kind === 'heading' || p.kind === 'para').map((p) => 'auto' in p && p.auto)).toEqual(['body', 'heading']);
 
@@ -113,4 +115,27 @@ test('doc: heading or body on a row makes it one, whatever it would be; setDoc k
   setDoc(s, lone, 'role', null);
   expect(s.field(sec, 'doc')).toBeUndefined();
   expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し]', 'h2 まとめ', 'list[結論]', 'list[最後の行]']);
+});
+
+test('sentences under a paragraph are paragraphs indented under it, and so on down; words, a list', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const doc = add(s.rootId, 'Doc');
+  const why = add(doc, '背景');
+  const old = add(why, '今のポータルは古い。');
+  add(add(old, 'スマホで見づらい。'), '特に表が崩れる。');
+  add(old, '検索も弱い');
+  add(why, '問い合わせが増えている。');
+  const ask = add(why, '要望は次のとおり：');
+  add(ask, '検索');
+  add(ask, '通知');
+
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual([
+    'h2 背景',
+    'p 今のポータルは古い。',
+    'indent[p スマホで見づらい。, indent[p 特に表が崩れる。], p 検索も弱い]',
+    'text[問い合わせが増えている。]',
+    'p 要望は次のとおり：',
+    'list[検索, 通知]',
+  ]);
 });

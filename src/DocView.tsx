@@ -53,6 +53,7 @@ function Part({ part }: { part: DocPart }) {
   if (part.kind === 'heading') return <Heading id={part.id} level={part.level} auto={part.auto} />;
   if (part.kind === 'para') return <Para id={part.id} auto={part.auto} />;
   if (part.kind === 'rows') return <Rows part={part} />;
+  if (part.kind === 'indent') return <Indent part={part} />;
   return <ExtraView extra={part} />;
 }
 
@@ -88,14 +89,18 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
   );
 }
 
-/** A paragraph; auto is what its row would be with nothing set on it (else it is a row as one of many, and stays one). */
-function Para({ id, auto = 'body' }: { id: string; auto?: DocRole }) {
+/**
+ * A paragraph; auto is what its row would be with nothing set on it (else it
+ * is a row as one of many, and stays one). Indented under another, it stays
+ * a paragraph (no heading there).
+ */
+function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?: boolean }) {
   const { store } = useCtl();
   return (
     <p class={'doc-line' + (store.node(id).completed ? ' done' : '')} {...useEdit(id)}>
       <Check id={id} />
       <InlineText text={store.node(id).text} />
-      <RoleSwitch id={id} now="body" auto={auto} />
+      {!fixed && <RoleSwitch id={id} now="body" auto={auto} />}
     </p>
   );
 }
@@ -107,30 +112,47 @@ function Check({ id }: { id: string }) {
   return <input type="checkbox" class="doc-check" checked={ctl.store.node(id).completed} onChange={() => ctl.toggleComplete(id)} />;
 }
 
-/** Rows side by side, as a list or as paragraphs, with a switch between the two (written as `doc` on the row above them). */
-function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
+/** The switch beside rows between a list and paragraphs (written as `doc` on under, the row above them). */
+function StyleSwitch({ under, style, auto }: { under: string; style: DocStyle; auto: boolean }) {
   const ctl = useCtl();
-  const set = (style: DocStyle | null) => {
-    setDoc(ctl.store, part.under, 'style', style);
+  const set = (to: DocStyle | null) => {
+    setDoc(ctl.store, under, 'style', to);
     ctl.commit(null);
   };
-  const choice = (style: DocStyle, label: string) => (
-    <button class={'mini' + (part.style === style ? ' on' : '')} onClick={() => part.style !== style && set(style)}>
+  const choice = (to: DocStyle, label: string) => (
+    <button class={'mini' + (style === to ? ' on' : '')} onClick={() => style !== to && set(to)}>
       {label}
     </button>
   );
   return (
+    <span class="doc-style" role="group" aria-label={t('書き方', 'Written as')}>
+      {choice('list', t('箇条書き', 'List'))}
+      {choice('text', t('段落', 'Paragraphs'))}
+      {!auto && (
+        <button class="mini" title={t('行の書き方から自動で決める', 'Decide from how the rows are written')} onClick={() => set(null)}>
+          {t('自動', 'Auto')}
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Rows side by side, as a list or as paragraphs. */
+function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
+  return (
     <div class="doc-rows">
-      <span class="doc-style" role="group" aria-label={t('書き方', 'Written as')}>
-        {choice('list', t('箇条書き', 'List'))}
-        {choice('text', t('段落', 'Paragraphs'))}
-        {!part.auto && (
-          <button class="mini" title={t('行の書き方から自動で決める', 'Decide from how the rows are written')} onClick={() => set(null)}>
-            {t('自動', 'Auto')}
-          </button>
-        )}
-      </span>
+      <StyleSwitch under={part.under} style={part.style} auto={part.auto} />
       {part.style === 'list' ? <List items={part.items} top={!part.listed} /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
+    </div>
+  );
+}
+
+/** Paragraphs under a paragraph, indented under it. */
+function Indent({ part }: { part: Extract<DocPart, { kind: 'indent' }> }) {
+  return (
+    <div class="doc-rows doc-indent">
+      <StyleSwitch under={part.under} style="text" auto={part.auto} />
+      {part.parts.map((p, i) => (p.kind === 'para' ? <Para key={p.id} id={p.id} fixed /> : <Part key={i} part={p} />))}
     </div>
   );
 }

@@ -205,7 +205,7 @@ Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map and Sli
 
 - **Outline**: where every kind of editing can be done. An item with a `views` field has a badge before its name for each (“Diagram”, “Gantt” …), opening it in that view.
 - **Document**: the rows as headings and prose, read top to bottom. Turned on with `views: doc`.
-  - A row with rows under it (or blocks, or an `embed`) is a heading (three levels; deeper, a paragraph), unless it ends in `。` or `:`, when it is a paragraph leading into its rows, listed under it.
+  - A row with rows under it (or blocks, or an `embed`) is a heading (three levels; deeper, a paragraph), unless it ends in `。` or `:`, when it is a paragraph with its rows under it: paragraphs indented a step (and theirs a step further) when any of them is a sentence, else a list.
   - Rows with nothing under them are a bulleted list when none of them ends a sentence (`.` `!` `?` `。` …), else a paragraph each. Tasks have checkboxes.
   - Where that reads wrong, hover over the rows and pick “List” or “Paragraphs” (this writes `doc: list` / `doc: text` on the row above them; “Auto” takes it off).
   - Which rows are headings can be picked too: hover over a line for “Make a heading” or “Make body text” at its end (this writes `doc: heading` / `doc: body` on its row; pressing again undoes it).
