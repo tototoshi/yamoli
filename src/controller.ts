@@ -253,6 +253,18 @@ export class Controller extends Editing {
       store.remove(id);
       return this.commit(n.key.trim().toLowerCase() === 'subtitle' ? fText(parent, 'end') : null);
     }
+    // In the document a line joins the one before it whatever it holds (a heading's section joining the one before).
+    if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && this.view === 'doc' && n.children.length) {
+      const prev = vis[idx - 1];
+      const pn = prev ? store.node(prev) : null;
+      if (pn && pn.key === null && pn.format === null && store.isData(prev) === store.isData(id)) {
+        e.preventDefault();
+        const pos = pn.text.length;
+        store.joinInto(id, prev);
+        return this.commit(fText(prev, pos));
+      }
+      return;
+    }
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && !n.children.length) {
       const prev = vis[idx - 1];
       if (!ta.value) {

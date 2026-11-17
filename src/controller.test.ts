@@ -564,3 +564,32 @@ test('in the document view, ⌘⌥1 makes the line a heading and ⌘⌥0 body te
   press(ctl, editor(ctl, line), 'º', { ...mod, code: 'Digit0' });
   expect(ctl.store.field(line, 'doc')).toBeUndefined();
 });
+
+test('in the document view, Backspace at the start of a line joins it to the one before, its rows kept in place', () => {
+  let doc = '',
+    intro = '',
+    sec = '',
+    a = '',
+    b = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    intro = add(doc, 'Intro.');
+    sec = add(doc, 'Section');
+    s.addField(sec, 'doc', 'heading');
+    a = add(sec, 'A.');
+    b = add(sec, 'B.');
+    s.addField(sec, 'owner', 'me');
+  });
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  expect(press(ctl, editor(ctl, sec), 'Backspace').defaultPrevented).toBe(true);
+  expect(ctl.store.node(intro).text).toBe('Intro.Section');
+  expect(ctl.store.items(doc)).toEqual([intro, a, b]); // the section's rows where they were, a level up
+  expect(ctl.store.field(intro, 'owner')?.text).toBe('me');
+  expect(ctl.store.field(intro, 'doc')).toBeUndefined();
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + intro }));
+  // The first line under its parent joins the parent.
+  press(ctl, editor(ctl, a), 'Backspace');
+  expect(ctl.store.node(intro).text).toBe('Intro.SectionA.');
+});

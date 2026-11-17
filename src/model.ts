@@ -340,6 +340,27 @@ export class OutlineStore {
     this.remove(srcId);
   }
 
+  /**
+   * Join src's text on to dst, the line before it as a document reads, keeping
+   * everything in the order it reads: src's rows take its place (one level
+   * up), its other fields and blocks go to dst, and its `doc` (heading or
+   * body) goes with it.
+   */
+  joinInto(srcId: string, dstId: string) {
+    const src = this.node(srcId);
+    this.node(dstId).text += src.text;
+    const parent = this.parentOf(srcId)!;
+    let at = this.node(parent).children.indexOf(srcId);
+    for (const c of src.children.slice()) {
+      const n = this.node(c);
+      if (n.key === 'doc') continue;
+      this.detach(c);
+      if (n.key === null || parent === dstId) this.insert(c, parent, at++);
+      else this.insert(c, dstId, -1);
+    }
+    this.remove(srcId);
+  }
+
   // ---------- tasks
 
   /** Whether id is something to do: marked as a task, completed, or scheduled (`duration`, `due`). */
