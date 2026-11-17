@@ -876,8 +876,9 @@ function ZoomTools({ zoom, onFit }: { zoom: ReturnType<typeof useZoom>; onFit: (
 /**
  * The diagram (a flow, or a mind map) for the zoomed item, or (embedded, e.g.
  * in a slide) for rootId, without the hints and not editable but for edit (in
- * a document): then its keys and paste act only on what is selected in it,
- * and a click outside it lets go of that.
+ * a document): then it is drawn and zoomed as in its own view, its keys and
+ * paste act only on what is selected in it, and a click outside it lets go
+ * of that.
  */
 export function DiagramView({
   rootId,
@@ -897,7 +898,9 @@ export function DiagramView({
   const [hover, setHover] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const zoom = useZoom(id, scrollRef, svgRef, !embedded);
+  /** Shrunk into the space given (in a slide), not zoomed. */
+  const sized = embedded && !edit;
+  const zoom = useZoom(id, scrollRef, svgRef, !sized);
   /** The box or arrow clicked, which Delete removes (and Enter renames, for a box). */
   const [sel, setSel] = useState<{ box: string } | { edge: string } | null>(null);
   /** More boxes picked with Shift or ⌘ besides the selected one, to line up, frame or remove together. */
@@ -1329,10 +1332,11 @@ export function DiagramView({
   const renamed = renaming ? L.boxes.get(renaming) : undefined;
 
   return (
-    <div ref={wrapRef} class={'diagram-wrap' + (embedded ? ' embedded' : '')}>
+    <div ref={wrapRef} class={'diagram-wrap' + (sized ? ' embedded' : '')}>
       {embedded && edit && (
         <div class="diagram-tools">
           <AddBox onAdd={() => addBox(id)} tree={d.kind === 'tree'} />
+          <ZoomTools zoom={zoom} onFit={() => zoom.fit(W, H)} />
         </div>
       )}
       {!embedded && (
@@ -1360,12 +1364,12 @@ export function DiagramView({
           ref={svgRef}
           class={'diagram' + (editable ? ' editable' : '') + (zoom.panning ? ' panning' : '')}
           viewBox={`${x0 - M} ${y0 - M} ${W} ${H}`}
-          width={embedded ? '100%' : W * zoom.scale}
-          height={embedded ? '100%' : H * zoom.scale}
+          width={sized ? '100%' : W * zoom.scale}
+          height={sized ? '100%' : H * zoom.scale}
           // Embedded, it fills the space it is given, though a small drawing grows no more than so much.
-          style={embedded ? { maxWidth: `min(100%, ${W * EMBED_GROW}px)`, maxHeight: `min(100%, ${H * EMBED_GROW}px)` } : undefined}
+          style={sized ? { maxWidth: `min(100%, ${W * EMBED_GROW}px)`, maxHeight: `min(100%, ${H * EMBED_GROW}px)` } : undefined}
           onMouseLeave={() => setHover(null)}
-          onPointerDown={(e) => e.target === e.currentTarget && (embedded ? select(null) : zoom.pan(e, () => select(null)))}
+          onPointerDown={(e) => e.target === e.currentTarget && (sized ? select(null) : zoom.pan(e, () => select(null)))}
         >
           <defs>
             <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
