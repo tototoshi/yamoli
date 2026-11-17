@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { OutlineStore } from './model';
-import { buildDeck, splitColumns } from './slides';
+import { addImage, buildDeck, removeImage, splitColumns } from './slides';
 
 test('a deck: title slide, one slide per item, fields as settings', () => {
   const s = OutlineStore.create();
@@ -76,4 +76,25 @@ test('image-at says where the picture goes, in English or Japanese; anything els
   for (const v of ['left', '背景', 'Below', 'somewhere']) s.addField(add(deck, v), 'image-at', v);
   add(deck, 'none');
   expect(buildDeck(s, deck).slides.map((x) => x.imageAt)).toEqual(['right', 'left', 'background', 'below', 'right', 'right']);
+});
+
+test('pictures added to a slide: one is the image value, more a list under it; taken off, back to one, then none', () => {
+  const s = OutlineStore.create();
+  const deck = s.addChild(s.rootId, -1, 'Deck').id;
+  const slide = s.addChild(deck, -1, 'A').id;
+  const images = () => buildDeck(s, deck).slides[1].images;
+  addImage(s, slide, 'files/a.png');
+  expect(s.fieldValue(slide, 'image')).toBe('files/a.png');
+  addImage(s, slide, 'files/b.png');
+  addImage(s, slide, 'files/c.png');
+  const f = s.field(slide, 'image')!;
+  expect(f.text).toBe('');
+  expect(images()).toEqual(['files/a.png', 'files/b.png', 'files/c.png']);
+  removeImage(s, slide, f.children[1]);
+  expect(images()).toEqual(['files/a.png', 'files/c.png']);
+  removeImage(s, slide, f.children[0]);
+  expect(s.field(slide, 'image')?.children).toEqual([]);
+  expect(s.fieldValue(slide, 'image')).toBe('files/c.png');
+  removeImage(s, slide, s.field(slide, 'image')!.id);
+  expect(s.field(slide, 'image')).toBeUndefined();
 });

@@ -1087,7 +1087,13 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide-image-box:hover .slide-image-tools, .slide:hover > .slide-image-tools, .slide-image-tools.open { opacity: 1; }
 .slide-image-menu { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--faint); border-radius: 6px; background: var(--bg); color: var(--fg); }
 .slide-image-tools .slide-image-src { padding: 4px 8px; border: 1px solid var(--faint); border-radius: 6px; background: var(--bg); color: var(--fg); }
-.slide-image { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; cursor: pointer; }
+.slide-images { flex: 1 1 auto; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 16px; }
+.slide-image-item { position: relative; min-width: 0; min-height: 0; }
+.slide-image { display: block; width: 100%; height: 100%; object-fit: contain; cursor: pointer; }
+/* Taking one off: over its top left corner while the pointer is over it. */
+.slide-image-del { position: absolute; top: 6px; left: 6px; padding: 0 6px; border: 1px solid var(--faint); border-radius: 4px; background: var(--bg); color: var(--muted); font-size: 16px; line-height: 22px; cursor: pointer; opacity: 0; transition: opacity 0.1s; }
+.slide-image-item:hover .slide-image-del { opacity: 1; }
+.slide-image-del:hover { color: var(--danger); }
 /* The picture's address, typed in under it. */
 .slide-image-src { font-size: 18px; overflow-wrap: anywhere; }
 /* A block typed in on the slide: its text in the slide's size. */

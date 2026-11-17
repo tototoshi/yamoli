@@ -15,6 +15,7 @@ import { ViewState } from './viewState';
 import { VIEWS_KEY, type DrawnView } from './views';
 import { isImageRef, uploadFile } from './files';
 import { canAddFiles } from './storage';
+import { addImage } from './slides';
 
 /** The field that records when an item was completed. */
 const DONE_KEY = 'completed';
@@ -430,8 +431,8 @@ export class Editing extends ViewState {
     );
   }
 
-  /** Keep an image beside the outline file and make it the picture of item id (its `image` field). */
-  setImage(id: string, file: File) {
+  /** Keep images beside the outline file and add them to the pictures of item id (its `image` field, a slide's). */
+  addImages(id: string, files: File[]) {
     if (!canAddFiles()) {
       return this.showToast(
         t(
@@ -441,12 +442,12 @@ export class Editing extends ViewState {
       );
     }
     this.showToast(t('画像を保存しています…', 'Saving the picture…'));
-    uploadFile(file).then(
-      ({ ref }) => {
+    Promise.all(files.map(uploadFile)).then(
+      (kept) => {
         const { store } = this; // the outline may have been replaced (undo) while uploading
         this.hideToast();
         if (!store.get(id)) return;
-        store.setField(id, 'image', ref);
+        for (const { ref } of kept) addImage(store, id, ref);
         this.commit(null);
       },
       (e: Error) => this.showToast(t('保存できませんでした: ', 'Couldn’t save it: ') + e.message)

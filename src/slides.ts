@@ -10,7 +10,7 @@
  *                    (two-column: bullets beside the data, or split in half)
  *                  reveal: yes | no    its bullets shown one at a time (or not, whatever the deck says)
  *                  notes: …            speaker notes (also as a list)
- *                  image: https://…    picture beside the bullets
+ *                  image: https://…    picture beside the bullets (pictures: a list under it)
  *                  image-at: right | left | below | full | background
  *                                      where it goes (右 / 左 / 下 / 大きく / 背景): beside the
  *                                      bullets, under them, alone under the title, behind it all
@@ -21,7 +21,7 @@
  *                                      (`mindmap`, `gantt`: a mind map, a Gantt chart), not bullets
  */
 import { refIds } from './links';
-import type { OutlineStore } from './model';
+import type { OutlineNode, OutlineStore } from './model';
 
 export type Layout = 'default' | 'title' | 'center' | 'two-column';
 export type ImageAt = 'right' | 'left' | 'below' | 'full' | 'background';
@@ -51,8 +51,9 @@ export interface Slide {
   bullets: Bullet[];
   subtitle?: string;
   notes?: string;
-  image?: string;
-  /** Where the picture goes (with one, or its field). */
+  /** Its pictures' addresses, in order. */
+  images: string[];
+  /** Where the pictures go (with any, or their field). */
   imageAt: ImageAt;
   embed?: string;
   /** What of the embedded item to show. */
@@ -88,6 +89,7 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
       bullets: [],
       subtitle: value(deckId, 'subtitle'),
       notes: value(deckId, 'notes'),
+      images: [],
       imageAt: 'right',
     });
   }
@@ -102,7 +104,9 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
       bullets: own ? [] : bullets(id),
       subtitle: value(id, 'subtitle'),
       notes: value(id, 'notes'),
-      image: value(id, 'image'),
+      images: imageRows(store, id)
+        .map((n) => n.text.trim())
+        .filter(Boolean),
       imageAt: IMAGE_AT[value(id, 'image-at')?.trim().toLowerCase() ?? ''] ?? 'right',
       embed: own ? id : embed ? refIds(embed).find((r) => store.get(r)) : undefined,
       embedAs: embed ? embedKind(embed.replace(/\[\[[^\]]*\]\]/g, '')) : undefined,
@@ -110,6 +114,43 @@ export function buildDeck(store: OutlineStore, deckId: string): Deck {
     });
   }
   return { theme: value(deckId, 'theme') === 'dark' ? 'dark' : 'light', slides };
+}
+
+/**
+ * The rows holding a slide's pictures: its `image` field, with one; the rows
+ * of the list under it, with several (empty ones too, to be typed in).
+ */
+export function imageRows(store: OutlineStore, id: string): OutlineNode[] {
+  const f = store.field(id, 'image');
+  if (!f) return [];
+  const list = f.children.map((c) => store.node(c)).filter((n) => n.key === null);
+  return list.length ? (f.text.trim() ? [f, ...list] : list) : [f];
+}
+
+/** Add a picture to a slide: its `image` field's value with none, else the list under it (one value made the list's first). */
+export function addImage(store: OutlineStore, id: string, ref: string) {
+  const f = store.field(id, 'image');
+  if (!f) return void store.addField(id, 'image', ref);
+  if (!f.text.trim() && !f.children.length) return store.setText(f.id, ref);
+  if (f.text.trim()) {
+    store.addChild(f.id, 0, f.text.trim());
+    store.setText(f.id, '');
+  }
+  store.addChild(f.id, -1, ref);
+}
+
+/** Take a picture (its row) off a slide: a list of one left is that one value again, none no field. */
+export function removeImage(store: OutlineStore, id: string, row: string) {
+  const f = store.field(id, 'image');
+  if (!f) return;
+  if (row === f.id) store.setText(f.id, '');
+  else store.remove(row);
+  const left = imageRows(store, id).filter((n) => n.text.trim() || n.id !== f.id);
+  if (!left.length) return store.remove(f.id);
+  if (left.length === 1 && left[0].id !== f.id && !left[0].children.length) {
+    store.setText(f.id, left[0].text);
+    store.remove(left[0].id);
+  }
 }
 
 /** What an `embed` asks to show, from its words: a mind map, a diagram, else a Gantt chart. */
