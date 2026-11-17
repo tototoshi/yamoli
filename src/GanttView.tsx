@@ -183,6 +183,8 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   const [link, setLink] = useState<{ from: string; px: number; py: number; to: string | null } | null>(null);
   /** The arrow clicked (`from>to`), which Delete or its × removes. */
   const [picked, setPicked] = useState<string | null>(null);
+  /** In a document, how wide its days are (an index into GANTT_SCALES), once zoomed. */
+  const [ownZoom, setOwnZoom] = useState<number | null>(null);
   const editable = !embedded || !!edit;
 
   const unlink = (key: string) => {
@@ -215,7 +217,18 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   const isRoot = zoomId === store.rootId;
   const below = embedded ? expandedRows(store, zoomId) : ctl.visibleRows();
   const rows = (isRoot ? below : [zoomId, ...below]).filter((id) => !store.isData(id));
-  const scale = Math.min(Math.max(ctl.prefs.ganttZoom, 0), GANTT_SCALES.length - 1);
+  // The widest days that still show the whole schedule.
+  const span = ganttRange(rows, schedule, 1);
+  let fitScale = 0;
+  if (span) while (fitScale + 1 < GANTT_SCALES.length && (span.to - span.from + 1) * GANTT_SCALES[fitScale + 1] <= chartWidth) fitScale++;
+  // In a document, a chart has days of its own width: fitted until zoomed. Elsewhere, as last set.
+  const own = embedded && edit;
+  const scale = Math.min(
+    Math.max(own ? (ownZoom ?? (span ? fitScale : ctl.prefs.ganttZoom)) : ctl.prefs.ganttZoom, 0),
+    GANTT_SCALES.length - 1
+  );
+  if (!span) fitScale = scale;
+  const setZoom = (z: number) => (own ? setOwnZoom(z) : ctl.setGanttZoom(z));
   const dw = GANTT_SCALES[scale];
   const now = today();
   // Fill the available width with days. With nothing dated yet (say the
@@ -223,11 +236,6 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   // problems still show.
   const minDays = Math.max(21, Math.floor(chartWidth / dw));
   const range = ganttRange(rows, schedule, minDays) ?? { from: now - 2, to: now - 3 + minDays };
-
-  // The widest days that still show the whole schedule.
-  const span = ganttRange(rows, schedule, 1);
-  let fitScale = span ? 0 : scale;
-  if (span) while (fitScale + 1 < GANTT_SCALES.length && (span.to - span.from + 1) * GANTT_SCALES[fitScale + 1] <= chartWidth) fitScale++;
 
   const scrollToToday = () => {
     const el = chartRef.current;
@@ -432,32 +440,34 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
 
   const rowCls = (id: string) => (store.node(id).completed ? ' done' : '') + (schedule.byId.get(id)?.kind === 'summary' ? ' summary' : '');
 
+  const zoomTools = (
+    <>
+      <button class="mini" title={t('縮小', 'Narrower days')} disabled={scale === 0} onClick={() => setZoom(scale - 1)}>
+        −
+      </button>
+      <button class="mini" title={t('拡大', 'Wider days')} disabled={scale === GANTT_SCALES.length - 1} onClick={() => setZoom(scale + 1)}>
+        ＋
+      </button>
+      <button
+        class="mini"
+        title={t('全体が入る幅にする', 'Fit the whole schedule')}
+        disabled={scale === fitScale}
+        onClick={() => setZoom(fitScale)}
+      >
+        {t('全体', 'Fit')}
+      </button>
+      <button class="mini" disabled={now < range.from || now > range.to} onClick={scrollToToday}>
+        {t('今日', 'Today')}
+      </button>
+    </>
+  );
+
   return (
     <div class={'gantt-wrap' + (embedded ? ' embedded' : '')}>
+      {own && <div class="gantt-tools">{zoomTools}</div>}
       {!embedded && (
         <div class="gantt-tools">
-          <button class="mini" title={t('縮小', 'Narrower days')} disabled={scale === 0} onClick={() => ctl.setGanttZoom(scale - 1)}>
-            −
-          </button>
-          <button
-            class="mini"
-            title={t('拡大', 'Wider days')}
-            disabled={scale === GANTT_SCALES.length - 1}
-            onClick={() => ctl.setGanttZoom(scale + 1)}
-          >
-            ＋
-          </button>
-          <button
-            class="mini"
-            title={t('全体が入る幅にする', 'Fit the whole schedule')}
-            disabled={scale === fitScale}
-            onClick={() => ctl.setGanttZoom(fitScale)}
-          >
-            {t('全体', 'Fit')}
-          </button>
-          <button class="mini" disabled={now < range.from || now > range.to} onClick={scrollToToday}>
-            {t('今日', 'Today')}
-          </button>
+          {zoomTools}
           <button
             class={'mini' + (showDates ? ' on' : '')}
             aria-pressed={showDates}
