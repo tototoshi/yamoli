@@ -753,7 +753,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   transition: opacity 0.1s;
 }
 .doc-line:hover > .doc-role, .doc-role:focus-visible { opacity: 1; }
-.doc-line:has(.rich) > .doc-role { display: none; } /* not while the line is typed in */
+.doc-line:has(.rich:focus-within) > .doc-role { opacity: 1; } /* shown while the line is typed in */
 @media (hover: none) {
   .doc .doc-role { display: none; }
 }

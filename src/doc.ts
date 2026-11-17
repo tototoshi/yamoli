@@ -200,3 +200,24 @@ export const docContents = (store: OutlineStore, parts: DocPart[]): { id: string
   parts.flatMap((p) =>
     p.kind === 'heading' && p.level < 4 ? [{ id: p.id, level: p.level as 2 | 3, text: store.node(p.id).text.replace(/[`*~]/g, '') }] : []
   );
+
+/**
+ * Whether id, written out in the document of rootId, is a heading or body text
+ * now and with no `doc` on it; null where it can't be made either (a row
+ * listed inside another, or one not in the document).
+ */
+export function docRoleAt(store: OutlineStore, rootId: string, id: string): { now: DocRole; auto: DocRole } | null {
+  for (const p of buildDoc(store, rootId).parts) {
+    if ((p.kind === 'heading' || p.kind === 'para') && p.id === id) return { now: p.kind === 'heading' ? 'heading' : 'body', auto: p.auto };
+    if (p.kind === 'rows' && !p.listed && p.items.some((it) => it.id === id)) return { now: 'body', auto: 'body' };
+  }
+  return null;
+}
+
+/** Make id a heading or body text in the document of rootId; false where it can't be. */
+export function setDocRole(store: OutlineStore, rootId: string, id: string, to: DocRole): boolean {
+  const at = docRoleAt(store, rootId, id);
+  if (!at || at.now === to) return false;
+  setDoc(store, id, 'role', to === at.auto ? null : to);
+  return true;
+}

@@ -7,6 +7,7 @@ import { t } from './i18n';
 import { parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
 import { toMarkdownRows } from './serialize';
+import { setDocRole } from './doc';
 import { fKey, fText } from './focus';
 import { arrowOf, IS_MAC, isMod } from './keys';
 import { Editing } from './editing';
@@ -198,6 +199,13 @@ export class Controller extends Editing {
     const idx = vis.indexOf(id);
     const zoomFocus = zoomId !== store.rootId ? fText(zoomId) : null;
     if (n.format !== null && !isTitle && this.blockKeydown(e, ta, n.id)) return;
+
+    // ---- the document view: ⌘⌥1 makes the line a heading, ⌘⌥0 body text (as in word processors)
+    if (this.view === 'doc' && isMod(e) && e.altKey && !e.shiftKey && (e.code === 'Digit1' || e.code === 'Digit0') && !isTitle) {
+      e.preventDefault();
+      if (setDocRole(store, zoomId, id, e.code === 'Digit1' ? 'heading' : 'body')) this.commit(fText(id, start, end));
+      return;
+    }
 
     // ---- structure
     if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !isMod(e)) {

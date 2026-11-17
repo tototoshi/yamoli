@@ -378,6 +378,10 @@ const shortcuts = (): [string, string][] => [
     IS_MAC ? '⌘⇧H' : 'Ctrl+Shift+H',
     t('選んだ文字に色を付ける（1〜7 で色、0 で解除）', 'Colour the selection (1–7 picks a colour, 0 takes it off)'),
   ],
+  [
+    IS_MAC ? '⌘⌥1 / ⌘⌥0' : 'Ctrl+Alt+1 / Ctrl+Alt+0',
+    t('ドキュメント表示で、カーソルの行を見出し / 本文に', 'In a document, make the line being typed in a heading / body text'),
+  ],
   ['Esc / ⌘+Enter', t('ブロックの編集を終了', 'Finish editing a block')],
   [
     t('Delete / Ctrl+D（行末）', 'Delete / Ctrl+D (at the end)'),

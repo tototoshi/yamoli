@@ -545,3 +545,22 @@ test('on a slide, Enter in its title makes its first bullet, before those it has
   expect(ctl.store.items(slide)[1]).toBe(old);
   location.hash = '';
 });
+
+test('in the document view, ⌘⌥1 makes the line a heading and ⌘⌥0 body text again', () => {
+  let doc = '',
+    line = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    line = add(doc, 'A sentence.');
+    add(doc, 'Another.');
+  });
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  const mod = { code: 'Digit1', altKey: true, metaKey: true, ctrlKey: true };
+  expect(press(ctl, editor(ctl, line, 2), '¡', mod).defaultPrevented).toBe(true);
+  expect(ctl.store.field(line, 'doc')?.text).toBe('heading');
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + line }));
+  press(ctl, editor(ctl, line), 'º', { ...mod, code: 'Digit0' });
+  expect(ctl.store.field(line, 'doc')).toBeUndefined();
+});

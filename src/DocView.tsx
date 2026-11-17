@@ -160,10 +160,14 @@ function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole
   return (
     <button
       class="mini doc-role"
-      title={to === 'heading' ? t('見出しにする', 'Make it a heading') : t('本文にする', 'Make it body text')}
+      title={to === 'heading' ? t('見出しにする（⌘⌥1）', 'Make it a heading (⌘⌥1)') : t('本文にする（⌘⌥0）', 'Make it body text (⌘⌥0)')}
+      // Not taking the caret from the line being typed in, which keeps it after.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
+        const ta = document.activeElement as HTMLTextAreaElement | null;
+        const typing = ta?.dataset.id === id;
         setDoc(ctl.store, id, 'role', to === auto ? null : to);
-        ctl.commit(null);
+        ctl.commit(typing ? fText(id, ta.selectionStart, ta.selectionEnd) : null);
       }}
     >
       {to === 'heading' ? 'H' : '¶'}
