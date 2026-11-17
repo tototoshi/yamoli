@@ -5,8 +5,8 @@
  * subtitle, blocks, notes and picture's address are typed in where they are,
  * with the outline's keys; slides are added, dragged into another order and
  * deleted in the list beside them; the slide on screen
- * follows the row being typed in (Enter on a title with no bullets makes the
- * next slide, and goes to it).
+ * follows the row being typed in (Shift+Tab on a bullet makes it the next
+ * slide, and goes to it; Enter on a title makes its first bullet).
  */
 import { createPortal } from 'preact/compat';
 import type { RefObject } from 'preact';

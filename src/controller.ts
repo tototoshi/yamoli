@@ -205,6 +205,13 @@ export class Controller extends Editing {
       if (isTitle) return this.commit(fText(store.addChild(id, 0).id, 0));
       const before = ta.value.slice(0, start);
       const after = ta.value.slice(end);
+      // A slide's title: Enter goes on to its first bullet (not a slide after it), the text after the caret in it.
+      if (this.view === 'slides' && store.parentOf(id) === zoomId && !(start === 0 && end === 0 && after)) {
+        store.setText(id, before);
+        const first = store.items(id)[0];
+        const bullet = store.addChild(id, first ? store.indexOf(first) : -1, after);
+        return this.commit(fText(bullet.id, 0));
+      }
       if (start === 0 && end === 0 && after) {
         store.addSiblingBefore(id);
         return this.commit(fText(id, 0));

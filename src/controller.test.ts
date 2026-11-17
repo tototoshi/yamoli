@@ -523,3 +523,25 @@ test('on a slide, Backspace at the start of a field keeps it a field; emptied, i
   expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + slide }));
   location.hash = '';
 });
+
+test('on a slide, Enter in its title makes its first bullet, before those it has', () => {
+  let deck = '',
+    slide = '',
+    old = '';
+  const ctl = setup((s, add) => {
+    deck = add(s.rootId, 'Deck');
+    s.addField(deck, 'views', 'slides');
+    slide = add(deck, 'Title');
+    s.addField(slide, 'notes', 'n');
+    old = add(slide, 'Old bullet');
+    s.setCollapsed(slide, true);
+  });
+  ctl.bind(() => {});
+  location.hash = `#/${deck}?view=slides`;
+  ctl.onHashChange();
+  press(ctl, editor(ctl, slide, 5), 'Enter');
+  expect(ctl.store.items(deck)).toEqual([slide]); // no slide after it
+  expect(ctl.store.items(slide).map((c) => ctl.store.node(c).text)).toEqual(['', 'Old bullet']);
+  expect(ctl.store.items(slide)[1]).toBe(old);
+  location.hash = '';
+});
