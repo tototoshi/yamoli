@@ -231,7 +231,12 @@ export class Controller extends Editing {
     }
     if (e.key === 'Backspace' && start === 0 && end === 0 && n.key !== null) {
       e.preventDefault();
-      return this.unfield(id);
+      if (this.view !== 'slides') return this.unfield(id);
+      // On a slide a field (a subtitle, the notes) stays one: emptied, Backspace takes it away; a subtitle's caret goes to the title.
+      if (ta.value) return;
+      const parent = store.parentOf(id)!;
+      store.remove(id);
+      return this.commit(n.key.trim().toLowerCase() === 'subtitle' ? fText(parent, 'end') : null);
     }
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && !n.children.length) {
       const prev = vis[idx - 1];

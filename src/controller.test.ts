@@ -496,3 +496,30 @@ test('in the document, the arrow keys go through every row, folded or not, and p
   expect(ctl.visibleRows()).toEqual([b, c]);
   location.hash = '';
 });
+
+test('on a slide, Backspace at the start of a field keeps it a field; emptied, it takes the field away', () => {
+  let deck = '',
+    slide = '',
+    sub = '',
+    notes = '';
+  const ctl = setup((s, add) => {
+    deck = add(s.rootId, 'Deck');
+    s.addField(deck, 'views', 'slides');
+    slide = add(deck, 'Slide');
+    sub = s.addField(slide, 'subtitle', 'Sub').id;
+    notes = s.addField(slide, 'notes', '').id;
+  });
+  ctl.bind(() => {});
+  location.hash = `#/${deck}?view=slides`;
+  ctl.onHashChange();
+  press(ctl, editor(ctl, sub), 'Backspace');
+  expect(ctl.store.node(sub).key).toBe('subtitle'); // not a row (a bullet) now
+  expect(ctl.store.node(sub).text).toBe('Sub');
+  press(ctl, editor(ctl, notes), 'Backspace');
+  expect(ctl.store.get(notes)).toBeUndefined();
+  ctl.store.setText(sub, '');
+  press(ctl, editor(ctl, sub), 'Backspace');
+  expect(ctl.store.get(sub)).toBeUndefined();
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + slide }));
+  location.hash = '';
+});
