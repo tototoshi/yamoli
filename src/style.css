@@ -1033,7 +1033,13 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide li .rich > textarea { position: absolute; }
 .slide-content { flex: 1; min-height: 0; display: flex; gap: 48px; }
 .slide-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
-.slide-image { flex: 0 0 40%; min-width: 0; max-height: 100%; object-fit: contain; }
+.slide-image-box { flex: 0 0 40%; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.slide-image { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; cursor: pointer; }
+/* The picture's address, typed in under it. */
+.slide-image-src { font-size: 18px; overflow-wrap: anywhere; }
+/* A block typed in on the slide: its text in the slide's size. */
+.slide .block-editor { font-size: 20px; }
+.slide-data:not(.editing) { cursor: text; }
 .slide-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
 .slide-data { font-size: 24px; flex: 1; min-height: 0; overflow: hidden; }
 .slide pre code { background: none; padding: 0; font-size: inherit; }
@@ -1058,6 +1064,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide-edit { margin-left: auto; color: var(--muted); }
 .slide-edit:hover { color: var(--accent); }
 .slide-notes { margin-top: 8px; padding: 10px 14px; border: 1px solid var(--faint); border-radius: 6px; white-space: pre-wrap; font-size: 14px; }
+.slide-notes .rich, .slide-notes .text-view { display: block; }
 .muted { color: var(--muted); }
 
 /* ================================================================ yaml / json */

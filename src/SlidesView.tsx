@@ -1,14 +1,16 @@
 /*
  * Slides view: the zoomed item as a deck (see slides.ts). Slides are laid out
  * at 1280×720 and scaled to fit, in the page or full screen, and printed one
- * to a page of that size (to save as a PDF). A slide's title and bullets are
- * typed in where they are, with the outline's keys; the slide on screen
+ * to a page of that size (to save as a PDF). A slide's title, bullets,
+ * subtitle, blocks, notes and picture's address are typed in where they are,
+ * with the outline's keys; the slide on screen
  * follows the row being typed in (Enter on a title with no bullets makes the
  * next slide, and goes to it).
  */
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { NodeText } from './App';
+import { BlockBody, NodeText } from './App';
+import { fText } from './focus';
 import { useCtl } from './context';
 import { useFlowEditor } from './flowEditor';
 import { t } from './i18n';
@@ -138,7 +140,9 @@ export function SlidesView() {
           ref={stageRef}
           onPointerDown={() => (wasTyping.current = !!document.activeElement?.closest('.slide .rich'))}
           onClick={(e) =>
-            !wasTyping.current && !(e.target as Element).closest('a, button, .gantt-wrap, .diagram-wrap, .text, .rich') && go(index + 1)
+            !wasTyping.current &&
+            !(e.target as Element).closest('a, button, .gantt-wrap, .diagram-wrap, .text, .rich, .slide-data, .block, .slide-image') &&
+            go(index + 1)
           }
         >
           <div class={`slide layout-${slide.layout}`} style={{ transform: `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` }}>
@@ -194,7 +198,7 @@ export function SlidesView() {
           )}
         {showNotes && (
           <div class="slide-notes">
-            {slide.notes || <span class="muted">{t('（notes: でノートを書けます）', '(write notes in a notes: field)')}</span>}
+            <Notes id={slide.id} text={slide.notes} />
           </div>
         )}
       </div>
@@ -213,7 +217,7 @@ function SlideBody({ slide }: { slide: Slide }) {
         <h1>{title}</h1>
         {slide.subtitle && (
           <p class="subtitle">
-            <InlineText text={slide.subtitle} />
+            <FieldText id={slide.id} name="subtitle" text={slide.subtitle} />
           </p>
         )}
       </div>
@@ -224,7 +228,7 @@ function SlideBody({ slide }: { slide: Slide }) {
   const data = n.children
     .map((c) => store.node(c))
     .filter((c) => c.format !== null && c.key?.trim().toLowerCase() !== 'notes')
-    .map((c) => <DataHtml key={c.id} format={c.format!} content={c.text} />);
+    .map((c) => <SlideBlock key={c.id} id={c.id} />);
   // Two columns: bullets beside the data blocks, or the bullets split in half.
   const twoColumn = slide.layout === 'two-column';
   const body =
@@ -251,7 +255,7 @@ function SlideBody({ slide }: { slide: Slide }) {
       <h2>{title}</h2>
       {slide.subtitle && (
         <p class="subtitle">
-          <InlineText text={slide.subtitle} />
+          <FieldText id={slide.id} name="subtitle" text={slide.subtitle} />
         </p>
       )}
       <div class={'slide-content' + (slide.image ? ' with-image' : '')}>
@@ -267,7 +271,7 @@ function SlideBody({ slide }: { slide: Slide }) {
             </div>
           )}
         </div>
-        {slide.image && <img class="slide-image" src={fileUrl(slide.image)} alt="" />}
+        {slide.image && <SlideImage id={slide.id} src={slide.image} />}
       </div>
     </>
   );
@@ -304,7 +308,82 @@ function slideOf(slides: Slide[], store: ReturnType<typeof useCtl>['store'], id:
   return -1;
 }
 
-function DataHtml({ format, content }: { format: string; content: string }) {
-  const html = useMemo(() => renderFormat(format, content), [format, content]);
-  return <div class={`slide-data fmt fmt-${format}`} dangerouslySetInnerHTML={{ __html: html }} />;
+/** A block on the slide as its format draws it, typed in when clicked. */
+function SlideBlock({ id }: { id: string }) {
+  const ctl = useCtl();
+  const n = ctl.store.node(id);
+  const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
+  if (ctl.activeField === fText(id).key) {
+    return (
+      <div class="slide-data editing">
+        <BlockBody node={n} />
+      </div>
+    );
+  }
+  return (
+    <div
+      class={`slide-data fmt fmt-${n.format}`}
+      title={t('クリックして編集（Esc で終了）', 'Click to edit (Esc to finish)')}
+      dangerouslySetInnerHTML={{ __html: html }}
+      onClick={(e) => !(e.target as Element).closest('a') && !document.getSelection()?.toString() && ctl.focus(fText(id, 'end'))}
+    />
+  );
+}
+
+/** id's field name when its value is one line of text to type in (not a list under it, nor a block). */
+function plainField(store: ReturnType<typeof useCtl>['store'], id: string, name: string) {
+  const f = store.field(id, name);
+  return f && f.format === null && !f.children.length ? f : undefined;
+}
+
+/** A field's value shown on the slide (as text), typed in where it is when it is one line of text. */
+function FieldText({ id, name, text }: { id: string; name: string; text: string }) {
+  const { store } = useCtl();
+  const f = plainField(store, id, name);
+  return f ? <NodeText node={f} /> : <InlineText text={text} />;
+}
+
+/** The slide's picture; clicked, its address (`image:`) to type in under it. */
+function SlideImage({ id, src }: { id: string; src: string }) {
+  const ctl = useCtl();
+  const f = plainField(ctl.store, id, 'image');
+  const editing = !!f && ctl.activeField === fText(f.id).key;
+  return (
+    <div class="slide-image-box">
+      <img
+        class="slide-image"
+        src={fileUrl(src)}
+        alt=""
+        title={f ? t('クリックで画像のアドレスを編集', "Click to edit the picture's address") : undefined}
+        onClick={() => f && ctl.focus(fText(f.id, 'end'))}
+      />
+      {editing && (
+        <div class="slide-image-src">
+          <NodeText node={f} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The speaker notes, typed in where they are (a block, or one line); none yet, a button that adds the field. */
+function Notes({ id, text }: { id: string; text?: string }) {
+  const ctl = useCtl();
+  const f = ctl.store.field(id, 'notes');
+  if (!f) {
+    return (
+      <button
+        class="mini"
+        onClick={() => {
+          const n = ctl.store.addField(id, 'notes');
+          ctl.commit(fText(n.id, 0));
+        }}
+      >
+        {t('ノートを書く', 'Write notes')}
+      </button>
+    );
+  }
+  if (f.format !== null) return <BlockBody node={f} />;
+  if (f.children.length) return <>{text}</>; // a list under it: written in the outline
+  return <NodeText node={f} />;
 }
