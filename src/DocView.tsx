@@ -1,7 +1,8 @@
 /*
  * Document view: the zoomed item read as prose (see doc.ts): headings,
  * paragraphs and lists from its rows, its blocks and embedded drawings among
- * them. Clicking a line edits its row in the outline.
+ * them. Clicking a line edits its row right there, as in the outline (Enter
+ * a new row after it, Tab under the one above, and so on).
  */
 import { useMemo } from 'preact/hooks';
 import { useCtl } from './context';
@@ -10,6 +11,8 @@ import { buildDoc, setDoc, type DocItem, type DocPart, type DocRole, type DocSty
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
+import { BlockBody, NodeText } from './App';
+import { fText } from './focus';
 import { InlineText } from './InlineText';
 
 export function DocView() {
@@ -36,18 +39,10 @@ export function DocView() {
   );
 }
 
-/** Props for a line that opens its row in the outline when clicked (not when text is being selected, or a link followed). */
-function useEdit(id: string) {
-  const ctl = useCtl();
-  return {
-    'data-id': id,
-    title: t('クリックでアウトラインで編集', 'Click to edit in the outline'),
-    onClick: (e: MouseEvent) => {
-      e.stopPropagation(); // a sentence's own row, not the paragraph's it is written on in
-      if ((e.target as Element).closest('a, input, button') || document.getSelection()?.toString()) return;
-      ctl.openRow(id);
-    },
-  };
+/** A row's text, edited in place when clicked (the outline's own row editor). */
+function Text({ id }: { id: string }) {
+  const { store } = useCtl();
+  return <NodeText node={store.node(id)} />;
 }
 
 function Part({ part }: { part: DocPart }) {
@@ -82,8 +77,8 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
   const { store } = useCtl();
   const H = `h${level}` as 'h2';
   return (
-    <H class="doc-line" {...useEdit(id)}>
-      <InlineText text={store.node(id).text} />
+    <H class="doc-line">
+      <Text id={id} />
       <RoleSwitch id={id} now="heading" auto={auto} />
     </H>
   );
@@ -97,9 +92,9 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
 function Para({ id, auto = 'body', more }: { id: string; auto?: DocRole; more?: Extract<DocPart, { kind: 'para' }>['more'] }) {
   const { store } = useCtl();
   const p = (
-    <p class={'doc-line' + (store.node(id).completed ? ' done' : '')} {...useEdit(id)}>
+    <p class={'doc-line' + (store.node(id).completed ? ' done' : '')}>
       <Check id={id} />
-      <InlineText text={store.node(id).text} />
+      <Text id={id} />
       {more?.ids.map((m, i) => (
         <Sentence key={m} id={m} after={store.node(i ? more.ids[i - 1] : id).text} />
       ))}
@@ -121,8 +116,8 @@ function Sentence({ id, after }: { id: string; after: string }) {
   return (
     <>
       {/[!-~]$/.test(after.trimEnd()) && ' '}
-      <span class={'doc-line' + (store.node(id).completed ? ' done' : '')} {...useEdit(id)}>
-        <InlineText text={store.node(id).text} />
+      <span class={'doc-line' + (store.node(id).completed ? ' done' : '')}>
+        <Text id={id} />
       </span>
     </>
   );
@@ -198,9 +193,9 @@ function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boo
   const { store } = useCtl();
   return (
     <li class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
-      <span class="doc-line" {...useEdit(item.id)}>
+      <span class="doc-line">
         <Check id={item.id} />
-        <InlineText text={store.node(item.id).text} />
+        <Text id={item.id} />
         {top && <RoleSwitch id={item.id} now="body" auto="body" />}
       </span>
       {item.extras.map((x, i) => (
@@ -224,9 +219,19 @@ function ExtraView({ extra }: { extra: Extra }) {
   );
 }
 
+/** A block as its format draws it, edited in place when clicked (folded in the outline or not). */
 function Block({ id }: { id: string }) {
-  const { store } = useCtl();
-  const n = store.node(id);
+  const ctl = useCtl();
+  const n = ctl.store.node(id);
   const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
-  return <div class="data-view doc-block" data-format={n.format} {...useEdit(id)} dangerouslySetInnerHTML={{ __html: html }} />;
+  if (ctl.activeField === fText(id).key) return <BlockBody node={n} />;
+  return (
+    <div
+      class="data-view doc-block"
+      data-format={n.format}
+      title={t('クリックして編集（Esc で終了）', 'Click to edit (Esc to finish)')}
+      dangerouslySetInnerHTML={{ __html: html }}
+      onClick={(e) => !(e.target as Element).closest('a') && !document.getSelection()?.toString() && ctl.focus(fText(id, 'end'))}
+    />
+  );
 }

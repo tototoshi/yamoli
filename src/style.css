@@ -718,10 +718,16 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* Make a line a heading, or body text again: at its end while the pointer is over it. */
 .doc .doc-role { margin-left: 10px; font-size: 11px; font-weight: 400; vertical-align: 2px; opacity: 0; transition: opacity 0.1s; }
 .doc-line:hover > .doc-role, .doc-role:focus-visible { opacity: 1; }
+.doc-line:has(.rich) > .doc-role { display: none; } /* not while the line is typed in */
 @media (hover: none) {
   .doc .doc-role { display: none; }
 }
-/* Each line opens its row in the outline. */
+/* A row's text in the flow of its line (a sentence among others); typed in, the outline's editor in the document's type. */
+.doc .text-view { display: inline; padding: 0; min-height: 0; line-height: inherit; }
+.doc .rich > .mirror, .doc .rich > textarea { padding: 0; font: inherit; line-height: inherit; }
+.doc p .rich, .doc li .rich { display: inline-grid; min-width: 4em; vertical-align: top; }
+.doc .block { margin: 0 0 1em; }
+/* Each line can be typed in where it is. */
 .doc-line, .doc-block { cursor: text; border-radius: 4px; }
 .doc-line:hover, .doc-block:hover { background: var(--hover); }
 .doc-block { margin: 0 0 1em; }

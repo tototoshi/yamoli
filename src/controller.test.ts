@@ -477,3 +477,22 @@ test('text copied from a page pastes with its links, on one line or many', () =>
   paste(ctl, editor(ctl, b), 'One\nTwo', '<p><a href="https://one.example">One</a></p><p>Two</p>');
   expect(texts(ctl, ctl.store.rootId).slice(1)).toEqual(['[One](https://one.example)', 'Two']);
 });
+
+test('in the document, the arrow keys go through every row, folded or not, and past the fields', () => {
+  let a = '',
+    b = '',
+    c = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'A');
+    s.addField(a, 'views', 'doc');
+    b = add(a, 'B');
+    s.addField(b, 'note', 'x');
+    c = add(b, 'C');
+    s.setCollapsed(b, true);
+  });
+  ctl.bind(() => {});
+  location.hash = `#/${a}?view=doc`;
+  ctl.onHashChange();
+  expect(ctl.visibleRows()).toEqual([b, c]);
+  location.hash = '';
+});

@@ -210,7 +210,7 @@ Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map and Sli
   - Where that reads wrong, hover over the rows and pick “List” or “Paragraphs” (this writes `doc: list` / `doc: text` on the row above them; “Auto” takes it off).
   - Which rows are headings can be picked too: hover over a line for “Make a heading” or “Make body text” at its end (this writes `doc: heading` / `doc: body` on its row; pressing again undoes it).
   - Blocks show where they are, and `embed: [[item]] diagram` draws that item's diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item's `description` leads the document.
-  - Click a line to edit its row in the outline.
+  - Click a line or block to edit it right there. The keys are the outline's: Enter for the next row, Tab / Shift+Tab to indent, ↑↓ to the rows before and after. Headings, paragraphs and lists are drawn again as you go (a row given rows under it becomes a heading, and so on).
 - **Gantt**: the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
 - **Diagram**: the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
 - **Mind map**: the rows branching out from the zoomed item, as they are nested. No frames or arrows: every row is a node. Turned on with `views: mindmap` (`マインドマップ`). Select a row: Tab adds a row under it and Enter one after it, named as you type. The arrow keys go along the branches; F2, Space or a double-click renames, Delete removes, and dragging moves a row under another.

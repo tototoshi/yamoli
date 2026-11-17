@@ -394,7 +394,7 @@ function FieldKey({ node }: { node: OutlineNode }) {
   );
 }
 
-function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
+export function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
   const ctl = useCtl();
   const key = 'text:' + node.id;
   if (!title && ctl.activeField !== key) {
@@ -581,7 +581,7 @@ function BlockHead({ node }: { node: OutlineNode }) {
 }
 
 /** A block's text: rendered in its format, or the editor once clicked. */
-function BlockBody({ node }: { node: OutlineNode }) {
+export function BlockBody({ node }: { node: OutlineNode }) {
   const ctl = useCtl();
   const key = 'text:' + node.id;
   const editing = ctl.activeField === key;

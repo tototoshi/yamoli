@@ -299,10 +299,14 @@ export class ViewState {
   /** Rows on screen in order. */
   visibleRows(): string[] {
     const out: string[] = [];
+    // The document shows every row, folded or not, and no fields.
+    const doc = this.view === 'doc';
+    const kids = (id: string) =>
+      doc ? this.store.items(id).filter((c) => this.prefs.showCompleted || !this.store.node(c).completed) : this.shownChildren(id);
     const walk = (id: string) => {
-      for (const c of this.shownChildren(id)) {
+      for (const c of kids(id)) {
         out.push(c);
-        if (this.isExpanded(c)) walk(c);
+        if (doc || this.isExpanded(c)) walk(c);
       }
     };
     walk(this.zoomId);
