@@ -743,9 +743,12 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc .rich > .mirror, .doc .rich > textarea { padding: 0; font: inherit; line-height: inherit; }
 /* An empty row stays something to click on (and type in, or take away with Backspace). */
 .doc .text-view:empty::before { content: '…'; color: var(--faint); }
-/* In a line, the text shown sizes the editor (a textarea's own width would leave a gap after a sentence). */
-.doc .doc-p .rich, .doc li .rich { display: inline-block; position: relative; min-width: 1em; vertical-align: top; }
-.doc .doc-p .rich > textarea, .doc li .rich > textarea { position: absolute; inset: 0; width: calc(100% + 2px); height: 100% !important; }
+/*
+ * In a paragraph or list item, the text shown flows on as it did (among the other sentences,
+ * after a checkbox), and the textarea lies over it from where it starts (DocView's useFlowEditor).
+ */
+.doc .doc-p .rich, .doc li .rich, .doc .doc-p .rich > .mirror, .doc li .rich > .mirror { display: inline; position: static; }
+.doc .doc-p .rich > textarea, .doc li .rich > textarea { position: absolute; }
 .doc .block { margin: 0 0 1em; }
 /* Each line can be typed in where it is. */
 .doc-line, .doc-block { cursor: text; border-radius: 4px; }

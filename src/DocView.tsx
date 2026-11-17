@@ -4,7 +4,8 @@
  * them. Clicking a line edits its row right there, as in the outline (Enter
  * a new row after it, Tab under the one above, and so on).
  */
-import { useMemo } from 'preact/hooks';
+import type { RefObject } from 'preact';
+import { useLayoutEffect, useMemo, useRef } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
@@ -91,9 +92,11 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
  */
 function Para({ id, auto = 'body', more }: { id: string; auto?: DocRole; more?: Extract<DocPart, { kind: 'para' }>['more'] }) {
   const { store } = useCtl();
+  const ref = useRef<HTMLDivElement>(null);
+  useFlowEditor(ref);
   const p = (
     // A div, not a p: the row editor in it is one.
-    <div class={'doc-line doc-p' + (store.node(id).completed ? ' done' : '')}>
+    <div ref={ref} class={'doc-line doc-p' + (store.node(id).completed ? ' done' : '')}>
       <RoleSwitch id={id} now="body" auto={auto} />
       <Check id={id} />
       <Text id={id} />
@@ -109,6 +112,38 @@ function Para({ id, auto = 'body', more }: { id: string; auto?: DocRole; more?: 
       {p}
     </div>
   );
+}
+
+/**
+ * Lay the row editor in a paragraph or list item (line) over its text where
+ * it flows: the copy showing the text stays inline as it was, among other
+ * sentences or after a checkbox, and the (unseen) textarea over it starts on
+ * its line, indented to where it starts, and wraps across the line's width as
+ * it does, so nothing moves when typing starts.
+ */
+function useFlowEditor(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const line = ref.current;
+    const rich = line && [...line.querySelectorAll<HTMLElement>('.rich')].find((r) => r.parentElement?.closest('li, .doc-p') === line);
+    const mirror = rich?.querySelector<HTMLElement>(':scope > .mirror');
+    const ta = rich?.querySelector<HTMLTextAreaElement>(':scope > textarea');
+    if (!line || !mirror || !ta?.offsetParent) return;
+    const place = () => {
+      const first = mirror.getClientRects()[0];
+      if (!first) return;
+      const box = line.getBoundingClientRect();
+      const at = ta.offsetParent!.getBoundingClientRect();
+      const lineHeight = parseFloat(getComputedStyle(line).lineHeight);
+      ta.style.top = first.top - (lineHeight - first.height) / 2 - at.top + 'px';
+      ta.style.left = box.left - at.left + 'px';
+      ta.style.width = line.clientWidth + 'px';
+      ta.style.textIndent = first.left - box.left + 'px';
+    };
+    place();
+    const watch = new ResizeObserver(place);
+    watch.observe(line);
+    return () => watch.disconnect();
+  });
 }
 
 /** A row written on in a paragraph: a space after text ending in a letter (none after 。), and its own row to edit. */
@@ -192,8 +227,10 @@ function List({ items, top }: { items: DocItem[]; top?: boolean }) {
 
 function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boolean }) {
   const { store } = useCtl();
+  const ref = useRef<HTMLLIElement>(null);
+  useFlowEditor(ref);
   return (
-    <li class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
+    <li ref={ref} class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
       <span class="doc-line">
         {top && <RoleSwitch id={item.id} now="body" auto="body" />}
         <Check id={item.id} />
