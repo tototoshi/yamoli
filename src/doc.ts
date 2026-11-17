@@ -168,12 +168,16 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
       parts.push({ kind: 'rows', under: parent, style, auto: !set, items: run.map(item) });
       run = [];
     };
+    const holds = (c: string) => (!drawsOwnRows(c) && rows(c).length > 0) || extrasOf(c).length > 0;
+    // Rows among which those holding nothing are phrases, not sentences, are a list: the ones holding rows are
+    // items with their own lists under them (a nested list), not headings in the middle of it.
+    const loose = rows(parent).filter((c) => !holds(c) && !docRoleOf(store, c));
+    const listed = set === 'list' || (!set && loose.length > 0 && !sentences(loose));
     for (const c of rows(parent)) {
-      const holds = (!drawsOwnRows(c) && rows(c).length > 0) || extrasOf(c).length > 0;
       const role = docRoleOf(store, c);
       // Of itself: a heading when it holds more, in its own place (not one of a list), and is no lead-in or too deep.
-      const auto: DocRole = holds && set !== 'list' && !LEADS_IN.test(store.node(c).text) && depth <= 2 ? 'heading' : 'body';
-      if (role !== 'heading' && (!holds || (!role && set === 'list'))) {
+      const auto: DocRole = holds(c) && !listed && !LEADS_IN.test(store.node(c).text) && depth <= 2 ? 'heading' : 'body';
+      if (role !== 'heading' && (!holds(c) || (!role && listed))) {
         run.push(c);
         continue;
       }

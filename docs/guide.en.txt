@@ -235,6 +235,7 @@ Using Yamoli
     The Document view
       The Document view decides what is a heading, a paragraph or a list from how the rows are written:
         A row with rows under it (or blocks, or an `embed`) is a heading (three levels; deeper, a paragraph).
+        But when the rows beside it with nothing under them are phrases (none ends a sentence), they are all a list, and the row is one of its items, the rows under it a list nested in it.
         Unless it ends in `。` or a colon, when it is a paragraph with its rows under it. After `。`, or when any of them is a sentence, they are paragraphs after it, not indented; after a colon or when all are phrases, they are listed under it.
         Rows with nothing under them are a bulleted list when none of them ends a sentence (`.` `!` `?` `。` …), else a paragraph each. Tasks have checkboxes.
         A row is one paragraph: write the sentences of a paragraph on in one row.

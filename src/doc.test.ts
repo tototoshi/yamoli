@@ -105,14 +105,19 @@ test('doc: heading or body on a row makes it one, whatever it would be; setDoc k
   expect(s.fieldValue(sec, 'doc')).toBe('body, text');
   const d = buildDoc(s, doc);
   expect(sketch(s, d.parts)).toEqual(['h2 単独の見出し', 'p まとめ', 'text[結論]', 'list[最後の行]']);
-  // What each would be with nothing set: the switch writes only a change from that.
-  expect(d.parts.filter((p) => p.kind === 'heading' || p.kind === 'para').map((p) => 'auto' in p && p.auto)).toEqual(['body', 'heading']);
+  // What each would be with nothing set (among a list, not a heading): the switch writes only a change from that.
+  expect(d.parts.filter((p) => p.kind === 'heading' || p.kind === 'para').map((p) => 'auto' in p && p.auto)).toEqual(['body', 'body']);
 
   setDoc(s, sec, 'role', null);
   setDoc(s, sec, 'style', null);
   setDoc(s, lone, 'role', null);
   expect(s.field(sec, 'doc')).toBeUndefined();
-  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し]', 'h2 まとめ', 'list[結論]', 'list[最後の行]']);
+  // Among phrases, a row with rows under it is an item with its own list: a nested list, no heading in it.
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[単独の見出し, まとめ(結論), 最後の行]']);
+  // Among sections, a loose sentence leaves them headings.
+  s.node(lone).text = '前置きの文。';
+  s.node(s.node(doc).children.at(-1)!).text = '最後の文。';
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['text[前置きの文。]', 'h2 まとめ', 'list[結論]', 'text[最後の文。]']);
 });
 
 test('a row is one paragraph; sentences under it, paragraphs after it (not joined on, not indented); words, a list under it', () => {
