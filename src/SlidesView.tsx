@@ -21,7 +21,7 @@ import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
 import { nodeLabel } from './links';
-import { buildDeck, splitColumns, type Bullet, type Slide } from './slides';
+import { buildDeck, splitColumns, type Bullet, type Layout, type Slide } from './slides';
 import { fileUrl } from './files';
 
 const W = 1280;
@@ -237,6 +237,7 @@ export function SlidesView() {
           <button class="mini" disabled={index === count - 1} onClick={() => go(index + 1)} title={t('次へ (→)', 'Next (→)')}>
             ▶
           </button>
+          {slide.id !== ctl.zoomId && <LayoutPick slide={slide} />}
           <button class={'mini' + (showNotes ? ' on' : '')} onClick={() => setShowNotes(!showNotes)} title={t('ノート (N)', 'Notes (N)')}>
             {t('ノート', 'Notes')}
           </button>
@@ -351,6 +352,38 @@ function SlideBody({ slide }: { slide: Slide }) {
         {slide.image && <SlideImage id={slide.id} src={slide.image} />}
       </div>
     </>
+  );
+}
+
+const LAYOUT_NAMES: [Layout, string, string][] = [
+  ['default', '標準', 'Standard'],
+  ['center', '中央', 'Centred'],
+  ['two-column', '2 段組', 'Two columns'],
+  ['title', 'タイトルのみ', 'Title only'],
+];
+
+/** The slide's layout, chosen from a menu: written as its `layout` field (none for the standard one). */
+function LayoutPick({ slide }: { slide: Slide }) {
+  const ctl = useCtl();
+  const set = (to: Layout) => {
+    const f = ctl.store.field(slide.id, 'layout');
+    if (to !== 'default') ctl.store.setField(slide.id, 'layout', to);
+    else if (f) ctl.store.remove(f.id);
+    ctl.commit(null);
+  };
+  return (
+    <select
+      class="slide-layout"
+      title={t('レイアウト', 'Layout')}
+      value={slide.layout}
+      onChange={(e) => set(e.currentTarget.value as Layout)}
+    >
+      {LAYOUT_NAMES.map(([value, ja, en]) => (
+        <option key={value} value={value}>
+          {t(ja, en)}
+        </option>
+      ))}
+    </select>
   );
 }
 

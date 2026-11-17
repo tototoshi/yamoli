@@ -1078,6 +1078,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .slide-count { min-width: 4em; text-align: center; font-variant-numeric: tabular-nums; }
 .slide-edit { margin-left: auto; color: var(--muted); }
 .slide-edit:hover { color: var(--accent); }
+.slide-layout { height: 24px; padding: 0 4px; border: 1px solid var(--faint); border-radius: 4px; font-size: 12px; color: var(--fg); background: var(--bg); }
 .slide-notes { margin-top: 8px; padding: 10px 14px; border: 1px solid var(--faint); border-radius: 6px; white-space: pre-wrap; font-size: 14px; }
 .slide-notes .rich, .slide-notes .text-view { display: block; }
 .muted { color: var(--muted); }
