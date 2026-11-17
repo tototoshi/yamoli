@@ -398,6 +398,26 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .link-picker .pick-path { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .link-picker li.empty { color: var(--muted); cursor: default; }
 
+/* the views an item turns on */
+.view-badge {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 6px 0 0;
+  padding: 0 6px;
+  border: 1px solid var(--faint);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.view-badge:hover { border-color: var(--accent); color: var(--accent); }
+.view-badge path { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+
 /* dependencies */
 .dep-badge {
   flex: none;

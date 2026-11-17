@@ -6,6 +6,7 @@
  *
  *   views: gantt, slides
  */
+import { t } from './i18n';
 import type { OutlineStore } from './model';
 
 export type View = 'outline' | 'gantt' | 'diagram' | 'mindmap' | 'slides' | 'text' | 'yaml' | 'json';
@@ -30,6 +31,25 @@ const NAMES: Record<string, DrawnView> = {
 };
 
 export const isDrawn = (view: View): view is DrawnView => (DRAWN_VIEWS as View[]).includes(view);
+
+/** What each view is called, on its button and its badge. */
+export const viewName = (view: View): string =>
+  ({
+    outline: t('アウトライン', 'Outline'),
+    gantt: t('ガント', 'Gantt'),
+    diagram: t('図', 'Diagram'),
+    mindmap: t('マインドマップ', 'Mind map'),
+    slides: t('スライド', 'Slides'),
+    text: t('テキスト', 'Text'),
+    yaml: 'YAML',
+    json: 'JSON',
+  })[view];
+
+/** The drawn views id's own `views` field turns on (not those of the items above it). */
+export function ownViews(store: OutlineStore, id: string): DrawnView[] {
+  const words = (store.fieldValue(id, VIEWS_KEY) ?? '').toLowerCase().split(/[\s,、]+/);
+  return DRAWN_VIEWS.filter((v) => words.some((w) => NAMES[w] === v));
+}
 
 /** The drawn views turned on for id, by a `views` field on it or on an item above it. */
 export function enabledViews(store: OutlineStore, id: string): Set<DrawnView> {

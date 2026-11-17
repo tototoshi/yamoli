@@ -4,6 +4,39 @@ import { blockers, dependencies, dependents, depStatus, missingDependencies } fr
 import { useCtl } from './context';
 import { shortDate, today } from './calendar';
 import { schedTooltip } from './gantt';
+import { ownViews, viewName, type DrawnView } from './views';
+
+// ================================================================ views
+
+/** A small picture of each drawn view, on a 12×12 grid. */
+const VIEW_PICTURES: Record<DrawnView, string> = {
+  gantt: 'M2 3h5M4 6h6M3 9h4',
+  diagram: 'M1.5 2.5h4v3h-4zM6.5 6.5h4v3h-4zM3.5 5.5v2.5h3',
+  mindmap: 'M5 6h2M7 6 9.5 2.5M7 6h3M7 6l2.5 3.5M1.5 4.5h3.5v3H1.5z',
+  slides: 'M1.5 2.5h9v6h-9zM6 8.5V10M4 10.5h4',
+};
+
+/** The views an item's own `views` field turns on, each opening the item in it. */
+export function ViewBadges({ id }: { id: string }) {
+  const ctl = useCtl();
+  return (
+    <>
+      {ownViews(ctl.store, id).map((view) => (
+        <a
+          key={view}
+          class="view-badge"
+          href={ctl.hashFor(id, view)}
+          title={t(`${viewName(view)}で開く`, `Open as ${viewName(view).toLowerCase()}`)}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path d={VIEW_PICTURES[view]} />
+          </svg>
+          {viewName(view)}
+        </a>
+      ))}
+    </>
+  );
+}
 
 // ================================================================ dependencies
 

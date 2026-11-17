@@ -2,7 +2,7 @@ import type { ComponentChildren, TargetedEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { fText } from './focus';
 import { IS_MAC } from './keys';
-import { DRAWN_VIEWS, enabledViews, type DrawnView, type View } from './views';
+import { DRAWN_VIEWS, enabledViews, viewName, type DrawnView, type View } from './views';
 import { lang, t } from './i18n';
 import { keepFocus, useCtl } from './context';
 import { saveFile } from './exportImage';
@@ -444,20 +444,10 @@ function HelpMenu() {
 
 export function ViewSwitch() {
   const ctl = useCtl();
-  const label: Record<View, string> = {
-    outline: t('アウトライン', 'Outline'),
-    gantt: t('ガント', 'Gantt'),
-    diagram: t('図', 'Diagram'),
-    mindmap: t('マインドマップ', 'Mind map'),
-    slides: t('スライド', 'Slides'),
-    text: t('テキスト', 'Text'),
-    yaml: 'YAML',
-    json: 'JSON',
-  };
   const on = enabledViews(ctl.store, ctl.zoomId);
   const item = (view: View) => (
     <button key={view} class={ctl.view === view ? 'on' : ''} onMouseDown={keepFocus} onClick={() => ctl.view !== view && ctl.setView(view)}>
-      {label[view]}
+      {viewName(view)}
     </button>
   );
   const off = DRAWN_VIEWS.filter((v) => !on.has(v));
@@ -493,7 +483,7 @@ export function ViewSwitch() {
                     ctl.enableView(v);
                   }}
                 >
-                  {label[v]}
+                  {viewName(v)}
                   <kbd>{hint[v]}</kbd>
                 </button>
               ))}

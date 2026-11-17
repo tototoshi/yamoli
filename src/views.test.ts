@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { OutlineStore } from './model';
-import { enabledViews } from './views';
+import { enabledViews, ownViews } from './views';
 
 test('a views field turns views on for its item and everything under it', () => {
   const s = OutlineStore.create();
@@ -22,4 +22,13 @@ test('unknown words in a views field are ignored', () => {
   const item = s.addChild(s.rootId, -1, 'Item').id;
   s.addField(item, 'views', 'Gantt  kanban、スライド');
   expect([...enabledViews(s, item)].sort()).toEqual(['gantt', 'slides']);
+});
+
+test("an item's badges are the views its own field turns on, not those of the items above it", () => {
+  const s = OutlineStore.create();
+  const a = s.addChild(s.rootId, -1, 'A').id;
+  const b = s.addChild(a, -1, 'B').id;
+  s.addField(a, 'views', 'slides、図, unknown');
+  expect(ownViews(s, a)).toEqual(['diagram', 'slides']);
+  expect(ownViews(s, b)).toEqual([]);
 });

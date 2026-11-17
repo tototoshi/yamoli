@@ -21,7 +21,7 @@ import type { OutlineNode } from './model';
 import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
 import { TopBar, ViewSwitch, ViewToggles } from './TopBar';
 import { ItemMenuView, JumpBox, LinkPickerMenu, SuggestMenu, ToastView } from './Popups';
-import { DependencyPanel, DepBadge, SchedLabel } from './Badges';
+import { DependencyPanel, DepBadge, SchedLabel, ViewBadges } from './Badges';
 import { filesIn } from './files';
 
 // ================================================================ app
@@ -219,7 +219,7 @@ function NodeRow({ id, changed }: RowProps) {
       <div
         class="row"
         onPointerDown={(e) =>
-          !(e.target as Element).closest('.bullet, .toggle, button, input, select, .link-bubble') && startRowSelect(e, id, ctl)
+          !(e.target as Element).closest('.bullet, .toggle, .view-badge, button, input, select, .link-bubble') && startRowSelect(e, id, ctl)
         }
         onDragOver={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()}
         onDrop={(e) => {
@@ -267,6 +267,8 @@ function NodeRow({ id, changed }: RowProps) {
           <span class="dot" />
         </a>
         {isField && <FieldKey node={n} />}
+        {/* Before the name: the row's own buttons cover its far end on hover. */}
+        {!isField && <ViewBadges id={id} />}
         {isBlock ? <BlockHead node={n} /> : <NodeText node={n} />}
         {isField && !isBlock && <DatePick node={n} />}
         {!isField && (
