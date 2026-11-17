@@ -45,6 +45,7 @@ export function SlidesView() {
   const wasTyping = useRef(false);
   const [fit, setFit] = useState({ scale: 1, x: 0, y: 0 });
   const [showNotes, setShowNotes] = useState(false);
+  const [presenter, openPresenter] = usePresenterWindow();
   /** Every slide is laid out for printing, and the print dialog opened. */
   const [printing, setPrinting] = useState(false);
 
@@ -129,8 +130,10 @@ export function SlidesView() {
       else return;
       e.preventDefault();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    // The presenter's window pages through the deck with the same keys.
+    const docs = presenter ? [document, presenter.document] : [document];
+    docs.forEach((d) => d.addEventListener('keydown', onKey));
+    return () => docs.forEach((d) => d.removeEventListener('keydown', onKey));
   });
 
   /** A new slide after the one on screen (after the title slide: the first), its title to type in. */
@@ -266,6 +269,16 @@ export function SlidesView() {
           <button class={'mini' + (showNotes ? ' on' : '')} onClick={() => setShowNotes(!showNotes)} title={t('ノート (N)', 'Notes (N)')}>
             {t('ノート', 'Notes')}
           </button>
+          <button
+            class={'mini' + (presenter ? ' on' : '')}
+            onClick={openPresenter}
+            title={t(
+              'ノート・次のスライド・経過時間を別のウィンドウに',
+              'The notes, the next slide and the time, in a window of their own'
+            )}
+          >
+            {t('発表者ビュー', 'Presenter view')}
+          </button>
           <button class="mini" onClick={fullscreen} title={t('全画面 (F、Esc で戻る)', 'Full screen (F, Esc to leave)')}>
             {t('全画面', 'Full screen')}
           </button>
@@ -296,6 +309,11 @@ export function SlidesView() {
               ))}
             </div>,
             document.body
+          )}
+        {presenter &&
+          createPortal(
+            <Presenter win={presenter} slides={deck.slides} index={index} theme={deck.theme} go={go} />,
+            presenter.document.body
           )}
         {showNotes && (
           <div class="slide-notes">
@@ -424,6 +442,126 @@ function AddToSlide({ slide, canHaveImage }: { slide: Slide; canHaveImage: boole
         </>
       )}
     </>
+  );
+}
+
+/**
+ * The presenter's window, opened by the button: an empty window this one
+ * draws into (with its styles), so the slide on screen is the same in both
+ * without any message between them. Closed with the view.
+ */
+function usePresenterWindow(): [Window | null, () => void] {
+  const [win, setWin] = useState<Window | null>(null);
+  const open = () => {
+    if (win && !win.closed) return win.focus();
+    const w = window.open('', 'yamoli-presenter', 'popup,width=1200,height=760');
+    if (!w) return; // blocked
+    const d = w.document;
+    for (const a of document.documentElement.attributes) d.documentElement.setAttribute(a.name, a.value);
+    d.head.replaceChildren(
+      ...[...document.head.querySelectorAll('meta[charset], style, link[rel="stylesheet"]')].map((n) => {
+        const c = n.cloneNode(true) as Element;
+        if (n instanceof HTMLLinkElement) c.setAttribute('href', n.href); // its address, from this page
+        return c;
+      })
+    );
+    d.title = t('発表者ビュー', 'Presenter view') + ' – ' + document.title;
+    d.body.replaceChildren();
+    d.body.className = 'presenter-body';
+    w.addEventListener('pagehide', () => setWin(null));
+    setWin(w);
+  };
+  useEffect(() => () => win?.close(), [win]);
+  return [win, open];
+}
+
+const clockText = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  const mm = String(Math.floor(s / 60) % 60).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${mm}:${ss}` : `${mm}:${ss}`;
+};
+
+/** In the presenter's window: the slide on screen, the next one, the notes, the time taken and the time of day. */
+function Presenter({
+  win,
+  slides,
+  index,
+  theme,
+  go,
+}: {
+  win: Window;
+  slides: Slide[];
+  index: number;
+  theme: string;
+  go: (i: number) => void;
+}) {
+  const [size, setSize] = useState({ w: win.innerWidth, h: win.innerHeight });
+  const [start, setStart] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const resize = () => setSize({ w: win.innerWidth, h: win.innerHeight });
+    const tick = win.setInterval(() => setNow(Date.now()), 1000);
+    win.addEventListener('resize', resize);
+    return () => {
+      win.clearInterval(tick);
+      win.removeEventListener('resize', resize);
+    };
+  }, [win]);
+  const slide = slides[index];
+  const next = slides[index + 1];
+  // The slide on screen as wide as it can be beside the next one's column, and under the controls' height.
+  const big = Math.max(200, Math.min((size.w - 72) * 0.64, ((size.h - 96) * W) / H));
+  const small = Math.max(160, size.w - 72 - big);
+  return (
+    <div class="presenter">
+      <div class="presenter-main">
+        <SlideAt slide={slide} width={big} theme={theme} number={`${index + 1} / ${slides.length}`} />
+        <div class="presenter-controls">
+          <button class="mini" disabled={index === 0} onClick={() => go(index - 1)}>
+            ◀
+          </button>
+          <span>
+            {index + 1} / {slides.length}
+          </span>
+          <button class="mini" disabled={index === slides.length - 1} onClick={() => go(index + 1)}>
+            ▶
+          </button>
+        </div>
+      </div>
+      <div class="presenter-side" style={{ width: small }}>
+        <div class="presenter-time">
+          <span class="presenter-elapsed" title={t('経過時間', 'Time taken')}>
+            {clockText(now - start)}
+          </span>
+          <button class="mini" onClick={() => setStart(Date.now())}>
+            {t('リセット', 'Reset')}
+          </button>
+          <span class="presenter-clock">{new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        <div class="presenter-label">{t('次のスライド', 'Next slide')}</div>
+        {next ? (
+          <SlideAt slide={next} width={small} theme={theme} />
+        ) : (
+          <div class="presenter-end">{t('最後のスライドです', 'This is the last slide')}</div>
+        )}
+        <div class="presenter-label">{t('ノート', 'Notes')}</div>
+        <div class="presenter-notes">{slide.notes || <span class="presenter-none">{t('ノートはありません', 'No notes')}</span>}</div>
+      </div>
+    </div>
+  );
+}
+
+/** A slide drawn width pixels wide, only to be looked at. */
+function SlideAt({ slide, width, theme, number }: { slide: Slide; width: number; theme: string; number?: string }) {
+  const k = width / W;
+  return (
+    <div class={'slide-stage presenter-slide theme-' + theme} style={{ width, height: H * k }}>
+      <div class={`slide layout-${slide.layout}`} style={{ transform: `scale(${k})` }}>
+        <SlideBody slide={slide} />
+        {number && <div class="slide-number">{number}</div>}
+      </div>
+    </div>
   );
 }
 

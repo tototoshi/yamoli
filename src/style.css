@@ -993,6 +993,22 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   --s-accent: #7fa6ff;
   --s-code: #2a2e37;
 }
+/* The presenter's window (SlidesView's Presenter): the slide on screen, and beside it the time, the next slide and the notes. */
+.presenter-body { margin: 0; background: var(--bg); color: var(--fg); }
+.presenter { display: flex; gap: 24px; padding: 24px; box-sizing: border-box; height: 100vh; }
+.presenter-main { display: flex; flex-direction: column; gap: 10px; }
+.presenter-controls { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.presenter-side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.presenter-slide { aspect-ratio: auto; flex: none; cursor: default; }
+/* Only to be looked at: nothing on them is clicked or typed in. */
+.presenter-slide .slide { pointer-events: none; }
+.presenter-time { display: flex; align-items: center; gap: 10px; }
+.presenter-elapsed { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.presenter-clock { margin-left: auto; font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.presenter-label { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.presenter-end { padding: 16px; border: 1px dashed var(--faint); border-radius: 8px; color: var(--muted); font-size: 14px; }
+.presenter-notes { flex: 1; min-height: 0; overflow-y: auto; white-space: pre-wrap; font-size: 20px; line-height: 1.5; }
+.presenter-none { color: var(--muted); font-size: 14px; }
 /* Every slide, a page each, only while printing them (the PDF button): laid out off screen, so what measures itself (a Gantt chart) can. */
 .slides-print { position: fixed; top: 0; left: -100000px; }
 @media print {
