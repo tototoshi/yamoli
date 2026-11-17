@@ -109,3 +109,10 @@ test('a Markdown list reads `- name: value` as a field and indented lines as mor
   // YAML, with an object's other keys under its first, is still read as YAML.
   expect(show(parseOutlineText('- name: x\n  role: PM'))).toEqual([['', [['name: x'], ['role: PM']]]]);
 });
+
+test('a sentence running on to a colon is text, not a field', () => {
+  expect(parseOutlineText('ガントチャートは、`views: gantt` を付けた項目で使えます。\n担当者: 田中')).toEqual([
+    { key: null, text: 'ガントチャートは、`views: gantt` を付けた項目で使えます。', children: [] },
+    { key: '担当者', text: '田中', children: [] },
+  ]);
+});

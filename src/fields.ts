@@ -9,8 +9,11 @@
  */
 export const FIELD_TYPED = /^([^\s:][^\s:]{0,39}): /;
 
-/** A `name: value` line (name without spaces), or `name:` alone. */
-const FIELD_LINE = /^([^\s:][^\s:]{0,39}):(?:\s+(.*))?$/;
+/**
+ * A `name: value` line (name without spaces), or `name:` alone. Not a sentence
+ * running on to a colon (`…は、\`views: gantt\` を…`): no backquote, 、 or 。 in the name.
+ */
+const FIELD_LINE = /^([^\s:`、。][^\s:`、。]{0,39}):(?:\s+(.*))?$/;
 
 export interface TextRow {
   key: string | null;

@@ -40,7 +40,7 @@ A `~/outliner/data.json` from the app's earlier name (Outliner) is moved to `~/y
 
 ## Using it
 
-The usage guide is in [docs/guide.en.md](docs/guide.en.md) (日本語: [docs/guide.ja.md](docs/guide.ja.md)), and in the app from the **?** menu at the top right (`#/docs`), in the interface language. It covers rows, fields and blocks, tasks, copying and pasting, scheduling and the Gantt chart, diagrams, slides, search and the views.
+The usage guide is in the app from the **?** menu at the top right (`#/docs`), in the interface language, shown as the Document view shows an outline. It is written as an outline in indented text: [docs/guide.en.txt](docs/guide.en.txt) (日本語: [docs/guide.ja.txt](docs/guide.ja.txt)), a row a paragraph, rows with rows under them headings, a row ending in a colon leading into a list, and tables and examples as `!markdown` blocks. **Open as an outline** on the guide page copies it into the outline. It covers rows, fields and blocks, tasks, copying and pasting, scheduling and the Gantt chart, diagrams, slides, search and the views.
 
 ## Code layout
 

@@ -1,0 +1,256 @@
+Using Yamoli
+  views: doc
+  description: Yamoli is an outline editor whose rows can carry fields, like YAML. Write rows, nest them with indentation, and organize them by folding and zooming; give them fields and the same outline becomes a Gantt chart, a diagram or a slide deck.
+  The interface is in English or Japanese, following the browser's language; switch it from the **⋯** menu. The **?** at the top right lists the keyboard shortcuts and opens this guide.
+  This guide is an outline too, shown in the Document view. **Open as an outline** on the left adds it to your outline, to see how it is written or to make slides of it.
+  Writing
+    Rows
+      doc: list
+      **Enter** starts a new row (splitting the row at the caret), **⌘Enter** a new row below wherever the caret is (after the rows under it). **Tab / Shift+Tab** indents and outdents. Click a ● to zoom into that item; the breadcrumbs at the top zoom back out.
+      Formatting (`**bold**`, `*italic*`, `~~struck~~`, code in backquotes, `[text](https://…)`, and `[text]{red}` for a colour) is styled as you type, its markup dimmed.
+      Select words and press **⌘B** (bold), **⌘I** (italic), **⌘⇧X** (strike) or **⌘E** (code) to mark them, and again to unmark; **⌘⇧H** shows a bubble of colours, 1–7 picking one and 0 taking it off (Ctrl in place of ⌘ outside macOS). The name and description in a diagram box's menu, and an arrow's label (in its menu or typed in place), take them too.
+      The colours are `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex`, with other formatting inside if you like (`[**key**]{red}`); they show in the diagram's names, descriptions and arrow labels too.
+      With the caret on a link, a bubble shows where it goes; **⌘K** (Ctrl+K outside macOS) adds or edits a link, and pasting a URL over selected text links it.
+      `[[` inserts a link to another item. **⌘P** (Ctrl+P outside macOS) jumps to an item by part of its name.
+      On macOS, **Ctrl+K** deletes to the end of the line and **Ctrl+Y** puts it back; at the end of a row, Ctrl+K (like Ctrl+D) joins the next row.
+    Selecting, copying and pasting
+      doc: list
+      Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Shift+Enter then act on all of them, and dragging one's ● moves them together.
+      **Copy tree** in a row's menu (right-click its ●) copies the item with everything under it, folded and hidden rows too.
+      Rows copied in Yamoli paste back as they were: fields, blocks, multi-line text, done or not. Elsewhere they paste as a Markdown list.
+      Pasted text with several lines becomes rows. A Markdown list keeps its nesting (`- name: value` becoming a field of the row above); YAML comes in as fields, nesting and blocks; a checklist (`- [ ]` / `- [x]`) as tasks.
+      Text copied from a web page keeps its links, as `[words](https://…)`. Each paragraph or heading becomes a row, and its lists rows nested as they were.
+    Tasks
+      **Tasks** are rows that are something to do, rather than notes. A row's **Task** button (or **⌘L**) makes it one, after which the button completes it (✓, ⌘Shift+Enter) and reopens it (↺). Completed rows, and rows with `duration`, `end` or `due`, count as tasks too.
+      **Tasks only** in the view bar shows just them, with the rows they sit under dimmed; search with `is:task` / `is:todo`. The Text view writes tasks as `- [ ]` / `- [x]`.
+    Fields and blocks
+      doc: list
+      Typing `name: ` at the start of a row makes it a **field**. Backspace at the start of the value turns it back into an ordinary row.
+      A field without a value can hold nested rows: fields below it make an object, ordinary rows a list.
+      A **block** (Alt+D) is a field with a multi-line value: Markdown, CSV, code, plain text, an image or a file. In YAML it is written as `note: !markdown |`.
+      **Paste** or **drop images and files** on a row and its item gets a block for each: an image is shown (`image: !image files/….png`; lines after the first are its caption), and any other file (a PDF, say) becomes a link with its name and size (`file: !file`) that downloads it under its own name.
+      Images and files are kept in the `files/` folder next to the data file, and Markdown can refer to them too, as `![caption](files/….png)` or `[minutes](files/….pdf)`. This works when saving to a file (`npm run dev` / `preview`).
+      While typing a field's name or value, the names and values already in use are offered below it: **↓** picks one, **Enter** takes it.
+      The **Fields** setting in the view bar shows field rows, folds each row's fields into a one-line summary (click it to open them), or hides them.
+    Seen as YAML
+      Once you use fields, editing the outline is close to editing YAML. The app reads the fields and changes what it does: with dates it draws a Gantt chart, with `layout` it shows slides.
+      In the outline:
+        example: !markdown |
+          ```
+          ・Project
+            ・start: 2026-11-09
+            ・Requirements
+              ・duration: 3d
+            ・Design
+              ・duration: 2d
+              ・after: Requirements
+          ```
+      In the YAML view:
+        example: !markdown |
+          ```yaml
+          text: Project
+          start: 2026-11-09
+          children:
+            - id: 1a2b3c4d5e6f
+              text: Requirements
+              duration: 3d
+            - text: Design
+              duration: 2d
+              after: "[[1a2b3c4d5e6f]]"
+          ```
+      Because of `after`, Design is scheduled to start on the working day after Requirements ends.
+  Scheduling
+    Fields
+      The Gantt chart is there for items with `views: gantt` (see Views). It reads these fields:
+        table: !markdown |
+          | Field | Example | Meaning |
+          | --- | --- | --- |
+          | `views` | `gantt` | Turns the Gantt chart on (see Views) |
+          | `duration` | `3d` / `2w` / `10cd` / `0d` | Length in working days / weeks / calendar days. `0d` is a milestone |
+          | `start` | `2026-11-10` | Don't start before this date. Inherited by children |
+          | `end` | `2026-11-14` | Instead of `duration`: the last day, the bar running from `start` to here (calendar days, so weekends count). Dependencies that end later move it whole |
+          | `after` | `[[Requirements]], [[API design]]` | Dependencies: starts once they have all finished. A parent's dependencies apply to its children |
+          | `due` | `2026-11-20` | Deadline; finishing later is shown as late |
+          | `completed` | `2026-11-09` | Set to the day an item is completed (⌘Shift+Enter); removed when it is reopened |
+          | `workdays` | `mon-fri` | Working days of the week (default `mon-fri`). Inherited by children |
+          | `holidays` | `jp`, `2026-12-29..2027-01-03` | Days off. `jp` adds Japanese public holidays |
+      An item with children spans the dates of its children. ★ marks the critical path (work whose delay delays the whole project).
+    The chart
+      The Gantt chart draws dependency arrows and due-date lines. − / + change the width of a day, down to years and months for a long project, and **Fit** picks the widest that shows the whole schedule.
+      **Dates** shows each row's start, end and working days in columns beside its name.
+      The buttons above the chart save it, names, dates and legend included, as an SVG or PNG file, or copy it as an image.
+    Editing on the chart
+      The schedule can be edited on the chart too. Changes are written as fields, so they are the same as editing the outline.
+      What you can do there:
+        **Drag a bar** to move its start (it gets a `start`; an item given an `end` has that moved along). It can't go before what it depends on: it stops just after that finishes.
+        **Drag a bar's right end** to move its end. This rewrites `duration` in working days (calendar days for an item like `10cd`; an item given an `end` gets a new `end`).
+        **Click a name, start, end or days** to type in it. Dates can be just month/day, like `12/3` (this year). `0` days makes a milestone. Giving an unscheduled item a start or a number of days schedules it. Enter keeps the change, Esc drops it.
+        **Add a dependency** by pointing at a bar, so that a small dot appears after it, and dragging from the dot to the row that should start after it; the dependency goes into that row's `after`. A dependency that would make a cycle, or one between an item and something inside it, isn't added.
+        **Remove a dependency** by clicking an arrow to select it, then pressing Delete (or clicking the × on it). It comes out of the row's `after`.
+        **›** beside a name zooms into that item.
+      Items whose dates come from their children (summary bars) can't be edited here. While dragging, Esc puts the bar back.
+  Diagrams
+    Writing one
+      For items with `views: diagram`, the Diagram view draws the zoomed item from its rows. A system's architecture written like this:
+        example: !markdown |
+          ```
+          ・Production
+            ・views: diagram
+            ・User
+              ・shape: actor
+              ・to: [[Web]] HTTPS
+            ・VPC
+              ・shape: frame
+              ・Private
+                ・shape: frame
+                ・Web
+                  ・to: [[API]] gRPC
+                ・API
+                  ・to: [[DB]]
+                ・DB
+                  ・shape: db
+          ```
+      is drawn as:
+        example: !markdown |
+          ```
+                ┌ VPC ─────────────────────────┐
+                │ ┌ Private ─────────────────┐ │
+          ☺ ──▶ │ │ Web ─gRPC─▶ API ──▶ (DB) │ │
+                │ └──────────────────────────┘ │
+                └──────────────────────────────┘
+          ```
+      What is written, and how it is drawn:
+        table: !markdown |
+          | Written | Drawn as |
+          | --- | --- |
+          | A row | A box, listing the rows under it (`• …`) |
+          | `shape: frame` | A frame around the rows under it, drawn as boxes; `frame solid` / `frame none` for its border (dashed by default) |
+          | `shape: container` | A box with boxes inside: like a frame, the rows under it are boxes, but it looks like a box |
+          | `shape: row` / `column` / `grid` | Lines up the boxes in it in outline order, whatever their arrows: `row` / `横` across, `column` / `縦` down, `grid` / `格子` in rows (`grid 3` for three columns; without a number, about as many columns as rows). Alone it draws no border and no name: an unseen line-up (the row's name is a note in the outline). With a border word or `frame` after it (`row dashed`, `grid 3 solid`, `row none`, `frame row`) it is a named frame. Arrows between them are still drawn, but don't move them |
+          | `[[link]]` in a field | An arrow, labelled with the words after the link (or the field's name, except `to`). `after` arrows run from the dependency. Arrows on the same side of a box spread out along it, in the order of the boxes at their other ends |
+          | `[[link]] SQL {red}` | That one arrow's look: a colour, or the words `lines` takes (`dashed`, `both` …), in braces, over the look its field gives it. `[words]{red}` in the label colours those words, not the arrow |
+          | `[[link]] SQL @top` | Pins the sides an arrow joins: after the `@` the side it enters the linked box by, before it the side it leaves by (`bottom@top`, `right@`). `top` / `bottom` / `left` / `right` (`上` / `下` / `左` / `右`). A pinned arrow goes straight out of and into those sides, turning at right angles around any box in its way |
+          | `shape` | `box` / `actor` / `db` / `queue` / `external` / `process` (an ellipse) / `store` (a data store) / `sticky` or `付箋` (a sticky note for remarks: its name is written on it, wrapped, and joined to a box with `to:` it sits beside that box on a dotted line without a head). For a data flow diagram: external entities as `box`, processes as `process`, data stores as `store`, and data flows as labelled arrows like `to: [[box]] order data` |
+          | `color` | `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex` |
+          | `font` / `文字色` | The colour of the text in a box or frame: a colour word as for `color`, or `#hex`. The name is in it, the description and fields a little paler. To colour a stretch of the text, write `[words]{red}` in it (⌘⇧H) |
+          | `border` / `枠線` | The outline of a box or frame: `solid` / `dashed` / `dotted` / `none`, `thick` / `thin`, `double`, `round` / `square` corners, `shadow` and a colour, in any mix (`border: thick dashed red`) |
+          | `icon` | Before the name: `server`, `database`, `storage`, `cloud`, `globe`, `user`, `users`, `mobile`, `desktop`, `browser`, `code`, `function`, `queue`, `bolt`, `lock`, `key`, `shield`, `mail`, `bell`, `chart`, `gear`, `container`, `file`, `search`, `cpu`, or an emoji. On an actor it replaces the figure |
+          | `note` / `description` | Text under the name of a box or a frame, wrapped; a long one makes the box wider, then taller. A `note` block works too. On the zoomed item, it describes the whole diagram and goes above it (in the SVG and PNG too). `**bold**`, `*italic*`, `~~struck~~`, code and `[text]{red}` in it or in a box's name are drawn so |
+          | Other fields | Small `key: value` lines in the box |
+          | `layout` (on the zoomed item) | Lines up the outermost boxes, with the same words as `shape: row` and the rest. On a frame or a container it wins over its `shape` |
+          | `direction` (on the zoomed item) | `LR` (left to right, default) / `TB` (top to bottom) |
+    Lines and saving
+      A line's look comes from the field it is written in: `async:` is dashed, `both:` has arrows at both ends, `link:` has none, and any other (`to:`) is a plain arrow. A `lines` field on the zoomed item sets more, one field per name (`calls: dotted red`, `sync: both`, with `solid` / `dashed` / `dotted`, `arrow` / `both` / `none` and a colour).
+      An arrow to or from a row listed in a box is drawn to the box. Lines that would cross a box go around it.
+      The buttons above the diagram save it as an SVG or PNG file, or copy it as an image to paste into documents. With boxes selected, **Selected boxes only** saves just those boxes (a frame with all inside it) and the arrows between them, cropped to them. Selection marks and highlights are left out of the image.
+    Editing on the diagram
+      You can edit the diagram where it is drawn. Each edit changes the outline's rows and fields, so the diagram and the outline always match.
+      What you can do there:
+        **Names** — select a box and just type to rename it; double-click it (or press Enter) to edit the name it has. Typing on a selected arrow writes its label.
+        **Description** — the right-click menu starts with the name and description, ready to type over (Shift+Enter for a new line in the description); they are written when the menu closes, or dropped with Esc. An arrow's menu has its label. The description is written to `note`, as a text block when it has several lines, or to the `description` (or other) field the box already has.
+        **Shape, colour, text colour and outline** — right-click a box and press Shape, Fill, Text or Line in its menu (each shows what it is now) to open its choices (they become the `shape`, `color`, `font` and `border` fields). Text and line choices leave the menu open. The same menu adds a box inside (a plain box becomes a container) or after the box, opens the row in the outline, or deletes it.
+        **New boxes** — **+ Add a box** at the top left of the diagram.
+        **Zoom** — **−** / **+** at the top right of the diagram, or the wheel with ⌘ held (Ctrl outside macOS; a pinch on a trackpad). Click the percentage for actual size, **Fit** to see it all (as it opens, never larger than actual size). Drag the empty background to scroll. Saved images are always at actual size.
+        **Drawing arrows** — hover over a box and drag from the dot that appears to another box (this adds `to: [[box]]`). Click an arrow and press × or Delete to remove it.
+        **An arrow's label and look** — double-click an arrow (or select it and press Enter) to write its label, the words beside its link (dependency arrows have none). Right-click an arrow to pick its colour (written as `{red}` beside its link) or its kind of line (arrow, dashed, both ends, line only, or a name set in `lines`): the link moves to the field of that name, `to` / `async` / `both` / `link` or yours (`after` dependencies stay).
+        **Moving an arrow's ends** — drag a dot at either end of a selected arrow to another side of the same box to pin it there (this writes `@top` and the like; right-click the arrow and pick “Let its ends face each other again” to undo it), or to another box to join it there instead (moving the head changes where the link points; moving the tail moves the field holding the link to that box. `after` dependencies work the same, but not into a loop).
+        **Moving** — drag a box onto another frame to move it inside. Dropped on the middle of a plain box, it goes inside and that box becomes a container (`shape: container`); dropped on its edge, it goes before it. A container left empty is a plain box again. In a frame lining up its boxes (`row` and the rest), where you drop it sets its place in the order. Press Esc during a drag to cancel.
+        **Deleting** — Delete removes the selected box (⌘Z brings it back).
+        **Several boxes** — Shift-click (or ⌘-click) boxes to select several. Right-click them to line them up in a row, a column or a grid, or to put them in a frame: a row with `shape: row` and so on goes where the first of them was, holding them (a line-up shows no name; a frame’s name is typed at once). Delete, ⌘C and ⌘X work on them all. Right-click a frame and pick “Take the boxes out” to put its boxes where it was and remove it.
+        **Copying and pasting** — ⌘C copies the selected box with the rows in it (⌘X cuts it), and ⌘V pastes right after the selected box (or last, with none selected). Arrows among the boxes copied together join the copies; arrows out of them stay as they were. Text pasted from elsewhere becomes a box a line. The same goes for mind maps.
+  Slides
+    Making slides
+      Slides are there for items with `views: slides`: the zoomed item is the deck, and each row under it is one slide. Rows under a slide are its bullets, and its blocks are its content.
+      The list on the left shows each slide as a small picture of it (changing as you type). **+ Slide** adds one after the slide on screen (its title ready to type), dragging puts them in another order, and the × that shows with the pointer over one deletes it (undone from the message that follows).
+      The menu under a slide picks its layout, written as its `layout:` field (taken away again for the standard one). The layouts are:
+        **Standard** — the bullets and blocks under the title.
+        **Centred** — the title and bullets in the middle.
+        **Two columns** — the bullets beside the blocks, or the bullets split in half.
+        **Title only** — just the title and subtitle, like the deck's cover.
+        **Section** — a chapter's first page, its name large on the left.
+        **Cards**, **Steps** and **Numbers** — each bullet a card, a numbered step or a big number, side by side, the rows under it inside.
+        **Statement** — the first bullet large in the middle.
+      When the bullets and blocks don't fit on a slide, their text is made smaller until they do (down to half; what still doesn't fit is cut off).
+    Pictures
+      A slide with no subtitle or picture has **+ Subtitle** and **+ Picture** under it. A picture can also be pasted or dropped on the slide (when the outline is saved to a file).
+      A slide takes any number of pictures (from the second, a list under `image:`). The × over a picture's top left corner takes it off, as does emptying its address and pressing Backspace.
+      The menu over a picture picks where they go, written as `image-at:` (taken away again for Right). The places are:
+        **Right** and **Left** — beside the bullets, one over another.
+        **Below** — under the bullets, side by side.
+        **Large** — alone under the title, up to three side by side, more in a grid.
+        **Background** — behind the whole slide, veiled (the first). Its menu is then over the slide's top right corner, with **Address** to edit where it comes from.
+    Editing on the slide
+      A slide's title, bullets, subtitle and blocks (tables, code and so on) can be clicked and typed in right there. A picture, clicked, shows its address (the `image:` value) under it to type in.
+      The notes are typed in where **Notes** opens them, and **Write notes** adds a `notes:` field to a slide with none. A subtitle or the notes, emptied, go with Backspace, which, unlike in the outline, never turns them into a row.
+      The keys are the outline's (Enter for the next row, Tab to indent, ↑↓ to the rows before and after), and moving to a row of another slide goes to that slide. Enter on a title makes its first bullet, and Shift+Tab on a bullet makes it the next slide.
+      A click on the slide while typing ends that; the next turns the page.
+      Drawings and Gantt charts embedded in a slide are edited as in their own views (with the pointer over one, “+ Add a box” or the chart's − / + / Fit show at its top right). While a box or arrow in one is selected, the arrow keys and the like are the drawing's, not paging (Esc lets go).
+    Presenting
+      ← → page through, F goes full screen, N shows the speaker notes.
+      On a slide with two bullets or more, **One by one** makes → show its bullets one at a time, each with those under it (written as `reveal: yes`; `reveal: yes` on the deck does it for every slide, and `reveal: no` on a slide undoes it there). ← takes them away again, and goes back to the slide before with all of its shown; while you type in a slide, all of them show.
+      **Presenter view** opens a window of its own with the slide on screen, the next one, the notes, the time taken (**Reset** to start again) and the time of day; ← → in either window turn the page in both. Show the first window full screen, and keep the presenter view on your own screen.
+      The **PDF** button below opens the print dialog with every slide on a 16:9 page of its own: choose Save as PDF for a PDF (without the notes).
+    Fields
+      Slides read these fields:
+        table: !markdown |
+          | Field | On | Meaning |
+          | --- | --- | --- |
+          | `subtitle` | deck, slide | Subtitle |
+          | `theme` | deck | `dark` for a dark theme |
+          | `layout` | slide | `center` / `two-column` / `title` / `section` / `cards` / `steps` / `numbers` / `statement` |
+          | `reveal` | deck, slide | `yes` shows the bullets one at a time (`no` on a slide against the deck's `yes`) |
+          | `notes` | slide | Speaker notes |
+          | `image` | slide | A picture: a URL, or a pasted image's `files/….png`; several as a list under it |
+          | `image-at` | slide | Where the pictures go: `left` / `below` / `full` / `background` (`左` / `下` / `大きく` / `背景`); without it, right |
+          | `embed` | slide | Embed the Gantt chart of `[[item]]` (`[[item]] diagram`: its diagram, `[[item]] mindmap`: its mind map). Without a link, `diagram` / `図` draws the slide's own rows as a diagram instead of bullets (`mindmap`: a mind map, `gantt` / `ガント`: a Gantt chart) |
+  Search
+    Search (⌘F) finds the rows matching all the terms you write; Esc clears it. The terms are:
+      table: !markdown |
+        | Term | Matches |
+        | --- | --- |
+        | `word` / `"two words"` | Text, field name or value contains it |
+        | `status:active` | Field `status` whose value contains `active` |
+        | `budget.amount:1200` | A nested field |
+        | `due:` | Has a field `due` |
+        | `is:done` | Completed rows |
+        | `is:task` / `is:todo` | Tasks / tasks not yet done |
+        | `is:ready` / `is:blocked` | Ready to start / waiting on a dependency |
+        | `is:late` / `is:critical` / `is:milestone` | Late / on the critical path / milestones |
+        | `is:cycle` | On a dependency cycle |
+        | `-term` | Negation |
+    `is:` terms also have Japanese names (`is:完了`, `is:タスク`, `is:未完了`, `is:着手可`, `is:待ち`, `is:遅延`, …). Matching ignores case and full-/half-width differences.
+  Views
+    Switch with the view bar; each item remembers the view last used for it (except slides, which are for presenting: an item never opens as slides by itself).
+    Outline, Text, YAML and JSON work for any item. Gantt, Diagram, Mind map, Slides and Document only make sense for rows written for them, so they are turned on per item.
+    Pick one from the **+** in the view bar and the item gets a `views` field, which turns it on for the item and every row under it. Writing `views: gantt, slides` yourself does the same (`gantt` / `diagram` / `mindmap` / `slides` / `doc`, or `ガント` / `図` / `マインドマップ` / `スライド`).
+    The views are:
+      **Outline** — where every kind of editing can be done. An item with a `views` field has a badge before its name for each (“Diagram”, “Gantt” …), opening it in that view.
+      **Document** — the rows as headings and prose, read top to bottom. Turned on with `views: doc` (this guide is shown in it).
+      **Gantt** — the schedule as a chart (see Scheduling). Turned on with `views: gantt`.
+      **Diagram** — the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
+      **Mind map** — the rows branching out from the zoomed item, as they are nested. Turned on with `views: mindmap` (`マインドマップ`).
+      **Slides** — the rows as a slide deck (see Slides). Turned on with `views: slides`.
+      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
+      **YAML / JSON** — the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
+    The Document view
+      The Document view decides what is a heading, a paragraph or a list from how the rows are written:
+        A row with rows under it (or blocks, or an `embed`) is a heading (three levels; deeper, a paragraph).
+        Unless it ends in `。` or a colon, when it is a paragraph with its rows under it. After `。`, or when any of them is a sentence, they are paragraphs after it, not indented; after a colon or when all are phrases, they are listed under it.
+        Rows with nothing under them are a bulleted list when none of them ends a sentence (`.` `!` `?` `。` …), else a paragraph each. Tasks have checkboxes.
+        A row is one paragraph: write the sentences of a paragraph on in one row.
+        Blocks show where they are, and `embed: [[item]] diagram` draws that item's diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item's `description` leads the document.
+      Where that reads wrong, hover over the rows and pick “List” or “Paragraphs” (this writes `doc: list` / `doc: text` on the row above them; “Auto” takes it off). Which rows are headings can be picked too: hover over a line for **H** (make it a heading) or **¶** (make it body text) in the margin left of it (this writes `doc: heading` / `doc: body` on its row; pressing again undoes it).
+      Click a line or block to edit it right there. The keys are the outline's: Enter for the next row, Tab / Shift+Tab to indent, ↑↓ to the rows before and after. Headings, paragraphs and lists are drawn again as you go (a row given rows under it becomes a heading, and so on).
+      Enter starts a new paragraph (a new row); Backspace at the start of a paragraph joins its text on to the one before (the two rows become one). An empty row shows as a faint “…” to click and type in, or remove with Backspace.
+      An embedded drawing (`embed: diagram` / `mindmap`) or Gantt chart can be edited right there as in its own view. A drawing zooms with − / + / Fit at its top right or ⌘ + wheel, and a chart sets its days' width with − / + / Fit / Today above it (both fitted when opened). Keys act only on what is selected in it; a click outside it lets go.
+    The Mind map view
+      No frames or arrows: every row is a node. Select a row: Tab adds a row under it and Enter one after it, named as you type.
+      The arrow keys go along the branches; F2, Space or a double-click renames, Delete removes, and dragging moves a row under another.
+  Saving
+    The outline saves itself as you type (the top bar shows when it has). If it changes in another tab or outside the app, you choose whether to reload it or overwrite it with yours.
+    When saving to a file, the contents before each day's first save, and before any save that removes 10 or more rows at once, are kept in the `backups/` folder next to the data file (30 days of daily copies, and the last 20 copies from before removing rows, named with the time).
+    Pasted images and files are in the `files/` folder; once kept, one is never changed.
+    The browser keeps a copy of each data file too: if the file goes missing, it is made again from that file's copy (or the sample, without one; never from another data file).
+    The **⋯** menu exports the outline as **YAML**, for reading or for other tools, or as a **backup (JSON)** that can be loaded back to restore it (without the images and files). When saving to a file it also exports a **backup (ZIP)** of the outline with the images and files it uses; **Restore from a backup** takes either (a ZIP's images and files go back into `files/`).
+    **Clean up unused files** deletes images and files that neither the outline nor any backup in `backups/` uses, added over a week ago. It says how many and how large before it does.
+    The usage-guide slides and the samples (a scheduled project, a system architecture, a data flow diagram, a mind map) can be added again from the **⋯** menu at any time.

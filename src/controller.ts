@@ -458,6 +458,13 @@ export class Controller extends Editing {
     );
   }
 
+  /** Add indented text (an outline written out, the guide) at the end of the outline; the id of its first row. */
+  addOutlineText(text: string): string {
+    const ids = parseOutlineText(text).map((r) => this.addTextRow(this.store.rootId, -1, r));
+    this.commit(null);
+    return ids[0];
+  }
+
   /** A row (and the rows under it) from text: `key: value` lines as fields, checklist lines as tasks. */
   private addTextRow(parent: string, index: number, r: TextRow): string {
     const n = this.store.addChild(parent, index, r.text);

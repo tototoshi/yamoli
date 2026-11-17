@@ -2,9 +2,11 @@
  * Document view: the zoomed item read as prose (see doc.ts): headings,
  * paragraphs and lists from its rows, its blocks and embedded drawings among
  * them. Clicking a line edits its row right there, as in the outline (Enter
- * a new row after it, Tab under the one above, and so on).
+ * a new row after it, Tab under the one above, and so on). It can also show
+ * an outline of its own, only to be read (the guide).
  */
-import { useMemo, useRef } from 'preact/hooks';
+import { createContext } from 'preact';
+import { useContext, useMemo, useRef } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
@@ -15,10 +17,28 @@ import { BlockBody, NodeText } from './App';
 import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
+import type { OutlineStore } from './model';
 
-export function DocView() {
+/** The outline written out, and whether it is only to be read (none: the one being edited). */
+const Source = createContext<{ store: OutlineStore; readOnly: boolean } | null>(null);
+
+/** The outline the document is of, and whether its lines can be edited. */
+function useSource() {
   const ctl = useCtl();
-  const doc = buildDoc(ctl.store, ctl.zoomId, { showCompleted: ctl.prefs.showCompleted });
+  const src = useContext(Source);
+  return { store: src?.store ?? ctl.store, readOnly: !!src?.readOnly, ctl };
+}
+
+/** A document, written out from the zoomed item; or from rootId of store, only to be read. */
+export function DocView({ store, rootId }: { store?: OutlineStore; rootId?: string } = {}) {
+  const ctl = useCtl();
+  const doc = buildDoc(store ?? ctl.store, rootId ?? ctl.zoomId, { showCompleted: store ? true : ctl.prefs.showCompleted });
+  const body = <DocBody lead={doc.lead} parts={doc.parts} />;
+  return store ? <Source.Provider value={{ store, readOnly: true }}>{body}</Source.Provider> : body;
+}
+
+function DocBody({ lead, parts }: { lead?: string; parts: DocPart[] }) {
+  const doc = { lead, parts };
   if (!doc.lead && !doc.parts.length) {
     return (
       <p class="doc-empty">
@@ -40,9 +60,16 @@ export function DocView() {
   );
 }
 
-/** A row's text, edited in place when clicked (the outline's own row editor). */
+/** A row's text, edited in place when clicked (the outline's own row editor); only to be read, drawn. */
 function Text({ id }: { id: string }) {
-  const { store } = useCtl();
+  const { store, readOnly } = useSource();
+  if (readOnly) {
+    return (
+      <span class="text text-view">
+        <InlineText text={store.node(id).text} />
+      </span>
+    );
+  }
   return <NodeText node={store.node(id)} />;
 }
 
@@ -59,7 +86,8 @@ function Part({ part }: { part: DocPart }) {
  * is what it would be anyway (auto).
  */
 function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole }) {
-  const ctl = useCtl();
+  const { ctl, readOnly } = useSource();
+  if (readOnly) return null;
   const to: DocRole = now === 'heading' ? 'body' : 'heading';
   return (
     <button
@@ -78,7 +106,7 @@ function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole
 function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocRole }) {
   const H = `h${level}` as 'h2';
   return (
-    <H class="doc-line">
+    <H class="doc-line" data-doc-id={id}>
       <RoleSwitch id={id} now="heading" auto={auto} />
       <Text id={id} />
     </H>
@@ -91,7 +119,7 @@ function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocR
  * paragraph, which stay paragraphs (no switch to a heading).
  */
 function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?: boolean }) {
-  const { store } = useCtl();
+  const { store } = useSource();
   const ref = useRef<HTMLDivElement>(null);
   useFlowEditor(ref);
   return (
@@ -106,14 +134,23 @@ function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?
 
 /** A task's checkbox, which completes it (or opens it again). */
 function Check({ id }: { id: string }) {
-  const ctl = useCtl();
-  if (!ctl.store.isTask(id)) return null;
-  return <input type="checkbox" class="doc-check" checked={ctl.store.node(id).completed} onChange={() => ctl.toggleComplete(id)} />;
+  const { store, readOnly, ctl } = useSource();
+  if (!store.isTask(id)) return null;
+  return (
+    <input
+      type="checkbox"
+      class="doc-check"
+      checked={store.node(id).completed}
+      disabled={readOnly}
+      onChange={() => ctl.toggleComplete(id)}
+    />
+  );
 }
 
 /** The switch beside rows between a list and paragraphs (written as `doc` on under, the row above them). */
 function StyleSwitch({ under, style, auto }: { under: string; style: DocStyle; auto: boolean }) {
-  const ctl = useCtl();
+  const { ctl, readOnly } = useSource();
+  if (readOnly) return null;
   const set = (to: DocStyle | null) => {
     setDoc(ctl.store, under, 'style', to);
     ctl.commit(null);
@@ -165,7 +202,7 @@ function Paragraph({ item, fixed }: { item: DocItem; fixed?: boolean }) {
 
 /** A list; top: of rows each in their own place, which can be made headings (not rows inside others). */
 function List({ items, top }: { items: DocItem[]; top?: boolean }) {
-  const { store } = useCtl();
+  const { store } = useSource();
   return (
     <ul class={items.every((it) => it.task) ? 'doc-tasks' : undefined}>
       {items.map((it) => (
@@ -176,7 +213,6 @@ function List({ items, top }: { items: DocItem[]; top?: boolean }) {
 }
 
 function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boolean }) {
-  const { store } = useCtl();
   const ref = useRef<HTMLLIElement>(null);
   useFlowEditor(ref);
   return (
@@ -209,9 +245,10 @@ function ExtraView({ extra }: { extra: Extra }) {
 
 /** A block as its format draws it, edited in place when clicked (folded in the outline or not). */
 function Block({ id }: { id: string }) {
-  const ctl = useCtl();
-  const n = ctl.store.node(id);
+  const { store, readOnly, ctl } = useSource();
+  const n = store.node(id);
   const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
+  if (readOnly) return <div class="data-view doc-block" data-format={n.format} dangerouslySetInnerHTML={{ __html: html }} />;
   if (ctl.activeField === fText(id).key) return <BlockBody node={n} />;
   return (
     <div
