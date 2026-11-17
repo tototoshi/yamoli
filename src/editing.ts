@@ -430,6 +430,29 @@ export class Editing extends ViewState {
     );
   }
 
+  /** Keep an image beside the outline file and make it the picture of item id (its `image` field). */
+  setImage(id: string, file: File) {
+    if (!canAddFiles()) {
+      return this.showToast(
+        t(
+          '画像は、ファイルに保存しているとき（npm run dev / preview）だけ追加できます',
+          'Pictures can only be added when the outline is saved to a file (npm run dev / preview)'
+        )
+      );
+    }
+    this.showToast(t('画像を保存しています…', 'Saving the picture…'));
+    uploadFile(file).then(
+      ({ ref }) => {
+        const { store } = this; // the outline may have been replaced (undo) while uploading
+        this.hideToast();
+        if (!store.get(id)) return;
+        store.setField(id, 'image', ref);
+        this.commit(null);
+      },
+      (e: Error) => this.showToast(t('保存できませんでした: ', 'Couldn’t save it: ') + e.message)
+    );
+  }
+
   /** Add a block (multi-line field, Markdown by default) and start writing in it. */
   addBlock(id: string, format = 'markdown') {
     this.revealFields();

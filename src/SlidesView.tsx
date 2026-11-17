@@ -22,7 +22,7 @@ import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
 import { nodeLabel } from './links';
 import { buildDeck, splitColumns, type Bullet, type Layout, type Slide } from './slides';
-import { fileUrl } from './files';
+import { fileUrl, filesIn } from './files';
 
 const W = 1280;
 const H = 720;
@@ -93,6 +93,23 @@ export function SlidesView() {
     ro.observe(el);
     return () => ro.disconnect();
   }, [count > 0]);
+
+  // A picture pasted (alone: not with text) or dropped anywhere on the view is the slide's picture.
+  const imageIn = (dt: DataTransfer | null) =>
+    dt && !dt.getData('text') ? filesIn(dt).find((f) => /^image\/(png|jpeg|gif|webp)$/.test(f.type)) : undefined;
+  const canHaveImage = slide && slide.id !== ctl.zoomId && slide.layout !== 'title';
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const file = imageIn(e.clipboardData);
+      if (!file || !canHaveImage) return;
+      // Before the row editor's own paste, which would add it to the row as a block.
+      e.preventDefault();
+      e.stopPropagation();
+      ctl.setImage(slide.id, file);
+    };
+    document.addEventListener('paste', onPaste, true);
+    return () => document.removeEventListener('paste', onPaste, true);
+  });
 
   // ← → (and friends) page through the deck when not typing.
   useEffect(() => {
@@ -213,6 +230,13 @@ export function SlidesView() {
         <div
           class={'slide-stage theme-' + deck.theme}
           ref={stageRef}
+          onDragOver={(e) => canHaveImage && e.dataTransfer?.types.includes('Files') && e.preventDefault()}
+          onDrop={(e) => {
+            const file = imageIn(e.dataTransfer);
+            if (!file || !canHaveImage) return;
+            e.preventDefault();
+            ctl.setImage(slide.id, file);
+          }}
           onPointerDown={() => (wasTyping.current = !!document.activeElement?.closest('.slide .rich'))}
           onClick={(e) =>
             !wasTyping.current &&
@@ -238,6 +262,7 @@ export function SlidesView() {
             ▶
           </button>
           {slide.id !== ctl.zoomId && <LayoutPick slide={slide} />}
+          <AddToSlide slide={slide} canHaveImage={!!canHaveImage} />
           <button class={'mini' + (showNotes ? ' on' : '')} onClick={() => setShowNotes(!showNotes)} title={t('ノート (N)', 'Notes (N)')}>
             {t('ノート', 'Notes')}
           </button>
@@ -288,14 +313,17 @@ function SlideBody({ slide }: { slide: Slide }) {
   useFitText(content);
   const n = store.node(slide.id);
   const title = <NodeText node={n} />;
+  // A subtitle or picture field is shown even empty (just added, or emptied to be taken away with Backspace).
+  const hasSubtitle = !!(slide.subtitle || store.field(slide.id, 'subtitle'));
+  const hasImage = !!(slide.image || store.field(slide.id, 'image'));
 
   if (slide.layout === 'title') {
     return (
       <div class="slide-title-only">
         <h1>{title}</h1>
-        {slide.subtitle && (
+        {hasSubtitle && (
           <p class="subtitle">
-            <FieldText id={slide.id} name="subtitle" text={slide.subtitle} />
+            <FieldText id={slide.id} name="subtitle" text={slide.subtitle ?? ''} />
           </p>
         )}
       </div>
@@ -331,12 +359,12 @@ function SlideBody({ slide }: { slide: Slide }) {
   return (
     <>
       <h2>{title}</h2>
-      {slide.subtitle && (
+      {hasSubtitle && (
         <p class="subtitle">
-          <FieldText id={slide.id} name="subtitle" text={slide.subtitle} />
+          <FieldText id={slide.id} name="subtitle" text={slide.subtitle ?? ''} />
         </p>
       )}
-      <div ref={content} class={'slide-content' + (slide.image ? ' with-image' : '')}>
+      <div ref={content} class={'slide-content' + (hasImage ? ' with-image' : '')}>
         <div class="slide-text">
           {body}
           {slide.embed && (
@@ -349,8 +377,52 @@ function SlideBody({ slide }: { slide: Slide }) {
             </div>
           )}
         </div>
-        {slide.image && <SlideImage id={slide.id} src={slide.image} />}
+        {hasImage && <SlideImage id={slide.id} src={slide.image ?? ''} />}
       </div>
+    </>
+  );
+}
+
+/** Buttons that give the slide what it lacks: a subtitle (to type in), a picture (a file chosen). */
+function AddToSlide({ slide, canHaveImage }: { slide: Slide; canHaveImage: boolean }) {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const pick = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      {!store.field(slide.id, 'subtitle') && (
+        <button
+          class="mini"
+          onClick={() => {
+            const f = store.addField(slide.id, 'subtitle', '');
+            ctl.commit(fText(f.id, 0));
+          }}
+        >
+          {t('+ サブタイトル', '+ Subtitle')}
+        </button>
+      )}
+      {canHaveImage && !store.field(slide.id, 'image') && (
+        <>
+          <button
+            class="mini"
+            onClick={() => pick.current?.click()}
+            title={t('画像は貼り付けやドロップでも入ります', 'Or paste or drop a picture')}
+          >
+            {t('+ 画像', '+ Picture')}
+          </button>
+          <input
+            ref={pick}
+            type="file"
+            accept="image/png, image/jpeg, image/gif, image/webp"
+            hidden
+            onChange={(e) => {
+              const file = e.currentTarget.files?.[0];
+              e.currentTarget.value = '';
+              if (file) ctl.setImage(slide.id, file);
+            }}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -493,14 +565,16 @@ function SlideImage({ id, src }: { id: string; src: string }) {
   const editing = !!f && ctl.activeField === fText(f.id).key;
   return (
     <div class="slide-image-box">
-      <img
-        class="slide-image"
-        src={fileUrl(src)}
-        alt=""
-        title={f ? t('クリックで画像のアドレスを編集', "Click to edit the picture's address") : undefined}
-        onClick={() => f && ctl.focus(fText(f.id, 'end'))}
-      />
-      {editing && (
+      {src && (
+        <img
+          class="slide-image"
+          src={fileUrl(src)}
+          alt=""
+          title={f ? t('クリックで画像のアドレスを編集', "Click to edit the picture's address") : undefined}
+          onClick={() => f && ctl.focus(fText(f.id, 'end'))}
+        />
+      )}
+      {f && (editing || !src) && (
         <div class="slide-image-src">
           <NodeText node={f} />
         </div>
