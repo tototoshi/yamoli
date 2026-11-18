@@ -489,7 +489,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 
 /* folded fields: one line right after the row's text (clear of the buttons at the far end) */
 .row:has(> .fields-summary) > :is(.text, .rich) { flex: 0 1 auto; min-width: 2em; }
-.row:has(> .fields-summary) > :is(.text, .rich textarea) { field-sizing: content; }
+/* the editor no wider than its text, so the summary stays put as the row is typed in */
+.row:has(> .fields-summary) > .rich > textarea { field-sizing: content; min-width: 0; }
 .fields-summary {
   flex: 0 1 auto;
   margin-right: auto;
