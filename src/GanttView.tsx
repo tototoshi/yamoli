@@ -347,9 +347,12 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
     }
     ctl.commit();
   };
-  const cellInput = (id: string, col: number) => (
-    <CellInput key={col} value={editText(id, col)} onDone={(text) => finishEdit(id, col, text)} />
-  );
+  const cellInput = (id: string, col: number) => {
+    if (col !== 0 && col !== 1) return <CellInput key={col} value={editText(id, col)} onDone={(text) => finishEdit(id, col, text)} />;
+    const s = schedule.byId.get(id);
+    const day = s ? (col === 0 ? s.start : s.end) : now;
+    return <DateCell key={col} value={editText(id, col)} day={day} onDone={(text) => finishEdit(id, col, text)} />;
+  };
 
   // The pointer is followed on the whole window until it is let go (Escape puts the bar back).
   const startDrag = (e: PointerEvent, id: string, s: Sched) => {
@@ -918,5 +921,40 @@ function Bar({ s, x, y }: { s: Sched; x: (d: Day) => number; y: number }) {
       <rect x={x0 + 0.5} y={mid - 7} width={Math.max(x1 - x0 - 1, 2)} height={14} rx={3} class={'bar' + (s.critical ? ' critical' : '')} />
       {late !== null && <rect x={x(late) + 0.5} y={mid - 7} width={Math.max(x1 - x(late) - 1, 2)} height={14} rx={3} class="bar late" />}
     </>
+  );
+}
+
+/**
+ * A start or end being typed in (as `12/3` or a full date), the browser's
+ * date picker opened beside it: a day picked there is taken at once.
+ */
+function DateCell({ value, day, onDone }: { value: string; day: Day; onDone: (text: string | null) => void }) {
+  const picker = useRef<HTMLInputElement>(null);
+  const finished = useRef(false);
+  const done = (text: string | null) => {
+    if (finished.current) return;
+    finished.current = true;
+    onDone(text);
+  };
+  useLayoutEffect(() => {
+    try {
+      picker.current?.showPicker(); // still within the click that started editing
+    } catch {
+      // no picker (or no click to open it for): typing still works
+    }
+  }, []);
+  return (
+    <span class="gantt-date-edit">
+      <CellInput value={value} onDone={done} />
+      <input
+        ref={picker}
+        type="date"
+        class="gantt-date-picker"
+        tabIndex={-1}
+        aria-hidden="true"
+        value={formatDate(day)}
+        onChange={(e) => e.currentTarget.value && done(e.currentTarget.value)}
+      />
+    </span>
   );
 }

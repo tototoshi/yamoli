@@ -48,7 +48,8 @@ export function CellInput({
         if (e.key === 'Enter') finish(text);
         else if (e.key === 'Escape') finish(null);
       }}
-      onBlur={() => finish(text)}
+      // Not when the window itself loses focus (to a date picker, or another app): the box is still being typed in.
+      onBlur={() => document.hasFocus() && finish(text)}
     />
   );
   if (!marked) return field;
