@@ -6,6 +6,7 @@
  *   moved          start (and end, for an item given its last day)
  *   end dragged    duration (working days, or calendar days for 10cd), or end
  *   days typed     the same, as that many working days
+ *   bar drawn      start and duration, on a row with no bar yet
  *
  * Dependencies still win: a bar moved before what it waits for stays after it.
  */
@@ -38,4 +39,14 @@ export function resizeTo(store: OutlineStore, id: string, s: Sched, day: Day, ca
 export function setDays(store: OutlineStore, id: string, s: Sched | undefined, n: number, cal: WorkCalendar) {
   if (n > 0 && s?.kind === 'task') resizeTo(store, id, s, cal.addWorkdays(s.start, n), cal);
   else store.setField(id, 'duration', `${n}d`);
+}
+
+/** Give an item with no bar yet one from day from to day to: its start, and the working days between (calendar days, with none). */
+export function drawBar(store: OutlineStore, id: string, from: Day, to: Day, cal: WorkCalendar) {
+  const [a, b] = from <= to ? [from, to] : [to, from];
+  const work = cal.workdaysBetween(a, b);
+  store.setField(id, 'start', formatDate(a));
+  store.setField(id, 'duration', work > 0 ? `${work}d` : `${b - a + 1}cd`);
+  const end = store.field(id, 'end');
+  if (end) store.remove(end.id);
 }

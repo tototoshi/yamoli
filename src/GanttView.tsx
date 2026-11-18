@@ -20,7 +20,7 @@ import { useCtl } from './context';
 import { lang, t } from './i18n';
 import { standaloneSvg } from './exportImage';
 import { ExportTools, type Drawing } from './ExportTools';
-import { moveTo, resizeTo, setDays } from './ganttEdit';
+import { drawBar, moveTo, resizeTo, setDays } from './ganttEdit';
 import { CellInput } from './CellInput';
 import { addDependency, dependencies, removeDependency, wouldCycle } from './deps';
 import { dependencyLinks, ganttRange, monthBands, schedTooltip, scheduleIssue } from './gantt';
@@ -182,6 +182,10 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   const [editing, setEditing] = useState<{ id: string; col: number } | null>(null);
   /** A dependency being drawn from a bar: where the pointer is, and the row under it. */
   const [link, setLink] = useState<{ from: string; px: number; py: number; to: string | null } | null>(null);
+  /** A bar being drawn on a row with none, from day to day. */
+  const [draft, setDraft] = useState<{ id: string; from: Day; to: Day } | null>(null);
+  /** A row just added, its name being typed: taken away again if left without one. */
+  const [added, setAdded] = useState<string | null>(null);
   /** The arrow clicked (`from>to`), which Delete or its × removes. */
   const [picked, setPicked] = useState<string | null>(null);
   /** In a document, how wide its days are (an index into GANTT_SCALES), once zoomed. */
@@ -310,6 +314,13 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   };
   const finishEdit = (id: string, col: number, text: string | null) => {
     setEditing(null);
+    if (id === added) {
+      setAdded(null);
+      if (!text?.trim()) {
+        store.remove(id);
+        return ctl.commit();
+      }
+    }
     if (text === null || text === editText(id, col)) return;
     const s = schedule.byId.get(id);
     const cal = calendarAt(store, id, ctl.jpDays);
@@ -370,6 +381,44 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
     window.addEventListener('keydown', key, true);
     setDrag({ id, mode, from, delta: 0 });
   };
+  /** Whether a bar can be drawn on id's row: one with no bar and nothing under it to span. */
+  const drawable = (id: string) => editable && !schedule.byId.has(id) && !store.items(id).length && !schedule.invalid.has(id);
+  // Drawn by dragging along the row from the day it starts to the day it ends (a click: one day).
+  const startDraw = (e: PointerEvent, id: string) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const svg = (e.currentTarget as SVGElement).ownerSVGElement!;
+    const day = (ev: PointerEvent) => range.from + Math.floor((ev.clientX - svg.getBoundingClientRect().left) / dw);
+    const from = day(e);
+    const move = (ev: PointerEvent) => setDraft({ id, from, to: day(ev) });
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('keydown', key, true);
+      setDraft(null);
+    };
+    const up = (ev: PointerEvent) => {
+      stop();
+      drawBar(store, id, from, day(ev), calendarAt(store, id, ctl.jpDays));
+      ctl.commit();
+    };
+    const key = (ev: KeyboardEvent) => ev.key === 'Escape' && (ev.preventDefault(), ev.stopPropagation(), stop());
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('keydown', key, true);
+    setPicked(null);
+    setDraft({ id, from, to: from });
+  };
+  /** A new row at the end, its name typed at once (its bar then drawn on its row). */
+  const addRow = () => {
+    const id = store.addChild(zoomId, -1, '').id;
+    ctl.commit();
+    setAdded(id);
+    setEditing({ id, col: -1 });
+  };
+
   /** Why from can't be made a dependency of to, or null when it can. */
   const linkProblem = (from: string, to: string) =>
     store.isAncestor(from, to) || store.isAncestor(to, from)
@@ -463,9 +512,27 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
     </>
   );
 
+  const addButton = editable && (
+    <button
+      class="mini"
+      title={t(
+        '最後に作業の行を足す（バーは行の上をドラッグして描く）',
+        'Add a task row at the end (then drag along its row to draw its bar)'
+      )}
+      onClick={addRow}
+    >
+      {t('+ 作業', '+ Task')}
+    </button>
+  );
+
   return (
     <div class={'gantt-wrap' + (embedded ? ' embedded' : '')} data-holding={embedded && picked ? '' : undefined}>
-      {own && <div class="gantt-tools">{zoomTools}</div>}
+      {own && (
+        <div class="gantt-tools">
+          {zoomTools}
+          {addButton}
+        </div>
+      )}
       {!embedded && (
         <div class="gantt-tools">
           {zoomTools}
@@ -477,6 +544,7 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
           >
             {t('日付', 'Dates')}
           </button>
+          {addButton}
           <span class="gantt-legend">
             <i class="lg task" />
             {t('作業', 'Task')} <i class="lg critical" />
@@ -675,9 +743,12 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
                 y={rowY(i)}
                 width={width}
                 height={ROW}
-                class={'row' + (i % 2 ? ' odd' : '')}
+                class={'row' + (i % 2 ? ' odd' : '') + (drawable(id) ? ' drawable' : '')}
                 onMouseEnter={() => setHover(id)}
-              />
+                onPointerDown={drawable(id) ? (e) => startDraw(e, id) : undefined}
+              >
+                {drawable(id) && <title>{t('ドラッグしてバーを描く', 'Drag to draw a bar')}</title>}
+              </rect>
             ))}
             {hover !== null && index.has(hover) && <rect x={0} y={rowY(index.get(hover)!)} width={width} height={ROW} class="row-hover" />}
             {offDays.map((d) => (
@@ -717,7 +788,7 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
               const y = rowY(i);
               if (!s) {
                 // Explain the missing bar, at the visible left edge.
-                const issue = scheduleIssue(store, id, schedule, ctl.cycles);
+                const issue = draft?.id === id ? null : scheduleIssue(store, id, schedule, ctl.cycles);
                 return issue ? (
                   <text key={id} x={scrollLeft + 6} y={y + ROW / 2 + 4} class={'unscheduled' + (issue.startsWith('⚠') ? ' invalid' : '')}>
                     {issue}
@@ -756,6 +827,20 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
               );
             })}
 
+            {draft && index.has(draft.id) && (
+              <g class="bar-draft">
+                <rect
+                  x={x(Math.min(draft.from, draft.to))}
+                  y={rowY(index.get(draft.id)!) + ROW / 2 - 7}
+                  width={(Math.abs(draft.to - draft.from) + 1) * dw}
+                  height={14}
+                  rx={3}
+                />
+                <text x={x(Math.max(draft.from, draft.to) + 1) + 8} y={rowY(index.get(draft.id)!) + ROW / 2 + 4} class="drag-label">
+                  {shortDate(Math.min(draft.from, draft.to), now) + ' – ' + shortDate(Math.max(draft.from, draft.to), now)}
+                </text>
+              </g>
+            )}
             {/* drawing dependencies: the dot after the hovered bar, the line being drawn, the arrow picked */}
             {editable && !drag && !link && hover !== null && schedule.byId.has(hover) && index.has(hover) && (
               <circle

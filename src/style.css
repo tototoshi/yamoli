@@ -1320,6 +1320,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .gantt-svg g.dragging .bar, .gantt-svg g.dragging .milestone { opacity: 0.75; }
 .gantt-svg .bar-handle { fill: transparent; cursor: ew-resize; }
 .gantt-svg .drag-label { font-size: 11px; fill: var(--fg); pointer-events: none; }
+/* A bar drawn on a row with none: the pointer a crosshair over it, the bar faint until let go. */
+.gantt-svg .row.drawable { cursor: crosshair; }
+.gantt-svg .bar-draft rect { fill: var(--bar); opacity: 0.55; pointer-events: none; }
 
 /* Drawing and removing dependencies on the Gantt chart. */
 .gantt-svg .dep-hit { fill: none; stroke: transparent; stroke-width: 10; pointer-events: stroke; cursor: pointer; }

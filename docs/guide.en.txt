@@ -86,6 +86,8 @@ Using Yamoli
         **Drag a bar** to move its start (it gets a `start`; an item given an `end` has that moved along). It can't go before what it depends on: it stops just after that finishes.
         **Drag a bar's right end** to move its end. This rewrites `duration` in working days (calendar days for an item like `10cd`; an item given an `end` gets a new `end`).
         **Click a name, start, end or days** to type in it. Dates can be just month/day, like `12/3` (this year). `0` days makes a milestone. Giving an unscheduled item a start or a number of days schedules it. Enter keeps the change, Esc drops it.
+        **Add a task** with **+ Task** above the chart: a row is added at the end, its name ready to type (Esc with nothing typed takes it away).
+        **Draw a bar** by dragging along a row with none, from the day it starts to the day it ends (it gets a `start` and a `duration` in working days; a click alone makes one day).
         **Add a dependency** by pointing at a bar, so that a small dot appears after it, and dragging from the dot to the row that should start after it; the dependency goes into that row's `after`. A dependency that would make a cycle, or one between an item and something inside it, isn't added.
         **Remove a dependency** by clicking an arrow to select it, then pressing Delete (or clicking the × on it). It comes out of the row's `after`.
         **›** beside a name zooms into that item.

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { parseDate, parseDateInput, WorkCalendar } from './calendar';
 import { findCycles } from './deps';
-import { moveTo, resizeTo, setDays } from './ganttEdit';
+import { drawBar, moveTo, resizeTo, setDays } from './ganttEdit';
 import { OutlineStore } from './model';
 import { computeSchedule } from './schedule';
 
@@ -76,4 +76,17 @@ test('dates can be typed short, in the current year', () => {
   expect(parseDateInput('2027/1/5', now)).toBe(day('2027-01-05'));
   expect(parseDateInput('2/30', now)).toBeNull();
   expect(parseDateInput('soon', now)).toBeNull();
+});
+
+test('a bar drawn on a row with none gives it a start and working days, either way it is drawn', () => {
+  const s = OutlineStore.create();
+  const id = s.addChild(s.rootId, -1, 'New').id;
+  s.addField(id, 'end', '2026-12-01');
+  const mon = day('2026-11-16');
+  drawBar(s, id, mon + 4, mon, cal); // Friday back to Monday
+  expect(s.fieldValue(id, 'start')).toBe('2026-11-16');
+  expect(s.fieldValue(id, 'duration')).toBe('5d');
+  expect(s.field(id, 'end')).toBeUndefined();
+  drawBar(s, id, mon + 5, mon + 6, cal); // a weekend: calendar days
+  expect(s.fieldValue(id, 'duration')).toBe('2cd');
 });
