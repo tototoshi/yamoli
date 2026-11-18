@@ -552,12 +552,13 @@ export class ViewState {
     this.search = this.runSearch();
     const zoom = store.node(this.zoomId);
     let focus: Focus | null = null;
+    const first = this.view === 'outline' ? this.visibleRows()[0] : undefined;
     if (store.visible(this.zoomId).includes(prev)) {
       focus = fText(prev); // zoomed out: land on the node we came from
+    } else if (first) {
+      focus = fText(first); // the title stays drawn, its formatting shown, until clicked
     } else if (this.zoomId !== store.rootId) {
-      focus = fText(this.zoomId);
-    } else if (zoom.children.length) {
-      focus = fText(zoom.children[0]);
+      focus = fText(this.zoomId); // nothing under it yet: name it, or Enter for its first row
     }
     this.focus(this.view === 'outline' ? focus : null);
     window.scrollTo(0, 0);

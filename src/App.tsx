@@ -103,7 +103,7 @@ export function App() {
   if (ctl.selection && !ctl.selected.size) ctl.selection = null;
   if (ctl.schedule.needsJp) ctl.loadJpHolidays();
   const rows = ctl.shownChildren(zoomId);
-  document.title = (zoomId === store.rootId ? 'Home' : zoom.text || t('無題', 'Untitled')) + ' – Yamoli';
+  document.title = (zoomId === store.rootId ? 'Home' : nodeLabel(store, zoomId) || t('無題', 'Untitled')) + ' – Yamoli';
 
   if (ctl.docs) {
     document.title = t('使い方', 'Guide') + ' – Yamoli';
@@ -397,15 +397,16 @@ function FieldKey({ node }: { node: OutlineNode }) {
 export function NodeText({ node, title }: { node: OutlineNode; title?: boolean }) {
   const ctl = useCtl();
   const key = 'text:' + node.id;
-  if (!title && ctl.activeField !== key) {
+  // Drawn, its formatting shown (the zoomed item's title too), until it is typed in.
+  if (ctl.activeField !== key) {
     const { store } = ctl;
     // An object in a list (`- name: …`) has no text of its own: show what it holds.
     const fields = !node.text && store.isData(node.id) ? node.children.filter((c) => store.isField(c)) : [];
     return (
       <InlineView
-        class="text text-view"
+        class={'text text-view' + (title ? ' title' : '')}
         text={node.text}
-        placeholder={fields.length ? fields.map((f) => nodeLabel(store, f)).join(' · ') : undefined}
+        placeholder={fields.length ? fields.map((f) => nodeLabel(store, f)).join(' · ') : title ? t('無題', 'Untitled') : undefined}
         data-id={node.id}
         onEdit={(pos) => ctl.focus(fText(node.id, pos))}
       />
