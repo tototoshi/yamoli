@@ -1,15 +1,15 @@
 import { expect, test } from 'vitest';
-import { buildDoc, docContents, headingOf, withHeading, type DocPart } from './doc';
+import { buildDoc, docContents, headingOf, setDocStyle, withHeading, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
-/** The parts in short: `h1 Text`, `list[A, B(C)]`, `data`, `embed diagram`. */
+/** The parts in short: `h1 Text`, `list[A, B(C)]`, `text[A, B]`, `data`, `embed diagram`. */
 function sketch(s: OutlineStore, parts: DocPart[]): string[] {
   const label = (id: string) => s.node(id).text;
   return parts.map((p) =>
     p.kind === 'heading'
       ? `h${p.level} ${label(p.id)}`
       : p.kind === 'list'
-        ? `list[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
+        ? `${p.style}[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
         : p.kind === 'data'
           ? 'data'
           : `embed ${p.as}`
@@ -69,7 +69,8 @@ test('a # row inside a list ends it, as in Markdown: it and the rows after it in
     'list[企画(キックオフ)]',
     'h2 ## 要件定義',
     'list[ヒアリング]',
-    'list[まとめ, 設計]', // after the heading's rows, as nothing is there to end its section
+    'list[まとめ]', // after the heading's rows, as nothing is there to end its section
+    'list[設計]', // rows under another row: a list of their own, its style switched on its own
   ]);
 });
 
@@ -99,4 +100,28 @@ test('headingOf reads the #s, withHeading sets them', () => {
   expect(withHeading('## 進め方', 1)).toBe('# 進め方');
   expect(withHeading('進め方', 3)).toBe('### 進め方');
   expect(withHeading('# 進め方', 0)).toBe('進め方');
+});
+
+test('doc: text makes paragraphs of the rows under a row, and of those in the sections under it; doc: list a list again', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const doc = add(s.rootId, 'Doc');
+  setDocStyle(s, doc, 'text');
+  add(doc, '前書き');
+  const why = add(doc, '# 背景');
+  const old = add(why, '今のポータルは古い');
+  add(old, 'スマホで見づらい');
+  const ask = add(doc, '# 要望');
+  s.addField(ask, 'doc', '箇条書き');
+  add(ask, '検索');
+  const parts = buildDoc(s, doc).parts;
+  expect(sketch(s, parts)).toEqual(['text[前書き]', 'h1 # 背景', 'text[今のポータルは古い(スマホで見づらい)]', 'h1 # 要望', 'list[検索]']);
+  const rows = parts.filter((p) => p.kind === 'list');
+  expect(rows.map((p) => [p.under, p.inherited])).toEqual([
+    [doc, 'list'],
+    [why, 'text'],
+    [ask, 'text'],
+  ]);
+  setDocStyle(s, doc, null);
+  expect(s.field(doc, 'doc')).toBeUndefined();
 });

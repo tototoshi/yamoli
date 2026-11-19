@@ -797,6 +797,16 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc-embed { margin: 0 0 1.2em; padding: 12px; border: 1px solid var(--faint); border-radius: 8px; }
 /* A diagram is drawn as in its own view: fitted when opened, zoomed with its buttons, scrolled sideways. */
 .doc-embed .diagram-wrap { padding: 0; }
+/* The list or paragraphs switch, at the side of the rows it is for, while the pointer is over them. */
+.doc-rows { position: relative; }
+.doc-style { position: absolute; top: 0; right: 100%; margin-right: 36px; font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.1s; }
+.doc-rows:hover > .doc-style, .doc-style:focus-visible { opacity: 1; }
+@media (max-width: 1100px), (hover: none) {
+  .doc-style { position: static; display: block; margin: 0 0 2px auto; }
+}
+@media (hover: none) {
+  .doc-style { opacity: 1; }
+}
 
 /* ---------------------------------------------------------------- gantt */
 

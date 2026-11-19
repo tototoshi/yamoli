@@ -1,7 +1,7 @@
 /*
  * Document view: the zoomed item written out (see doc.ts): its rows as a
- * bulleted list, `#` rows as headings, its blocks and embedded drawings among
- * them. Text can be selected and copied across lines; a click (not a drag)
+ * bulleted list (or paragraphs, switched beside them), `#` rows as headings,
+ * its blocks and embedded drawings among them. Text can be selected and copied across lines; a click (not a drag)
  * edits the line's row right there, as in the outline (Enter a new row after
  * it, Tab under the one above, and so on). It can also show an outline of its
  * own, only to be read (the guide). With a few headings, their contents go at
@@ -11,7 +11,7 @@ import { createContext, type ComponentChildren } from 'preact';
 import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
-import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
+import { buildDoc, docContents, setDocStyle, type DocItem, type DocPart, type Extra } from './doc';
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
@@ -145,7 +145,7 @@ function Text({ id }: { id: string }) {
 
 function Part({ part }: { part: DocPart }) {
   if (part.kind === 'heading') return <Heading id={part.id} level={part.level} />;
-  if (part.kind === 'list') return <List items={part.items} />;
+  if (part.kind === 'list') return <Rows part={part} />;
   return <ExtraView extra={part} />;
 }
 
@@ -165,6 +165,53 @@ function Check({ id }: { id: string }) {
   const n = store.node(id);
   if (!n.task && !n.completed) return null;
   return <input type="checkbox" class="doc-check" checked={n.completed} disabled={readOnly} onChange={() => ctl.toggleComplete(id)} />;
+}
+
+/** Rows side by side, as a list or as paragraphs, with the switch between them at their side. */
+function Rows({ part }: { part: Extract<DocPart, { kind: 'list' }> }) {
+  const { ctl, readOnly } = useSource();
+  const to = part.style === 'list' ? 'text' : 'list';
+  return (
+    <div class="doc-rows">
+      {!readOnly && (
+        <button
+          class="mini doc-style"
+          title={t(
+            'この行のまとまりの書き方を切り替える（上の行に doc 属性が付きます）',
+            'Switch how these rows are written (writes doc on the row above)'
+          )}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            setDocStyle(ctl.store, part.under, to === part.inherited ? null : to);
+            ctl.commit(null);
+          }}
+        >
+          {to === 'text' ? t('段落にする', 'Paragraphs') : t('箇条書きにする', 'List')}
+        </button>
+      )}
+      {part.style === 'list' ? <List items={part.items} /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
+    </div>
+  );
+}
+
+/** A row as a paragraph; the rows under it paragraphs after it (with `doc: text` on it), else a list. */
+function Paragraph({ item }: { item: DocItem }) {
+  const { store } = useSource();
+  const ref = useRef<HTMLDivElement>(null);
+  useFlowEditor(ref);
+  return (
+    <>
+      {/* A div, not a p: the row editor in it is one. */}
+      <div ref={ref} class={'doc-line doc-p' + (store.node(item.id).completed ? ' done' : '')}>
+        <Check id={item.id} />
+        <Text id={item.id} />
+      </div>
+      {item.extras.map((x, i) => (
+        <ExtraView key={i} extra={x} />
+      ))}
+      {item.text ? item.items.map((it) => <Paragraph key={it.id} item={it} />) : item.items.length > 0 && <List items={item.items} />}
+    </>
+  );
 }
 
 function List({ items }: { items: DocItem[] }) {
@@ -190,7 +237,7 @@ function ListItem({ item, done }: { item: DocItem; done: boolean }) {
       {item.extras.map((x, i) => (
         <ExtraView key={i} extra={x} />
       ))}
-      {item.items.length > 0 && <List items={item.items} />}
+      {item.text ? item.items.map((it) => <Paragraph key={it.id} item={it} />) : item.items.length > 0 && <List items={item.items} />}
     </li>
   );
 }

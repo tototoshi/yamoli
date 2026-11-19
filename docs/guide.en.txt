@@ -231,12 +231,13 @@ Using Yamoli
       **Diagram** — the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
       **Mind map** — the rows branching out from the zoomed item, as they are nested. Turned on with `views: mindmap` (`マインドマップ`).
       **Slides** — the rows as a slide deck (see Slides). Turned on with `views: slides`.
-      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, `#` rows are headings and tasks checklist items; the Tasks only, Completed and Fields toggles apply.
+      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, `#` rows are headings, rows under `doc: text` paragraphs and tasks checklist items; the Tasks only, Completed and Fields toggles apply.
       **YAML / JSON** — the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
     ## The Document view
       The Document view writes the rows out as they are, a bulleted list nested as the outline is, to read from the top. It doesn’t guess headings or paragraphs from how the rows are laid out. What is written as Markdown is drawn as such:
         A row starting with `# ` is a heading (`## ` / `### ` for the levels under it). The rows under it follow it, as its section. The `#`s show while it is typed in and are hidden otherwise (in the outline too).
-        Prose goes in a Markdown block (Alt+D), drawn where it is as paragraphs.
+        For paragraphs rather than a list, hover over the rows and press **Paragraphs** at their left (this writes `doc: text` on the row above them). The rows under it are then a paragraph each, and so are those in the sections under it; rows under a paragraph are a list after it. **List** turns them back (on paragraphs it inherits, it writes `doc: list`).
+        Long prose or tables can also go in a Markdown block (Alt+D), drawn where it is.
         Tasks made with `[ ]` have checkboxes.
         `embed: [[item]] diagram` draws that item’s diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item’s `description` leads the document.
       On the line being typed in, **⌘⌥1** / **⌘⌥2** / **⌘⌥3** make it a heading (writing the `#`s at its start) and **⌘⌥0** a plain row again (Ctrl+Alt outside macOS; in the outline too).
