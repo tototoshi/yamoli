@@ -39,6 +39,7 @@ test('YAML-ish text becomes a tree of rows and fields', () => {
         ['', [['name: 鈴木']]],
       ],
     ],
+    ['# a comment'], // a heading, as in Markdown
   ]);
 });
 

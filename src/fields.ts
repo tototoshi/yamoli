@@ -49,7 +49,7 @@ export function parseOutlineText(text: string): TextRow[] {
   const list = isMarkdownList(lines);
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
-    if (!raw.trim() || /^\s*#/.test(raw)) continue;
+    if (!raw.trim()) continue; // (a `#` line is a row: a heading, as in Markdown)
     let indent = raw.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length;
     let line = raw.trim();
     const marker = line.match(/^(?:[-*+]|\d+[.)])\s+/);

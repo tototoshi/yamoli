@@ -546,23 +546,19 @@ test('on a slide, Enter in its title makes its first bullet, before those it has
   location.hash = '';
 });
 
-test('in the document view, ⌘⌥1 makes the line a heading and ⌘⌥0 body text again', () => {
-  let doc = '',
-    line = '';
+test('⌘⌥1 to ⌘⌥3 make the line a heading (its #s written), ⌘⌥0 a plain row again; the caret stays on its word', () => {
+  let line = '';
   const ctl = setup((s, add) => {
-    doc = add(s.rootId, 'Doc');
-    s.addField(doc, 'views', 'doc');
-    line = add(doc, 'A sentence.');
-    add(doc, 'Another.');
+    line = add(s.rootId, 'A sentence.');
   });
-  location.hash = `#/${doc}?view=doc`;
-  ctl.onHashChange();
-  const mod = { code: 'Digit1', altKey: true, metaKey: true, ctrlKey: true };
-  expect(press(ctl, editor(ctl, line, 2), '¡', mod).defaultPrevented).toBe(true);
-  expect(ctl.store.field(line, 'doc')?.text).toBe('heading');
-  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + line }));
+  const mod = { altKey: true, metaKey: true, ctrlKey: true };
+  expect(press(ctl, editor(ctl, line, 2), '¡', { ...mod, code: 'Digit1' }).defaultPrevented).toBe(true);
+  expect(ctl.store.node(line).text).toBe('# A sentence.');
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + line, start: 4 }));
+  press(ctl, editor(ctl, line, 4), '™', { ...mod, code: 'Digit2' });
+  expect(ctl.store.node(line).text).toBe('## A sentence.');
   press(ctl, editor(ctl, line), 'º', { ...mod, code: 'Digit0' });
-  expect(ctl.store.field(line, 'doc')).toBeUndefined();
+  expect(ctl.store.node(line).text).toBe('A sentence.');
 });
 
 test('in the document view, Backspace at the start of a line joins it to the one before, its rows kept in place', () => {

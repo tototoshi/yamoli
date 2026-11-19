@@ -22,6 +22,7 @@ import type { OutlineNode } from './model';
 import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
 import { TopBar, ViewSwitch, ViewToggles } from './TopBar';
 import { ItemMenuView, JumpBox, LinkPickerMenu, SuggestMenu, ToastView } from './Popups';
+import { headingOf } from './doc';
 import { BookmarkMark, DependencyPanel, DepBadge, SchedLabel, ViewBadges } from './Badges';
 import { filesIn } from './files';
 
@@ -405,13 +406,16 @@ export function NodeText({ node, title }: { node: OutlineNode; title?: boolean }
     const { store } = ctl;
     // An object in a list (`- name: …`) has no text of its own: show what it holds.
     const fields = !node.text && store.isData(node.id) ? node.children.filter((c) => store.isField(c)) : [];
+    // A heading's `#`s show only while it is typed in.
+    const h = node.key === null ? headingOf(node.text) : null;
+    const skip = h?.prefix ?? 0;
     return (
       <InlineView
-        class={'text text-view' + (title ? ' title' : '')}
-        text={node.text}
+        class={'text text-view' + (title ? ' title' : '') + (h ? ' heading-' + h.level : '')}
+        text={node.text.slice(skip)}
         placeholder={fields.length ? fields.map((f) => nodeLabel(store, f)).join(' · ') : title ? t('無題', 'Untitled') : undefined}
         data-id={node.id}
-        onEdit={(pos) => ctl.focus(fText(node.id, pos))}
+        onEdit={(pos) => ctl.focus(fText(node.id, pos === 'end' ? pos : pos + skip))}
       />
     );
   }
@@ -440,9 +444,13 @@ function InlineView({
   const ctl = useCtl();
   const segs = useMemo(() => parseInline(text), [text]);
   const pointerDown = useRef(false);
+  const downAt = useRef<[number, number] | null>(null);
 
   const onClick = (e: MouseEvent) => {
     pointerDown.current = false;
+    // The end of a drag selecting text: kept, to copy.
+    const from = downAt.current;
+    if (from && Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4 && !document.getSelection()?.isCollapsed) return;
     const target = e.target as Element;
     // A click on a link edits there (the bubble then offers to open it); ⌘/Ctrl+click follows it.
     const link = target.closest<HTMLAnchorElement>('a');
@@ -477,7 +485,10 @@ function InlineView({
     <div
       class={cls}
       tabIndex={focusable ? 0 : undefined}
-      onMouseDown={() => (pointerDown.current = true)}
+      onMouseDown={(e) => {
+        pointerDown.current = true;
+        downAt.current = [e.clientX, e.clientY];
+      }}
       onFocus={() => !pointerDown.current && onEdit('end')}
       onClick={onClick}
       {...rest}

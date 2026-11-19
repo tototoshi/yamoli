@@ -7,7 +7,7 @@ import { t } from './i18n';
 import { parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
 import { toMarkdownRows } from './serialize';
-import { setDocRole } from './doc';
+import { withHeading } from './doc';
 import { fKey, fText } from './focus';
 import { arrowOf, IS_MAC, isMod } from './keys';
 import { Editing } from './editing';
@@ -203,11 +203,14 @@ export class Controller extends Editing {
     const zoomFocus = zoomId !== store.rootId ? fText(zoomId) : null;
     if (n.format !== null && !isTitle && this.blockKeydown(e, ta, n.id)) return;
 
-    // ---- the document view: ⌘⌥1 makes the line a heading, ⌘⌥0 body text (as in word processors)
-    if (this.view === 'doc' && isMod(e) && e.altKey && !e.shiftKey && (e.code === 'Digit1' || e.code === 'Digit0') && !isTitle) {
+    // ---- ⌘⌥1 to ⌘⌥3 make the line a heading (`# ` to `### `), ⌘⌥0 a plain row again (as in word processors)
+    const level = /^Digit([0-3])$/.exec(e.code);
+    if (level && isMod(e) && e.altKey && !e.shiftKey && !isTitle && n.key === null) {
       e.preventDefault();
-      if (setDocRole(store, zoomId, id, e.code === 'Digit1' ? 'heading' : 'body')) this.commit(fText(id, start, end));
-      return;
+      const text = withHeading(ta.value, Number(level[1]) as 0 | 1 | 2 | 3);
+      const shift = text.length - ta.value.length;
+      store.setText(id, text);
+      return this.commit(fText(id, Math.max(0, start + shift), Math.max(0, end + shift)));
     }
 
     // ---- structure

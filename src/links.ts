@@ -100,6 +100,7 @@ export function nodeLabel(store: OutlineStore, id: string, depth = 0): string {
   if (!n) return '';
   const text = n.text
     .split('\n')[0]
+    .replace(n.key === null ? /^#{1,3}[ \u3000]+/ : /^$/, '') // a heading's `#`s
     .replace(REF_RE, (src, ref) => (depth < 2 && store.get(ref) ? nodeLabel(store, ref, depth + 1) : src))
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)\s]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\{#?\w+\}/g, '$1')

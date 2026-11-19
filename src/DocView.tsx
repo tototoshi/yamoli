@@ -1,16 +1,17 @@
 /*
- * Document view: the zoomed item read as prose (see doc.ts): headings,
- * paragraphs and lists from its rows, its blocks and embedded drawings among
- * them. Clicking a line edits its row right there, as in the outline (Enter
- * a new row after it, Tab under the one above, and so on). It can also show
- * an outline of its own, only to be read (the guide). With a few headings,
- * their contents go at the side, the one being read marked.
+ * Document view: the zoomed item written out (see doc.ts): its rows as a
+ * bulleted list, `#` rows as headings, its blocks and embedded drawings among
+ * them. Text can be selected and copied across lines; a click (not a drag)
+ * edits the line's row right there, as in the outline (Enter a new row after
+ * it, Tab under the one above, and so on). It can also show an outline of its
+ * own, only to be read (the guide). With a few headings, their contents go at
+ * the side, the one being read marked.
  */
 import { createContext, type ComponentChildren } from 'preact';
 import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
-import { buildDoc, docContents, setDoc, type DocItem, type DocPart, type DocRole, type DocStyle, type Extra } from './doc';
+import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
@@ -19,6 +20,7 @@ import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
 import type { OutlineStore } from './model';
+import { withHeading } from './doc';
 
 /** The outline written out, and whether it is only to be read (none: the one being edited). */
 const Source = createContext<{ store: OutlineStore; readOnly: boolean } | null>(null);
@@ -66,7 +68,7 @@ export function DocView({
 }
 
 /** The headings to go to, the one being read marked. */
-function Contents({ items }: { items: { id: string; level: 2 | 3; text: string }[] }) {
+function Contents({ items }: { items: { id: string; level: 1 | 2; text: string }[] }) {
   const [at, setAt] = useState<string | null>(null);
   const ids = items.map((h) => h.id).join(' ');
   useEffect(() => {
@@ -95,7 +97,7 @@ function Contents({ items }: { items: { id: string; level: 2 | 3; text: string }
       {items.map((h) => (
         <button
           key={h.id}
-          class={'doc-toc-item level-' + h.level + (h.id === at ? ' at' : '')}
+          class={'doc-toc-item level-' + (h.level + 1) + (h.id === at ? ' at' : '')}
           onClick={() => document.querySelector(`[data-doc-id="${h.id}"]`)?.scrollIntoView({ behavior: 'smooth' })}
         >
           {h.text}
@@ -134,7 +136,7 @@ function Text({ id }: { id: string }) {
   if (readOnly) {
     return (
       <span class="text text-view">
-        <InlineText text={store.node(id).text} />
+        <InlineText text={withHeading(store.node(id).text, 0)} />
       </span>
     );
   }
@@ -142,149 +144,46 @@ function Text({ id }: { id: string }) {
 }
 
 function Part({ part }: { part: DocPart }) {
-  if (part.kind === 'heading') return <Heading id={part.id} level={part.level} auto={part.auto} />;
-  if (part.kind === 'rows') return <Rows part={part} />;
+  if (part.kind === 'heading') return <Heading id={part.id} level={part.level} />;
+  if (part.kind === 'list') return <List items={part.items} />;
   return <ExtraView extra={part} />;
 }
 
-/**
- * In the margin before a line, while the pointer is over it: make its row a
- * heading (H), or a body line again (¶); written as `doc` on it, unless that
- * is what it would be anyway (auto).
- */
-function RoleSwitch({ id, now, auto }: { id: string; now: DocRole; auto: DocRole }) {
-  const { ctl, readOnly } = useSource();
-  if (readOnly) return null;
-  const to: DocRole = now === 'heading' ? 'body' : 'heading';
-  return (
-    <button
-      class="mini doc-role"
-      title={to === 'heading' ? t('見出しにする（⌘⌥1）', 'Make it a heading (⌘⌥1)') : t('本文にする（⌘⌥0）', 'Make it body text (⌘⌥0)')}
-      // Not taking the caret from the line being typed in, which keeps it after.
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={() => {
-        const ta = document.activeElement as HTMLTextAreaElement | null;
-        const typing = ta?.dataset.id === id;
-        setDoc(ctl.store, id, 'role', to === auto ? null : to);
-        ctl.commit(typing ? fText(id, ta.selectionStart, ta.selectionEnd) : null);
-      }}
-    >
-      {to === 'heading' ? 'H' : '¶'}
-    </button>
-  );
-}
-
-function Heading({ id, level, auto }: { id: string; level: 2 | 3 | 4; auto: DocRole }) {
-  const H = `h${level}` as 'h2';
+/** A `#` row; its `#`s show only while it is typed in. */
+function Heading({ id, level }: { id: string; level: 1 | 2 | 3 }) {
+  const H = `h${level + 1}` as 'h2';
   return (
     <H class="doc-line" data-doc-id={id}>
-      <RoleSwitch id={id} now="heading" auto={auto} />
       <Text id={id} />
     </H>
-  );
-}
-
-/**
- * A paragraph; auto is what its row would be with nothing set on it. fixed:
- * among rows under a paragraph, which stay paragraphs (no switch to a heading).
- */
-function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?: boolean }) {
-  const { store } = useSource();
-  const ref = useRef<HTMLDivElement>(null);
-  useFlowEditor(ref);
-  return (
-    // A div, not a p: the row editor in it is one.
-    <div ref={ref} class={'doc-line doc-p' + (store.node(id).completed ? ' done' : '')}>
-      {!fixed && <RoleSwitch id={id} now="body" auto={auto} />}
-      <Check id={id} />
-      <Text id={id} />
-    </div>
   );
 }
 
 /** A task's checkbox, which completes it (or opens it again). */
 function Check({ id }: { id: string }) {
   const { store, readOnly, ctl } = useSource();
-  if (!store.node(id).task && !store.node(id).completed) return null;
-  return (
-    <input
-      type="checkbox"
-      class="doc-check"
-      checked={store.node(id).completed}
-      disabled={readOnly}
-      onChange={() => ctl.toggleComplete(id)}
-    />
-  );
+  const n = store.node(id);
+  if (!n.task && !n.completed) return null;
+  return <input type="checkbox" class="doc-check" checked={n.completed} disabled={readOnly} onChange={() => ctl.toggleComplete(id)} />;
 }
 
-/** The switch beside rows between a list and paragraphs (written as `doc` on under, the row above them). */
-function StyleSwitch({ under, style, auto }: { under: string; style: DocStyle; auto: boolean }) {
-  const { ctl, readOnly } = useSource();
-  if (readOnly) return null;
-  const set = (to: DocStyle | null) => {
-    setDoc(ctl.store, under, 'style', to);
-    ctl.commit(null);
-  };
-  const choice = (to: DocStyle, label: string) => (
-    <button class={'mini' + (style === to ? ' on' : '')} onClick={() => style !== to && set(to)}>
-      {label}
-    </button>
-  );
-  return (
-    <span class="doc-style" role="group" aria-label={t('書き方', 'Written as')}>
-      {choice('list', t('箇条書き', 'List'))}
-      {choice('text', t('段落', 'Paragraphs'))}
-      {!auto && (
-        <button class="mini" title={t('行の書き方から自動で決める', 'Decide from how the rows are written')} onClick={() => set(null)}>
-          {t('自動', 'Auto')}
-        </button>
-      )}
-    </span>
-  );
-}
-
-/** Rows side by side, as a list or as paragraphs. */
-function Rows({ part }: { part: Extract<DocPart, { kind: 'rows' }> }) {
-  return (
-    <div class="doc-rows">
-      <StyleSwitch under={part.under} style={part.style} auto={part.auto} />
-      {part.style === 'list' ? <List items={part.items} top /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
-    </div>
-  );
-}
-
-/** A row as a paragraph, and the rows under it: paragraphs after it (not indented), or a list under it. */
-function Paragraph({ item, fixed }: { item: DocItem; fixed?: boolean }) {
-  return (
-    <>
-      <Para id={item.id} auto={item.auto} fixed={fixed} />
-      {item.extras.map((x, i) => (
-        <ExtraView key={i} extra={x} />
-      ))}
-      {item.text ? item.items.map((it) => <Paragraph key={it.id} item={it} fixed />) : item.items.length > 0 && <List items={item.items} />}
-    </>
-  );
-}
-
-/** A list; top: of rows each in their own place, which can be made headings (not rows inside others). */
-function List({ items, top }: { items: DocItem[]; top?: boolean }) {
+function List({ items }: { items: DocItem[] }) {
   const { store } = useSource();
   return (
     <ul class={items.every((it) => it.task) ? 'doc-tasks' : undefined}>
       {items.map((it) => (
-        <ListItem key={it.id} item={it} done={store.node(it.id).completed} top={top} />
+        <ListItem key={it.id} item={it} done={store.node(it.id).completed} />
       ))}
     </ul>
   );
 }
 
-function ListItem({ item, done, top }: { item: DocItem; done: boolean; top?: boolean }) {
+function ListItem({ item, done }: { item: DocItem; done: boolean }) {
   const ref = useRef<HTMLLIElement>(null);
   useFlowEditor(ref);
   return (
     <li ref={ref} class={(item.task ? 'task' : '') + (done ? ' done' : '')}>
       <span class="doc-line">
-        {top && <RoleSwitch id={item.id} now="body" auto={item.auto} />}
         <Check id={item.id} />
         <Text id={item.id} />
       </span>

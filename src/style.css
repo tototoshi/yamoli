@@ -296,6 +296,10 @@ textarea.text {
   line-height: 1.6;
 }
 textarea.text.title { padding: 0; width: 100%; }
+/* A `#` row in the outline: its #s hidden until it is typed in, it reads as a heading. */
+.node .text-view.heading-1 { font-size: 1.25em; font-weight: 700; }
+.node .text-view.heading-2 { font-size: 1.1em; font-weight: 700; }
+.node .text-view.heading-3 { font-weight: 700; }
 
 /*
  * The row editor (RowEditor.tsx): the textarea's text is invisible and a copy
@@ -774,24 +778,6 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
  * the line's first line (where it would be, as it comes first), while the pointer is over it.
  */
 .doc { position: relative; }
-.doc .doc-role {
-  position: absolute;
-  left: -28px;
-  width: 22px;
-  margin-top: 0.15em;
-  padding: 0;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 18px;
-  text-align: center;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-.doc-line:hover > .doc-role, .doc-role:focus-visible { opacity: 1; }
-.doc-line:has(.rich:focus-within) > .doc-role { opacity: 1; } /* shown while the line is typed in */
-@media (hover: none) {
-  .doc .doc-role { display: none; }
-}
 /* A row's text in the flow of its line (a sentence among others); typed in, the outline's editor in the document's type. */
 .doc .text-view { display: inline; padding: 0; min-height: 0; line-height: inherit; }
 .doc .rich > .mirror, .doc .rich > textarea { padding: 0; font: inherit; line-height: inherit; }
@@ -806,22 +792,11 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc .block { margin: 0 0 1em; }
 /* Each line can be typed in where it is. */
 .doc-line, .doc-block { cursor: text; border-radius: 4px; }
-.doc-line:hover, .doc-block:hover { background: var(--hover); }
+.doc-block:hover { background: var(--hover); }
 .doc-block { margin: 0 0 1em; }
 .doc-embed { margin: 0 0 1.2em; padding: 12px; border: 1px solid var(--faint); border-radius: 8px; }
 /* A diagram is drawn as in its own view: fitted when opened, zoomed with its buttons, scrolled sideways. */
 .doc-embed .diagram-wrap { padding: 0; }
-/* The list or paragraphs switch, at the side of the rows it is for, while the pointer is over them. */
-.doc-rows { position: relative; }
-.doc-style { position: absolute; top: 0; right: 100%; display: flex; gap: 2px; margin-right: 36px; opacity: 0; transition: opacity 0.1s; }
-.doc-style .mini { font-size: 11px; white-space: nowrap; }
-.doc-rows:hover > .doc-style, .doc-style:focus-within { opacity: 1; }
-@media (max-width: 1100px), (hover: none) {
-  .doc-style { position: static; justify-content: flex-end; margin: 0 0 2px; }
-}
-@media (hover: none) {
-  .doc-style { opacity: 1; }
-}
 
 /* ---------------------------------------------------------------- gantt */
 
