@@ -1,7 +1,7 @@
 /*
  * Document view: the zoomed item written out (see doc.ts): its rows as a
- * bulleted list (or paragraphs, switched beside them), `#` rows as headings,
- * its blocks and embedded drawings among them. Text can be selected and copied across lines; a click (not a drag)
+ * bulleted list (rows marked so as paragraphs among them), `#` rows as
+ * headings, its blocks and embedded drawings among them. Text can be selected and copied across lines; a click (not a drag)
  * edits the line's row right there, as in the outline (Enter a new row after
  * it, Tab under the one above, and so on). It can also show an outline of its
  * own, only to be read (the guide). With a few headings, their contents go at
@@ -11,7 +11,7 @@ import { createContext, type ComponentChildren } from 'preact';
 import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
-import { buildDoc, docContents, setDocStyle, type DocItem, type DocPart, type Extra } from './doc';
+import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
 import { renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
@@ -145,7 +145,7 @@ function Text({ id }: { id: string }) {
 
 function Part({ part }: { part: DocPart }) {
   if (part.kind === 'heading') return <Heading id={part.id} level={part.level} />;
-  if (part.kind === 'list') return <Rows part={part} />;
+  if (part.kind === 'rows') return <Rows items={part.items} />;
   return <ExtraView extra={part} />;
 }
 
@@ -167,34 +167,45 @@ function Check({ id }: { id: string }) {
   return <input type="checkbox" class="doc-check" checked={n.completed} disabled={readOnly} onChange={() => ctl.toggleComplete(id)} />;
 }
 
-/** Rows side by side, as a list or as paragraphs, with the switch between them at their side. */
-function Rows({ part }: { part: Extract<DocPart, { kind: 'list' }> }) {
+/** Rows side by side, with the switch making them all paragraphs (or all list items) at their side. */
+function Rows({ items }: { items: DocItem[] }) {
   const { ctl, readOnly } = useSource();
-  const to = part.style === 'list' ? 'text' : 'list';
+  const para = !items.every((it) => it.para);
   return (
     <div class="doc-rows">
       {!readOnly && (
         <button
           class="mini doc-style"
           title={t(
-            'この行のまとまりの書き方を切り替える（上の行に doc 属性が付きます）',
-            'Switch how these rows are written (writes doc on the row above)'
+            '行のまとまりを段落 / 箇条書きにする（1 行だけなら、行の先頭で Backspace か - ）',
+            'Make these rows paragraphs or a list (one row: Backspace at its start, or - )'
           )}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            setDocStyle(ctl.store, part.under, to === part.inherited ? null : to);
+            for (const it of items) ctl.store.node(it.id).paragraph = para;
             ctl.commit(null);
           }}
         >
-          {to === 'text' ? t('段落にする', 'Paragraphs') : t('箇条書きにする', 'List')}
+          {para ? t('段落にする', 'Paragraphs') : t('箇条書きにする', 'List')}
         </button>
       )}
-      {part.style === 'list' ? <List items={part.items} /> : part.items.map((it) => <Paragraph key={it.id} item={it} />)}
+      <Flow items={items} />
     </div>
   );
 }
 
-/** A row as a paragraph; the rows under it paragraphs after it (with `doc: text` on it), else a list. */
+/** Rows in order: list items together in a list, paragraphs between. */
+function Flow({ items }: { items: DocItem[] }) {
+  const runs: DocItem[][] = [];
+  for (const it of items) {
+    const last = runs.at(-1);
+    if (last && !it.para && !last[0].para) last.push(it);
+    else runs.push([it]);
+  }
+  return <>{runs.map((r) => (r[0].para ? <Paragraph key={r[0].id} item={r[0]} /> : <List key={r[0].id} items={r} />))}</>;
+}
+
+/** A row as a paragraph; the rows under it come after it. */
 function Paragraph({ item }: { item: DocItem }) {
   const { store } = useSource();
   const ref = useRef<HTMLDivElement>(null);
@@ -209,7 +220,7 @@ function Paragraph({ item }: { item: DocItem }) {
       {item.extras.map((x, i) => (
         <ExtraView key={i} extra={x} />
       ))}
-      {item.text ? item.items.map((it) => <Paragraph key={it.id} item={it} />) : item.items.length > 0 && <List items={item.items} />}
+      <Flow items={item.items} />
     </>
   );
 }
@@ -237,7 +248,7 @@ function ListItem({ item, done }: { item: DocItem; done: boolean }) {
       {item.extras.map((x, i) => (
         <ExtraView key={i} extra={x} />
       ))}
-      {item.text ? item.items.map((it) => <Paragraph key={it.id} item={it} />) : item.items.length > 0 && <List items={item.items} />}
+      <Flow items={item.items} />
     </li>
   );
 }

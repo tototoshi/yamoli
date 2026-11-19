@@ -571,8 +571,7 @@ test('in the document view, Backspace at the start of a line joins it to the one
     doc = add(s.rootId, 'Doc');
     s.addField(doc, 'views', 'doc');
     intro = add(doc, 'Intro.');
-    sec = add(doc, 'Section');
-    s.addField(sec, 'doc', 'heading');
+    sec = add(doc, '# Section');
     a = add(sec, 'A.');
     b = add(sec, 'B.');
     s.addField(sec, 'owner', 'me');
@@ -583,9 +582,10 @@ test('in the document view, Backspace at the start of a line joins it to the one
   expect(ctl.store.node(intro).text).toBe('Intro.Section');
   expect(ctl.store.items(doc)).toEqual([intro, a, b]); // the section's rows where they were, a level up
   expect(ctl.store.field(intro, 'owner')?.text).toBe('me');
-  expect(ctl.store.field(intro, 'doc')).toBeUndefined();
   expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + intro }));
-  // The first line under its parent joins the parent.
+  // The first line under its parent joins the parent (a list item being made a paragraph first).
+  press(ctl, editor(ctl, a), 'Backspace');
+  expect(ctl.store.node(a).paragraph).toBe(true);
   press(ctl, editor(ctl, a), 'Backspace');
   expect(ctl.store.node(intro).text).toBe('Intro.SectionA.');
 });
@@ -645,4 +645,29 @@ test('typing # at the start of a row keeps the caret in it, the line being drawn
   ctl.onTextInput(a, ta);
   expect(ctl.store.node(a).text).toBe('# Plan');
   expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + a, start: 2 }));
+});
+
+test('in the document view, Backspace at the start of a list item makes it a paragraph; - typed makes it one again; Enter keeps the kind', () => {
+  let doc = '';
+  let a = '';
+  let b = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    a = add(doc, 'first');
+    b = add(doc, 'second');
+  });
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  press(ctl, editor(ctl, b), 'Backspace');
+  expect(ctl.store.node(b)).toMatchObject({ text: 'second', paragraph: true });
+  expect(ctl.store.node(a).paragraph).toBe(false);
+  press(ctl, editor(ctl, b, 6), 'Enter');
+  const c = ctl.store.node(doc).children.at(-1)!;
+  expect(ctl.store.node(c).paragraph).toBe(true);
+  const ta = editor(ctl, b);
+  ta.value = '- second';
+  ta.setSelectionRange(2, 2);
+  ctl.onTextInput(b, ta);
+  expect(ctl.store.node(b)).toMatchObject({ text: 'second', paragraph: false });
 });

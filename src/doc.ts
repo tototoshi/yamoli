@@ -8,9 +8,9 @@
  *                                    list ends it, as in Markdown: it and the
  *                                    rows after it in its place come out after
  *   any other row                   an item of the list, the rows under it nested
- *   doc: text (段落) on a row         the rows under it are paragraphs instead,
- *                                    and so are those in the sections under it
- *                                    (`doc: list`, 箇条書き, a list again)
+ *   a row marked as a paragraph     a paragraph instead (Backspace at the start
+ *                                    of an item; `- ` typed makes it one again),
+ *                                    the rows under it a list after it
  *   a task ([ ] / done)             an item with a checkbox
  *   a block (Markdown, CSV, image …) drawn where it is: prose goes in one
  *   embed: [[item]] diagram         that item's diagram there (or `mindmap`,
@@ -37,25 +37,6 @@ export function withHeading(text: string, level: 0 | 1 | 2 | 3): string {
   return level ? '#'.repeat(level) + ' ' + rest : rest;
 }
 
-export const DOC_KEY = 'doc';
-
-/** How the rows under a row are written out: as a list, or as paragraphs. */
-export type DocStyle = 'list' | 'text';
-const STYLES: Record<string, DocStyle> = { list: 'list', 箇条書き: 'list', text: 'text', 段落: 'text' };
-
-/** The style `doc` sets on id, if it does. */
-export const docStyleOf = (store: OutlineStore, id: string): DocStyle | undefined =>
-  STYLES[(store.fieldValue(id, DOC_KEY) ?? '').trim().toLowerCase()];
-
-/** Write the style of the rows under id; null takes `doc` off (back to what it inherits). */
-export function setDocStyle(store: OutlineStore, id: string, style: DocStyle | null) {
-  if (style) store.setField(id, DOC_KEY, style);
-  else {
-    const f = store.field(id, DOC_KEY);
-    if (f) store.remove(f.id);
-  }
-}
-
 /** What an `embed` draws. */
 export type EmbedAs = 'gantt' | 'diagram' | 'mindmap';
 
@@ -66,19 +47,16 @@ export interface DocItem {
   id: string;
   /** Marked as a task (or completed): drawn with a checkbox. */
   task: boolean;
+  /** A paragraph, not a list item. */
+  para: boolean;
   items: DocItem[];
-  /** Its items are paragraphs (`doc: text` on it), else a list under it. */
-  text: boolean;
   extras: Extra[];
 }
 
 export type DocPart =
   | { kind: 'heading'; id: string; level: 1 | 2 | 3 }
-  /**
-   * Rows side by side, as a bulleted list or as paragraphs; under is the row
-   * they are under, and inherited the style they would have without `doc` on it.
-   */
-  | { kind: 'list'; under: string; style: DocStyle; inherited: DocStyle; items: DocItem[] }
+  /** Rows side by side: list items, and paragraphs among them. */
+  | { kind: 'rows'; items: DocItem[] }
   | Extra;
 
 export interface Doc {
@@ -88,7 +66,7 @@ export interface Doc {
 }
 
 /** Fields that set up the views, not what the document says. */
-const QUIET = new Set(['views', DOC_KEY, 'description']);
+const QUIET = new Set(['views', 'description']);
 
 export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = true } = {}): Doc {
   const rows = (id: string) => store.items(id).filter((c) => showCompleted || !store.node(c).completed);
@@ -117,50 +95,37 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
     const at = kids.findIndex(isHeading);
     const items = (at < 0 ? kids : kids.slice(0, at)).map((c) => item(c, out));
     if (at >= 0) out.push(...kids.slice(at));
-    const text = docStyleOf(store, id) === 'text';
-    return { id, task: store.node(id).task || store.node(id).completed, items, text, extras: extrasOf(id) };
+    const n = store.node(id);
+    return { id, task: n.task || n.completed, para: n.paragraph, items, extras: extrasOf(id) };
   };
 
   const parts: DocPart[] = [];
   let run: DocItem[] = [];
-  let at = { under: rootId, inherited: 'list' as DocStyle };
   const flush = () => {
-    if (run.length) parts.push({ kind: 'list', ...at, style: docStyleOf(store, at.under) ?? at.inherited, items: run });
+    if (run.length) parts.push({ kind: 'rows', items: run });
     run = [];
   };
-  /**
-   * Rows under parent (or some of them), in their place: a heading ends the list before it, and its rows come after
-   * it; inherited is the style from the rows above (a `doc` there holds for the sections under it).
-   */
-  const write = (parent: string, ids: string[], inherited: DocStyle) => {
-    const style = docStyleOf(store, parent) ?? inherited;
+  /** Rows in their place: a heading ends the list before it, and its rows come after it. */
+  const write = (ids: string[]) => {
     for (const c of ids) {
       const h = headingOf(store.node(c).text);
       if (h) {
         flush();
         parts.push({ kind: 'heading', id: c, level: h.level }, ...extrasOf(c));
-        write(c, rowsOf(c), style);
+        write(rowsOf(c));
         flush();
         continue;
       }
-      if (at.under !== parent) flush();
-      at = { under: parent, inherited };
       const out: string[] = [];
       run.push(item(c, out));
       if (out.length) {
         flush();
-        // A heading inside the list, and what follows it there: written after the list, in the style around it.
-        // (Rows from rows nested deeper come first, each lot under its own row.)
-        for (let i = 0, j = 0; i < out.length; i = j) {
-          const under = store.parentOf(out[i])!;
-          while (j < out.length && store.parentOf(out[j]) === under) j++;
-          write(under, out.slice(i, j), style);
-        }
+        write(out);
       }
     }
   };
   parts.push(...extrasOf(rootId));
-  write(rootId, rowsOf(rootId), 'list');
+  write(rowsOf(rootId));
   flush();
   const lead = rootId !== store.rootId ? store.fieldValue(rootId, 'description') : undefined;
   return { ...(lead && { lead }), parts };

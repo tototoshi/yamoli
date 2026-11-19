@@ -30,6 +30,8 @@ export interface OutlineNode {
   task: boolean;
   /** Kept in the bookmarks, to go to from the top bar. */
   bookmarked: boolean;
+  /** Written as a paragraph in the document (and its Markdown), not a list item. */
+  paragraph: boolean;
   children: string[];
   /** Set on field rows: the field's name. null on ordinary rows. */
   key: string | null;
@@ -48,7 +50,18 @@ export function uid(): string {
 }
 
 function makeNode(text = ''): OutlineNode {
-  return { id: uid(), text, collapsed: false, completed: false, task: false, bookmarked: false, children: [], key: null, format: null };
+  return {
+    id: uid(),
+    text,
+    collapsed: false,
+    completed: false,
+    task: false,
+    bookmarked: false,
+    paragraph: false,
+    children: [],
+    key: null,
+    format: null,
+  };
 }
 
 function normalizeNode(id: string, raw: any): OutlineNode {
@@ -60,6 +73,7 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     completed: !!n.completed,
     task: !!n.task,
     bookmarked: !!n.bookmarked,
+    paragraph: !!n.paragraph,
     children: Array.isArray(n.children) ? n.children.slice() : [],
     key: typeof n.key === 'string' ? n.key : null,
     format: typeof n.key === 'string' && typeof n.format === 'string' ? n.format : null,
@@ -346,17 +360,16 @@ export class OutlineStore {
   /**
    * Join src's text on to dst, the line before it as a document reads, keeping
    * everything in the order it reads: src's rows take its place (one level
-   * up), its other fields and blocks go to dst, and its `doc` (heading or
-   * body) goes with it.
+   * up), and its other fields and blocks go to dst. A heading's `#`s go
+   * with it.
    */
   joinInto(srcId: string, dstId: string) {
     const src = this.node(srcId);
-    this.node(dstId).text += src.text;
+    this.node(dstId).text += src.text.replace(/^#{1,3}[ \u3000]+/, '');
     const parent = this.parentOf(srcId)!;
     let at = this.node(parent).children.indexOf(srcId);
     for (const c of src.children.slice()) {
       const n = this.node(c);
-      if (n.key === 'doc') continue;
       this.detach(c);
       if (n.key === null || parent === dstId) this.insert(c, parent, at++);
       else this.insert(c, dstId, -1);

@@ -17,7 +17,7 @@
  * being cluttered. A field named like one of those keys wins, and the item's
  * own entry gets a leading `_` instead.
  */
-import { docStyleOf, headingOf, type DocStyle } from './doc';
+import { headingOf } from './doc';
 import { refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 
@@ -114,8 +114,8 @@ function scalar(text: string): Value {
  * The rows under id as a nested Markdown list, for pasting elsewhere: links
  * become the linked item's label, tasks are checklist items (`[ ]`, `[x]`)
  * and fields read `name: value`. A `#` row is a heading, its rows the list
- * after it (one inside a list ends it, as in the Document view); the rows
- * under one with `doc: text` are paragraphs. Blocks
+ * after it (one inside a list ends it, as in the Document view); a row
+ * marked as a paragraph is one. Blocks
  * (multi-line values) are left out. children(id) picks the rows to include,
  * so the view's filters apply.
  */
@@ -128,39 +128,37 @@ export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id
   const lines: string[] = [];
   const isHeading = (c: string) => store.node(c).key === null && headingOf(store.node(c).text) !== null;
   /**
-   * c as a list item (or a paragraph, para); a heading among the rows under it, and those after it, go to out (to
-   * come after the list). The rows under a paragraph are a list after it, not indented.
+   * c as a list item (or a paragraph); a heading among the rows under it, and those after it, go to out (to come
+   * after the list). The rows under a paragraph are a list after it, not indented.
    */
-  const add = (c: string, depth: number, para: boolean, out: string[]) => {
+  const add = (c: string, depth: number, out: string[]) => {
     const n = store.node(c);
+    const para = n.paragraph && n.key === null;
     if (n.format !== null) return;
     const pad = '  '.repeat(depth);
     let text = withLabels(store, n.text).trim();
     if (n.key !== null) text = `${n.key}: ${text}`.trimEnd();
     else if (n.task || n.completed) text = `[${n.completed ? 'x' : ' '}] ${text}`;
-    if (para && n.key === null) lines.push('', `${pad}${text}`.trimEnd().replace(/\n/g, `\n${pad}`), '');
+    if (para) lines.push('', `${pad}${text}`.trimEnd().replace(/\n/g, `\n${pad}`), '');
     else lines.push(`${pad}- ${text}`.trimEnd().replace(/\n/g, `\n${pad}  `));
     const kids = children(c);
     const at = kids.findIndex(isHeading);
-    const textUnder = docStyleOf(store, c) === 'text';
-    for (const k of at < 0 ? kids : kids.slice(0, at)) add(k, para || textUnder ? depth : depth + 1, textUnder, out);
+    for (const k of at < 0 ? kids : kids.slice(0, at)) add(k, para ? depth : depth + 1, out);
     if (at >= 0) out.push(...kids.slice(at));
   };
-  /** Rows in their place, under parent's `doc` (else inherited, from the rows above). */
-  const write = (rows: string[], parent: string | undefined, inherited: DocStyle) => {
-    const style = (parent && docStyleOf(store, parent)) || inherited;
+  const write = (rows: string[]) => {
     for (const c of rows) {
       if (isHeading(c)) {
         lines.push('', withLabels(store, store.node(c).text).trim().replace(/\n/g, ' '), '');
-        write(children(c), c, style);
+        write(children(c));
         continue;
       }
       const out: string[] = [];
-      add(c, 0, style === 'text', out);
-      for (const r of out) write([r], store.parentOf(r), style);
+      add(c, 0, out);
+      write(out);
     }
   };
-  write(ids, ids.length ? store.parentOf(ids[0]) : undefined, 'list');
+  write(ids);
   // One empty line around a heading or a paragraph, none at the start or end.
   const text = lines
     .join('\n')

@@ -7,7 +7,7 @@ import { t } from './i18n';
 import { parseOutlineText, type TextRow } from './fields';
 import { OutlineStore } from './model';
 import { toMarkdownRows } from './serialize';
-import { withHeading } from './doc';
+import { headingOf, withHeading } from './doc';
 import { fKey, fText } from './focus';
 import { arrowOf, IS_MAC, isMod } from './keys';
 import { Editing } from './editing';
@@ -24,13 +24,14 @@ interface Copied {
   format: string | null;
   completed: boolean;
   task: boolean;
+  paragraph: boolean;
   collapsed: boolean;
   children: Copied[];
 }
 
 const copyOf = (store: OutlineStore, id: string): Copied => {
-  const { text, key, format, completed, task, collapsed, children } = store.node(id);
-  return { id, text, key, format, completed, task, collapsed, children: children.map((c) => copyOf(store, c)) };
+  const { text, key, format, completed, task, paragraph, collapsed, children } = store.node(id);
+  return { id, text, key, format, completed, task, paragraph, collapsed, children: children.map((c) => copyOf(store, c)) };
 };
 
 export class Controller extends Editing {
@@ -226,8 +227,9 @@ export class Controller extends Editing {
         const bullet = store.addChild(id, first ? store.indexOf(first) : -1, after);
         return this.commit(fText(bullet.id, 0));
       }
+      // A paragraph is followed by a paragraph, a list item by a list item.
       if (start === 0 && end === 0 && after) {
-        store.addSiblingBefore(id);
+        store.addSiblingBefore(id).paragraph = n.paragraph;
         return this.commit(fText(id, 0));
       }
       store.setText(id, before);
@@ -235,6 +237,7 @@ export class Controller extends Editing {
       const firstItem = this.shownChildren(id).find((c) => !store.isField(c));
       const next =
         firstItem && this.isExpanded(id) ? store.addChild(id, store.indexOf(firstItem), after) : store.addSiblingAfter(id, after);
+      if (store.parentOf(next.id) !== id) next.paragraph = n.paragraph;
       return this.commit(fText(next.id, 0));
     }
     if (e.key === 'Tab' && !isMod(e) && !e.altKey) {
@@ -264,6 +267,21 @@ export class Controller extends Editing {
       e.preventDefault();
       this.setDone(id, false);
       store.setTask(id, false);
+      return this.commit(fText(id, 0));
+    }
+    // In the document a list item is a paragraph first (as in word processors), before joining anything.
+    if (
+      e.key === 'Backspace' &&
+      start === 0 &&
+      end === 0 &&
+      !isTitle &&
+      this.view === 'doc' &&
+      n.key === null &&
+      !n.paragraph &&
+      !headingOf(n.text)
+    ) {
+      e.preventDefault();
+      n.paragraph = true;
       return this.commit(fText(id, 0));
     }
     // In the document a line joins the one before it whatever it holds (a heading's section joining the one before).
@@ -522,7 +540,14 @@ export class Controller extends Editing {
     copies.set(r.id, n.id);
     r.children.forEach((c) => this.addCopied(n.id, -1, c, copies));
     // After the children, as adding one opens its parent.
-    Object.assign(n, { key: r.key, format: r.format, completed: r.completed, task: r.task, collapsed: r.collapsed });
+    Object.assign(n, {
+      key: r.key,
+      format: r.format,
+      completed: r.completed,
+      task: r.task,
+      paragraph: r.paragraph,
+      collapsed: r.collapsed,
+    });
     return n.id;
   }
 

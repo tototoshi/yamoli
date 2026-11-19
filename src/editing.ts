@@ -353,6 +353,13 @@ export class Editing extends ViewState {
       this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
       return this.rerender();
     }
+    // `- ` typed at the start of a paragraph makes it a list item again.
+    const bullet = n.paragraph && n.key === null ? value.match(/^[-*・][ \u3000]/) : null;
+    if (bullet && ta.selectionStart === 2 && !n.text.startsWith(bullet[0])) {
+      store.setText(id, value.slice(2));
+      n.paragraph = false;
+      return this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
+    }
     // `# ` typed (or taken away): in the document the line is drawn anew, as a heading or in a list, the caret kept in it.
     const redrawn = n.key === null && headingOf(n.text)?.level !== headingOf(value)?.level;
     store.setText(id, value);

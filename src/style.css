@@ -260,6 +260,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .node.drag-source { opacity: 0.35; }
 .node.completed > .row .text { text-decoration: line-through; color: var(--muted); }
 .node.completed > .row .bullet .dot { background: var(--muted); }
+/* A paragraph in the document: a hollow bullet. */
+.node.paragraph > .row .bullet .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); }
 .node.completed > .block, .node.completed > ul.children { opacity: 0.55; }
 .mini.on { color: var(--accent); border-color: var(--accent); }
 .drop-indicator {

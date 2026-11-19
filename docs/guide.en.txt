@@ -231,19 +231,19 @@ Using Yamoli
       **Diagram** — the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
       **Mind map** — the rows branching out from the zoomed item, as they are nested. Turned on with `views: mindmap` (`マインドマップ`).
       **Slides** — the rows as a slide deck (see Slides). Turned on with `views: slides`.
-      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, `#` rows are headings, rows under `doc: text` paragraphs and tasks checklist items; the Tasks only, Completed and Fields toggles apply.
+      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, `#` rows are headings, paragraph rows paragraphs and tasks checklist items; the Tasks only, Completed and Fields toggles apply.
       **YAML / JSON** — the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
     ## The Document view
       The Document view writes the rows out as they are, a bulleted list nested as the outline is, to read from the top. It doesn’t guess headings or paragraphs from how the rows are laid out. What is written as Markdown is drawn as such:
         A row starting with `# ` is a heading (`## ` / `### ` for the levels under it). The rows under it follow it, as its section. The `#`s show while it is typed in and are hidden otherwise (in the outline too).
-        For paragraphs rather than a list, hover over the rows and press **Paragraphs** at their left (this writes `doc: text` on the row above them). The rows under it are then a paragraph each, and so are those in the sections under it; rows under a paragraph are a list after it. **List** turns them back (on paragraphs it inherits, it writes `doc: list`).
+        **Backspace** at the start of a list item makes it a paragraph (as in word processors, anywhere in a list); `- ` typed at the start of a paragraph makes it a list item again, and Enter in a paragraph starts another. **Paragraphs** / **List**, at the left of the rows while the pointer is over them, switch them all at once. Rows under a paragraph are a list after it. In the outline, a paragraph’s bullet is hollow.
         Long prose or tables can also go in a Markdown block (Alt+D), drawn where it is.
         Tasks made with `[ ]` have checkboxes.
         `embed: [[item]] diagram` draws that item’s diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item’s `description` leads the document.
       On the line being typed in, **⌘⌥1** / **⌘⌥2** / **⌘⌥3** make it a heading (writing the `#`s at its start) and **⌘⌥0** a plain row again (Ctrl+Alt outside macOS; in the outline too).
       A document with three headings or more has its contents on the left (down to `##` headings): click one to go to it, and the section being read is marked. A narrow window leaves them out.
       Drag to select text across lines, and copy it. A click (not a drag) on a line or block edits it right there. The keys are the outline’s: Enter for the next row, Tab / Shift+Tab to indent, ↑↓ to the rows before and after.
-      Backspace at the start of a line joins its text on to the line before (the two rows become one). Lines with rows under them join too, their rows staying in order a level up. An empty row shows as a faint “…” to click and type in, or remove with Backspace.
+      Backspace at the start of a paragraph or heading joins its text on to the line before (the two rows become one; a list item is made a paragraph first). Lines with rows under them join too, their rows staying in order a level up. An empty row shows as a faint “…” to click and type in, or remove with Backspace.
       An embedded drawing (`embed: diagram` / `mindmap`) or Gantt chart can be edited right there as in its own view. A drawing zooms with − / + / Fit at its top right or ⌘ + wheel, and a chart sets its days’ width with − / + / Fit / Today above it (both fitted when opened). Keys act only on what is selected in it; a click outside it lets go.
     ## The Mind map view
       No frames or arrows: every row is a node. Select a row: Tab adds a row under it and Enter one after it, named as you type.

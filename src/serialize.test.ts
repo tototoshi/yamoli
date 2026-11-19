@@ -114,13 +114,15 @@ test('toMarkdownList: a # row is a heading, its rows the list after it; one insi
   );
 });
 
-test('toMarkdownList: the rows under a row with doc: text are paragraphs, the rows under a paragraph a list after it', () => {
+test('toMarkdownList: a row marked as a paragraph is one, the rows under it a list after it', () => {
   const s = OutlineStore.create();
   const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
   const p = add(s.rootId, 'Doc');
-  s.addField(p, 'doc', 'text');
-  add(p, '前のサイトは古い。');
-  add(add(p, '問い合わせが増えている。'), '電話');
+  add(p, '検索');
+  const a = add(p, '前のサイトは古い。');
+  const b = add(p, '問い合わせが増えている。');
+  add(b, '電話');
+  s.node(a).paragraph = s.node(b).paragraph = true;
   const rows = (id: string) => s.items(id);
-  expect(toMarkdownList(s, p, rows)).toBe('前のサイトは古い。\n\n問い合わせが増えている。\n\n- 電話\n');
+  expect(toMarkdownList(s, p, rows)).toBe('- 検索\n\n前のサイトは古い。\n\n問い合わせが増えている。\n\n- 電話\n');
 });

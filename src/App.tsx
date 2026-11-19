@@ -215,6 +215,7 @@ function NodeRow({ id, changed }: RowProps) {
   if (isBlock) cls += ' block-field';
   if ((kids.length && !expanded) || (isBlock && n.collapsed)) cls += ' collapsed';
   if (n.completed) cls += ' completed';
+  if (n.paragraph && !isField) cls += ' paragraph';
   if (ctl.selected.has(id)) cls += ' selected';
   if (ctl.isContextRow(id)) cls += ' task-context';
   if (search) cls += search.matches.has(id) ? ' search-match' : ' search-context';
