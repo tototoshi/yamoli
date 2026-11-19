@@ -147,6 +147,9 @@ export class Controller extends Editing {
     } else if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyL') {
       e.preventDefault();
       this.toggleTask(this.selectionRoots());
+    } else if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyD') {
+      e.preventDefault();
+      this.toggleBookmark(this.selectionRoots());
     } else {
       return false;
     }
@@ -336,6 +339,12 @@ export class Controller extends Editing {
     if (isMod(e) && !e.altKey && !e.shiftKey && e.code === 'KeyL') {
       e.preventDefault();
       this.toggleTask([id]);
+      return;
+    }
+    // ⌘D (Ctrl+D elsewhere: on macOS, Ctrl+D joins the next row) bookmarks the row, the zoomed item's title too.
+    if ((IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyD') {
+      e.preventDefault();
+      this.toggleBookmark([id]);
       return;
     }
 

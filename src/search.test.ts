@@ -104,3 +104,12 @@ test('is:task and is:todo find what is to do: marked, completed or scheduled', (
   expect(find('is:タスク')).toEqual(find('is:task'));
   expect(find('-is:task').filter((id) => !s.isField(id))).toEqual([note]); // field rows aren't tasks either
 });
+
+test('is:bookmark finds bookmarked rows', () => {
+  const s = OutlineStore.create();
+  const a = s.addChild(s.rootId, -1, 'A');
+  s.addChild(s.rootId, -1, 'B');
+  a.bookmarked = true;
+  expect(matchNode(a, parseQuery('is:bookmark'))).toBe(true);
+  expect(matchNode(s.node(s.node(s.rootId).children[1]), parseQuery('is:ブックマーク'))).toBe(false);
+});

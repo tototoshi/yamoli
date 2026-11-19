@@ -229,6 +229,9 @@ export function ItemMenuView() {
       <button role="menuitem" onClick={run(() => ctl.toggleComplete(m.id))}>
         {n.completed ? t('未完了に戻す', 'Reopen') : t('完了にする', 'Complete')}
       </button>
+      <button role="menuitem" onClick={run(() => ctl.toggleBookmark([m.id]))}>
+        {n.bookmarked ? t('ブックマークから外す', 'Remove the bookmark') : t('ブックマークする', 'Bookmark')}
+      </button>
       <button role="menuitem" onClick={run(() => ctl.toggleTask([m.id]))}>
         {store.isTask(m.id) ? t('タスクをやめる', 'Not a task') : t('タスクにする', 'Mark as a task')}
       </button>

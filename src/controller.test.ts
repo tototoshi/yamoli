@@ -593,3 +593,22 @@ test('in the document view, Backspace at the start of a line joins it to the one
   press(ctl, editor(ctl, a), 'Backspace');
   expect(ctl.store.node(intro).text).toBe('Intro.SectionA.');
 });
+
+test('⌘D bookmarks the row (again: takes it out); bookmarks come first in the jump box, in outline order', () => {
+  let a = '';
+  let b = '';
+  const ctl = setup((s, add) => {
+    add(s.rootId, 'Alpha');
+    a = add(s.rootId, 'Beta');
+    b = add(a, 'Gamma');
+  });
+  press(ctl, editor(ctl, b), 'd', { code: 'KeyD', ctrlKey: true });
+  ctl.toggleBookmark([a]);
+  expect(ctl.store.bookmarks()).toEqual([a, b]);
+  expect(ctl.jumpCandidates('').slice(0, 2)).toEqual([a, b]);
+  expect(ctl.jumpCandidates('gam')).toEqual([b]);
+  press(ctl, editor(ctl, b), 'd', { code: 'KeyD', ctrlKey: true });
+  expect(ctl.store.bookmarks()).toEqual([a]);
+  // Kept with the outline.
+  expect(OutlineStore.fromJSON(JSON.parse(JSON.stringify(ctl.store.toJSON()))).bookmarks()).toEqual([a]);
+});

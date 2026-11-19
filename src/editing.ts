@@ -7,7 +7,7 @@ import { formatDate, today } from './calendar';
 import { DEP_KEY } from './deps';
 import { addDfdSample, addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } from './sample';
 import { t } from './i18n';
-import { keyCandidates, linkCandidates, pickerQueryAt, valueCandidates } from './links';
+import { keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED } from './fields';
 import { fKey, fText, type Focus } from './focus';
 import { arrowOf } from './keys';
@@ -157,7 +157,11 @@ export class Editing extends ViewState {
 
   /** Items for the jump box, nearest to where one is first. */
   jumpCandidates(query: string): string[] {
-    return linkCandidates(this.store, query, this.zoomId, { limit: 12 });
+    // Bookmarks whose name has the query come first (all of them, with nothing typed), then the rest.
+    const q = query.trim().normalize('NFKC').toLowerCase();
+    const marked = this.store.bookmarks().filter((id) => nodeLabel(this.store, id).normalize('NFKC').toLowerCase().includes(q));
+    const rest = linkCandidates(this.store, query, this.zoomId, { limit: 12 }).filter((id) => !marked.includes(id));
+    return [...marked, ...rest].slice(0, Math.max(12, marked.length));
   }
 
   /** Zoom into id from the jump box. */
@@ -181,6 +185,22 @@ export class Editing extends ViewState {
     this.commit();
     this.focusAfterHash = focus;
     this.setView('outline');
+  }
+
+  /** Bookmark rows, or (when they all are) take them out of the bookmarks. */
+  toggleBookmark(ids: string[]) {
+    const { store } = this;
+    // On a field, the item it is of.
+    const items = [...new Set(ids.map((id) => store.owner(id)))].filter((id) => id !== store.rootId);
+    if (!items.length) return;
+    const on = !items.every((id) => store.node(id).bookmarked);
+    for (const id of items) store.node(id).bookmarked = on;
+    this.commit();
+    this.showToast(
+      on
+        ? t('ブックマークしました（上部の栞のボタンから開けます）', 'Bookmarked (open it from the bookmark button at the top)')
+        : t('ブックマークから外しました', 'Taken out of the bookmarks')
+    );
   }
 
   /** Make rows tasks, or (when they all are) plain rows again; a row no longer a task is not completed either. */

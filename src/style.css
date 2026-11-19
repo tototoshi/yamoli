@@ -151,6 +151,22 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .menu-list button:disabled { color: var(--muted); opacity: 0.6; cursor: default; }
 .menu-list kbd { color: var(--muted); font-family: var(--mono); font-size: 11px; }
 .menu-list hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--faint); }
+.bookmarks { width: 300px; max-width: 100%; }
+.bookmarks a {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--fg);
+  font-size: 13px;
+  text-decoration: none;
+}
+.bookmarks a:hover { background: var(--hover); }
+.bookmarks a.at .pick-label { color: var(--accent); }
+.bookmarks .pick-label, .bookmarks .pick-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bookmarks .pick-path { color: var(--muted); font-size: 11px; }
+.bookmarks .pick-path:empty { display: none; }
+.bookmarks-empty { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 12px; }
 
 .mini {
   padding: 1px 8px;
@@ -172,7 +188,9 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .page.full { max-width: none; }
 .page.slides-page { padding-bottom: 24px; }
 
-.zoom-header { margin: 0 0 12px 28px; }
+.zoom-header { position: relative; margin: 0 0 12px 28px; }
+/* In the margin before the title. */
+.zoom-header > .bookmark-mark { position: absolute; left: -20px; top: 14px; }
 .title-static, .text.title {
   margin: 0 0 6px;
   font-size: 28px;
@@ -416,6 +434,21 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   white-space: nowrap;
 }
 .view-badge:hover { border-color: var(--accent); color: var(--accent); }
+.bookmark-mark {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  margin: 0 4px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.bookmark-icon path { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+.popup summary .bookmark-icon { vertical-align: -1px; }
+.bookmark-mark path { fill: currentColor; }
+.bookmark-mark:hover { opacity: 0.6; }
 .view-badge path { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* dependencies */

@@ -54,6 +54,8 @@ export function parseQuery(q: string): Term[] {
 
 const DONE = new Set(['done', 'completed', '完了']);
 const isDoneTerm = (t: Term) => t.key === 'is' && DONE.has(t.value);
+const BOOKMARKED = new Set(['bookmark', 'bookmarked', 'ブックマーク']);
+const isBookmarkTerm = (t: Term) => t.key === 'is' && BOOKMARKED.has(t.value);
 
 const TASK: Record<string, (task: boolean, n: OutlineNode) => boolean> = {
   task: (task) => task,
@@ -100,6 +102,7 @@ export const wantsCompleted = (terms: Term[]) => terms.some((t) => isDoneTerm(t)
 
 function matchTerm(n: OutlineNode, t: Term, ctx: MatchContext): boolean {
   if (isDoneTerm(t)) return n.completed;
+  if (isBookmarkTerm(t)) return n.bookmarked;
   if (isTaskTerm(t)) return TASK[t.value](ctx.task(), n);
   if (isStatusTerm(t)) {
     const want = STATUS[t.value];

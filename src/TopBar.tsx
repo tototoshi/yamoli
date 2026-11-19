@@ -11,6 +11,8 @@ import { OutlineStore } from './model';
 import { imeActive } from './RowEditor';
 import { dataFile, flush, saveState, whenSaved, type FieldsMode } from './storage';
 import { BACKUP_URL, restoreBackup, sizeLabel, unusedFiles } from './files';
+import { nodeLabel } from './links';
+import { BookmarkIcon } from './Badges';
 
 // ================================================================ top bar
 
@@ -41,6 +43,7 @@ export function TopBar() {
       </nav>
       <span class="spacer" />
       <SearchBox />
+      <Bookmarks />
       <SaveIndicator />
       <HelpMenu />
       <MoreMenu />
@@ -49,7 +52,15 @@ export function TopBar() {
 }
 
 /** A button in the top bar opening a panel; closes on Esc or a click elsewhere. */
-function Popup({ label, title, children }: { label: string; title: string; children: (close: () => void) => ComponentChildren }) {
+function Popup({
+  label,
+  title,
+  children,
+}: {
+  label: ComponentChildren;
+  title: string;
+  children: (close: () => void) => ComponentChildren;
+}) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(false);
   const close = () => ref.current?.removeAttribute('open');
@@ -73,6 +84,58 @@ function Popup({ label, title, children }: { label: string; title: string; child
 }
 
 const download = (name: string, text: string, type: string) => saveFile(name, new Blob([text], { type }));
+
+/** The bookmarked items, to go to; the zoomed item can be added from here too. */
+function Bookmarks() {
+  const ctl = useCtl();
+  const { store, zoomId } = ctl;
+  const marks = store.bookmarks();
+  return (
+    <Popup label={<BookmarkIcon />} title={t('ブックマーク', 'Bookmarks')}>
+      {(close) => (
+        <div class="menu-list bookmarks" role="menu">
+          {marks.map((id) => (
+            <a key={id} role="menuitem" href={ctl.hashFor(id)} class={id === zoomId ? 'at' : undefined} onClick={close}>
+              <span class="pick-label">{nodeLabel(store, id) || t('無題', 'Untitled')}</span>
+              <span class="pick-path">
+                {store
+                  .path(id)
+                  .slice(1, -1)
+                  .map((a) => nodeLabel(store, a))
+                  .join(' › ')}
+              </span>
+            </a>
+          ))}
+          {!marks.length && (
+            <p class="bookmarks-empty">
+              {t(
+                '行のメニューか ⌘D で、よく開く項目をブックマークできます。',
+                'Bookmark items you often open from a row’s menu, or with ⌘D.'
+              )}
+            </p>
+          )}
+          {zoomId !== store.rootId && (
+            <>
+              {marks.length > 0 && <hr />}
+              <button
+                role="menuitem"
+                onClick={() => {
+                  close();
+                  ctl.toggleBookmark([zoomId]);
+                }}
+              >
+                {store.node(zoomId).bookmarked
+                  ? t('この項目をブックマークから外す', 'Remove this item’s bookmark')
+                  : t('この項目をブックマークする', 'Bookmark this item')}
+                <kbd>⌘D</kbd>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </Popup>
+  );
+}
 
 /** Less frequent actions: undo, files, samples. */
 function MoreMenu() {
@@ -351,6 +414,13 @@ const shortcuts = (): [string, string][] => [
     t(
       'タスクにする / やめる（「タスクだけ」で絞り込み、検索 is:todo）',
       'Mark as a task or not (filter with “Tasks only”, search is:todo)'
+    ),
+  ],
+  [
+    '⌘/Ctrl+D',
+    t(
+      'ブックマークする / 外す（上部の栞のボタンから開く、検索 is:bookmark）',
+      'Bookmark or not (open from the bookmark button at the top, search is:bookmark)'
     ),
   ],
   ['Alt+→ / ⌘+.', t('ズームイン（●クリックでも可）', 'Zoom in (or click the ●)')],

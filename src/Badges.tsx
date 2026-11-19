@@ -18,6 +18,29 @@ const VIEW_PICTURES: Record<DrawnView, string> = {
 };
 
 /** The views an item's own `views` field turns on, each opening the item in it. */
+export const BookmarkIcon = () => (
+  <svg class="bookmark-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+    <path d="M3.5 1.5h5v9L6 8.6 3.5 10.5z" />
+  </svg>
+);
+
+/** A bookmark's mark before its name; a click takes it out of the bookmarks. */
+export function BookmarkMark({ id }: { id: string }) {
+  const ctl = useCtl();
+  if (!ctl.store.node(id).bookmarked) return null;
+  return (
+    <button
+      class="bookmark-mark"
+      tabIndex={-1}
+      title={t('ブックマーク（クリックで外す、⌘D）', 'Bookmarked (click to take it out, ⌘D)')}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => ctl.toggleBookmark([id])}
+    >
+      <BookmarkIcon />
+    </button>
+  );
+}
+
 export function ViewBadges({ id }: { id: string }) {
   const ctl = useCtl();
   return (

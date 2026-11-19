@@ -28,6 +28,8 @@ export interface OutlineNode {
   completed: boolean;
   /** Marked as something to do. */
   task: boolean;
+  /** Kept in the bookmarks, to go to from the top bar. */
+  bookmarked: boolean;
   children: string[];
   /** Set on field rows: the field's name. null on ordinary rows. */
   key: string | null;
@@ -46,7 +48,7 @@ export function uid(): string {
 }
 
 function makeNode(text = ''): OutlineNode {
-  return { id: uid(), text, collapsed: false, completed: false, task: false, children: [], key: null, format: null };
+  return { id: uid(), text, collapsed: false, completed: false, task: false, bookmarked: false, children: [], key: null, format: null };
 }
 
 function normalizeNode(id: string, raw: any): OutlineNode {
@@ -57,6 +59,7 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     collapsed: !!n.collapsed,
     completed: !!n.completed,
     task: !!n.task,
+    bookmarked: !!n.bookmarked,
     children: Array.isArray(n.children) ? n.children.slice() : [],
     key: typeof n.key === 'string' ? n.key : null,
     format: typeof n.key === 'string' && typeof n.format === 'string' ? n.format : null,
@@ -368,6 +371,19 @@ export class OutlineStore {
     const n = this.node(id);
     if (n.key !== null || id === this.rootId || this.isData(id)) return false;
     return n.task || n.completed || !!this.field(id, 'duration') || !!this.field(id, 'end') || !!this.field(id, 'due');
+  }
+
+  /** The bookmarked items, in outline order. */
+  bookmarks(): string[] {
+    const out: string[] = [];
+    const walk = (id: string) => {
+      for (const c of this.node(id).children) {
+        if (this.node(c).bookmarked) out.push(c);
+        walk(c);
+      }
+    };
+    walk(this.rootId);
+    return out;
   }
 
   setTask(id: string, task: boolean): boolean {

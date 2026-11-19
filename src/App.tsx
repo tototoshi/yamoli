@@ -22,7 +22,7 @@ import type { OutlineNode } from './model';
 import { AutoTextarea, hasFocus, imeActive, RowEditor } from './RowEditor';
 import { TopBar, ViewSwitch, ViewToggles } from './TopBar';
 import { ItemMenuView, JumpBox, LinkPickerMenu, SuggestMenu, ToastView } from './Popups';
-import { DependencyPanel, DepBadge, SchedLabel, ViewBadges } from './Badges';
+import { BookmarkMark, DependencyPanel, DepBadge, SchedLabel, ViewBadges } from './Badges';
 import { filesIn } from './files';
 
 // ================================================================ app
@@ -183,6 +183,7 @@ function ZoomHeader({ node }: { node: OutlineNode }) {
   const isRoot = node.id === ctl.store.rootId;
   return (
     <section class="zoom-header">
+      {!isRoot && <BookmarkMark id={node.id} />}
       {isRoot ? <h1 class="title-static">Home</h1> : <NodeText node={node} title />}
       <Actions id={node.id} class="header-actions" />
       {!isRoot && <SchedLabel id={node.id} header />}
@@ -271,6 +272,7 @@ function NodeRow({ id, changed }: RowProps) {
         </a>
         {isField && <FieldKey node={n} />}
         {/* Before the name: the row's own buttons cover its far end on hover. */}
+        {!isField && <BookmarkMark id={id} />}
         {!isField && <ViewBadges id={id} />}
         {isBlock ? <BlockHead node={n} /> : <NodeText node={n} />}
         {isField && !isBlock && <DatePick node={n} />}

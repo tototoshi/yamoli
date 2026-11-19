@@ -13,6 +13,7 @@ Using Yamoli
       The colours are `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex`, with other formatting inside if you like (`[**key**]{red}`); they show in the diagram's names, descriptions and arrow labels too.
       With the caret on a link, a bubble shows where it goes; **⌘K** (Ctrl+K outside macOS) adds or edits a link, and pasting a URL over selected text links it.
       `[[` inserts a link to another item. **⌘P** (Ctrl+P outside macOS) jumps to an item by part of its name.
+      Bookmark items you often open with **⌘D** (or from a row's menu) to open them from the bookmark button at the top; ⌘P lists them first too (⌘D again takes one out).
       On macOS, **Ctrl+K** deletes to the end of the line and **Ctrl+Y** puts it back; at the end of a row, Ctrl+K (like Ctrl+D) joins the next row.
     Selecting, copying and pasting
       doc: list
@@ -217,6 +218,7 @@ Using Yamoli
         | `due:` | Has a field `due` |
         | `is:done` | Completed rows |
         | `is:task` / `is:todo` | Tasks / tasks not yet done |
+        | `is:bookmark` | Bookmarked items |
         | `is:ready` / `is:blocked` | Ready to start / waiting on a dependency |
         | `is:late` / `is:critical` / `is:milestone` | Late / on the critical path / milestones |
         | `is:cycle` | On a dependency cycle |
