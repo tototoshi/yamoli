@@ -490,11 +490,15 @@ function InlineView({
   );
 }
 
-/** A task's checkbox before its name, which completes it (or opens it again). */
+/**
+ * A checkbox before the name of a row marked as a task (`[ ]`) or completed,
+ * which completes it (or opens it again). Rows that count as tasks only for
+ * their dates (`duration`, `due`) have none.
+ */
 function TaskCheck({ id }: { id: string }) {
   const ctl = useCtl();
-  if (!ctl.store.isTask(id)) return null;
-  const done = ctl.store.node(id).completed;
+  const { task, completed: done } = ctl.store.node(id);
+  if (!task && !done) return null;
   return (
     <input
       type="checkbox"

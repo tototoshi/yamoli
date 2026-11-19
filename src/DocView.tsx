@@ -205,7 +205,7 @@ function Para({ id, auto = 'body', fixed }: { id: string; auto?: DocRole; fixed?
 /** A task's checkbox, which completes it (or opens it again). */
 function Check({ id }: { id: string }) {
   const { store, readOnly, ctl } = useSource();
-  if (!store.isTask(id)) return null;
+  if (!store.node(id).task && !store.node(id).completed) return null;
   return (
     <input
       type="checkbox"

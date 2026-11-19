@@ -51,7 +51,7 @@ export type Extra = { kind: 'data'; id: string } | { kind: 'embed'; id: string; 
 
 export interface DocItem {
   id: string;
-  /** A task: drawn with a checkbox. */
+  /** Marked as a task (or completed): drawn with a checkbox. */
   task: boolean;
   items: DocItem[];
   /** Its items are paragraphs after it (else a list under it). */
@@ -129,7 +129,7 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
   /** A row as a line of the body, the rows under it a list nested in it (or paragraphs after it, as `doc` says). */
   const item = (id: string, auto: DocRole = 'body'): DocItem => ({
     id,
-    task: store.isTask(id),
+    task: store.node(id).task || store.node(id).completed,
     items: rowsOf(id).map((c) => item(c)),
     text: docStyleOf(store, id) === 'text',
     extras: extrasOf(id),

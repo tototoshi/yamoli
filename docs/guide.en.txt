@@ -23,7 +23,7 @@ Using Yamoli
       Pasted text with several lines becomes rows. A Markdown list keeps its nesting (`- name: value` becoming a field of the row above); YAML comes in as fields, nesting and blocks; a checklist (`- [ ]` / `- [x]`) as tasks.
       Text copied from a web page keeps its links, as `[words](https://…)`. Each paragraph or heading becomes a row, and its lists rows nested as they were.
     Tasks
-      **Tasks** are rows that are something to do, rather than notes. Type `[ ] ` at the start of a row to make it one (`[x] ` for one already done): a checkbox shows before its name, ticked to complete it (⌘Shift+Enter) and unticked to reopen it. Backspace at the row's start makes it a plain row again; **⌘L** and the row's menu switch it too. Completed rows, and rows with `duration`, `end` or `due`, count as tasks too.
+      **Tasks** are rows that are something to do, rather than notes. Type `[ ] ` at the start of a row to make it one (`[x] ` for one already done): a checkbox shows before its name, ticked to complete it (⌘Shift+Enter) and unticked to reopen it. Backspace at the row's start makes it a plain row again; **⌘L** and the row's menu switch it too. Completed rows are tasks too. Rows with `duration`, `end` or `due` have no checkbox, but count as tasks in Tasks only and in search.
       **Tasks only** in the view bar shows just them, with the rows they sit under dimmed; search with `is:task` / `is:todo`. The Text view writes tasks as `- [ ]` / `- [x]`.
     Fields and blocks
       doc: list
