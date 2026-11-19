@@ -15,7 +15,7 @@
  * The whole chart, names and all, saves as an SVG or PNG image.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { formatDate, parseDateInput, shortDate, today, type Day } from './calendar';
+import { formatDate, parseDate, parseDateInput, shortDate, today, type Day } from './calendar';
 import { useCtl } from './context';
 import { lang, t } from './i18n';
 import { standaloneSvg } from './exportImage';
@@ -417,6 +417,13 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   /** A new row at the end, its name typed at once (its bar then drawn on its row). */
   const addRow = () => {
     const id = store.addChild(zoomId, -1, '').id;
+    // From today, unless the project starts later (a start above it holds it back anyway).
+    const above = store
+      .path(id)
+      .reverse()
+      .map((a) => parseDate(store.fieldValue(a, 'start')))
+      .find((d) => d !== null);
+    if (above == null || above < now) store.setField(id, 'start', formatDate(now));
     ctl.commit();
     setAdded(id);
     setEditing({ id, col: -1 });
@@ -518,7 +525,7 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   const addButton = editable && (
     <button
       class="mini"
-      title={t('最後に作業の行を足す（1 日のバーが付く）', 'Add a task row at the end (with a bar of a day)')}
+      title={t('最後に作業の行を足す（今日から 1 日のバーが付く）', 'Add a task row at the end (with a bar of a day, from today)')}
       onClick={addRow}
     >
       {t('+ 作業', '+ Task')}
