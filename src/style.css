@@ -297,9 +297,9 @@ textarea.text {
 }
 textarea.text.title { padding: 0; width: 100%; }
 /* A `#` row in the outline: its #s hidden until it is typed in, it reads as a heading. */
-.node .text-view.heading-1 { font-size: 1.25em; font-weight: 700; }
-.node .text-view.heading-2 { font-size: 1.1em; font-weight: 700; }
-.node .text-view.heading-3 { font-weight: 700; }
+.node .text-view.heading-1, .node .rich.heading-1 > .text { font-size: 1.25em; font-weight: 700; }
+.node .text-view.heading-2, .node .rich.heading-2 > .text { font-size: 1.1em; font-weight: 700; }
+.node .text-view.heading-3, .node .rich.heading-3 > .text { font-weight: 700; }
 
 /*
  * The row editor (RowEditor.tsx): the textarea's text is invisible and a copy

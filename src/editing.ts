@@ -6,6 +6,7 @@
 import { formatDate, today } from './calendar';
 import { DEP_KEY } from './deps';
 import { addDfdSample, addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } from './sample';
+import { headingOf } from './doc';
 import { t } from './i18n';
 import { keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED } from './fields';
@@ -352,9 +353,12 @@ export class Editing extends ViewState {
       this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
       return this.rerender();
     }
+    // `# ` typed (or taken away): in the document the line is drawn anew, as a heading or in a list, the caret kept in it.
+    const redrawn = n.key === null && headingOf(n.text)?.level !== headingOf(value)?.level;
     store.setText(id, value);
     this.updatePicker(ta, id);
     if (n.key !== null) this.suggestValues(id);
+    if (redrawn) return this.commit(fText(id, ta.selectionStart, ta.selectionEnd), 'text:' + id);
     this.commit(undefined, 'text:' + id, this.rowsShowing(id));
   }
 

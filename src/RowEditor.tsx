@@ -8,13 +8,14 @@
  * With the caret on a link, a bubble shows where it goes; ⌘K (Ctrl+K outside
  * macOS, where Ctrl+K deletes to the end of the line) edits or adds a link, and pasting a URL over selected text links it.
  */
+import { headingOf } from './doc';
 import type { TextareaHTMLAttributes } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { IS_MAC } from './keys';
 import { t } from './i18n';
 import { colorValue } from './colors';
-import { linkAt, markupSpans, type LinkAt } from './inline';
+import { linkAt, markupSpans, type LinkAt, type MarkSpan } from './inline';
 import { reselect, useMarkKeys } from './MarkKeys';
 import { nodeLabel } from './links';
 import type { OutlineNode } from './model';
@@ -46,7 +47,12 @@ interface LinkDraft {
 export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean }) {
   const ctl = useCtl();
   const key = 'text:' + node.id;
-  const spans = useMemo(() => markupSpans(node.text), [node.text]);
+  // A heading's `#`s, faint, and the line in its size while it is typed in.
+  const heading = !title && node.key === null ? headingOf(node.text) : null;
+  const spans = useMemo((): MarkSpan[] => {
+    const skip = heading?.prefix ?? 0;
+    return [...(skip ? [{ text: node.text.slice(0, skip), cls: 'mk' as const }] : []), ...markupSpans(node.text.slice(skip))];
+  }, [node.text, heading?.prefix]);
   const [caret, setCaret] = useState<number | null>(null);
   const [draft, setDraft] = useState<LinkDraft | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -90,7 +96,7 @@ export function RowEditor({ node, title }: { node: OutlineNode; title?: boolean 
   return (
     <div
       ref={box}
-      class={'rich' + (title ? ' title' : '')}
+      class={'rich' + (title ? ' title' : '') + (heading ? ' heading-' + heading.level : '')}
       data-editor={key}
       onFocusOut={() => setTimeout(() => !hasFocus(key) && ctl.deactivate(key), 0)}
     >

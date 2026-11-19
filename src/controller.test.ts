@@ -633,3 +633,16 @@ test('typing [ ] at the start of a row makes it a task ([x] a completed one); Ba
   press(ctl, editor(ctl, a), 'Backspace'); // now it joins the row above
   expect(texts(ctl, ctl.store.rootId)[0]).toBe('beforebuy milk');
 });
+
+test('typing # at the start of a row keeps the caret in it, the line being drawn anew as a heading', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'Plan');
+  });
+  const ta = editor(ctl, a);
+  ta.value = '# Plan';
+  ta.setSelectionRange(2, 2);
+  ctl.onTextInput(a, ta);
+  expect(ctl.store.node(a).text).toBe('# Plan');
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + a, start: 2 }));
+});
