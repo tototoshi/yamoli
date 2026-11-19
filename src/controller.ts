@@ -256,6 +256,13 @@ export class Controller extends Editing {
       store.remove(id);
       return this.commit(n.key.trim().toLowerCase() === 'subtitle' ? fText(parent, 'end') : null);
     }
+    // A task marked so (`[ ] `) is a plain row again first, before joining anything.
+    if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && n.task) {
+      e.preventDefault();
+      this.setDone(id, false);
+      store.setTask(id, false);
+      return this.commit(fText(id, 0));
+    }
     // In the document a line joins the one before it whatever it holds (a heading's section joining the one before).
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && this.view === 'doc' && n.children.length) {
       const prev = vis[idx - 1];

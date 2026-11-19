@@ -272,6 +272,7 @@ function NodeRow({ id, changed }: RowProps) {
         </a>
         {isField && <FieldKey node={n} />}
         {/* Before the name: the row's own buttons cover its far end on hover. */}
+        {!isField && <TaskCheck id={id} />}
         {!isField && <BookmarkMark id={id} />}
         {!isField && <ViewBadges id={id} />}
         {isBlock ? <BlockHead node={n} /> : <NodeText node={n} />}
@@ -489,35 +490,32 @@ function InlineView({
   );
 }
 
+/** A task's checkbox before its name, which completes it (or opens it again). */
+function TaskCheck({ id }: { id: string }) {
+  const ctl = useCtl();
+  if (!ctl.store.isTask(id)) return null;
+  const done = ctl.store.node(id).completed;
+  return (
+    <input
+      type="checkbox"
+      class="task-check"
+      tabIndex={-1}
+      checked={done}
+      title={
+        done
+          ? t('未完了に戻す (⌘/Ctrl+Shift+Enter)', 'Reopen (⌘/Ctrl+Shift+Enter)')
+          : t('完了にする (⌘/Ctrl+Shift+Enter)', 'Complete (⌘/Ctrl+Shift+Enter)')
+      }
+      onMouseDown={keepFocus}
+      onChange={() => ctl.toggleComplete(id)}
+    />
+  );
+}
+
 function Actions({ id, class: cls }: { id: string; class: string }) {
   const ctl = useCtl();
   return (
     <span class={cls}>
-      {/* A plain row can become a task; a task can be completed, and reopened. */}
-      {id !== ctl.zoomId &&
-        (!ctl.store.isTask(id) ? (
-          <button
-            class="mini"
-            title={t('やることとして登録 (⌘/Ctrl+L)', 'Mark as something to do (⌘/Ctrl+L)')}
-            onMouseDown={keepFocus}
-            onClick={() => ctl.toggleTask([id])}
-          >
-            {t('タスク', 'Task')}
-          </button>
-        ) : (
-          <button
-            class="mini"
-            title={
-              ctl.store.node(id).completed
-                ? t('未完了に戻す (⌘/Ctrl+Shift+Enter)', 'Reopen (⌘/Ctrl+Shift+Enter)')
-                : t('完了にする (⌘/Ctrl+Shift+Enter)', 'Complete (⌘/Ctrl+Shift+Enter)')
-            }
-            onMouseDown={keepFocus}
-            onClick={() => ctl.toggleComplete(id)}
-          >
-            {ctl.store.node(id).completed ? '↺' : '✓'}
-          </button>
-        ))}
       <button
         class="mini"
         title={t('属性を追加 (Alt+A)', 'Add a field (Alt+A)')}

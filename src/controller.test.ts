@@ -612,3 +612,28 @@ test('⌘D bookmarks the row (again: takes it out); bookmarks come first in the 
   // Kept with the outline.
   expect(OutlineStore.fromJSON(JSON.parse(JSON.stringify(ctl.store.toJSON()))).bookmarks()).toEqual([a]);
 });
+
+test('typing [ ] at the start of a row makes it a task ([x] a completed one); Backspace at its start a plain row again', () => {
+  let a = '';
+  let b = '';
+  const ctl = setup((s, add) => {
+    add(s.rootId, 'before');
+    a = add(s.rootId, '');
+    b = add(s.rootId, '');
+  });
+  const type = (id: string, value: string) => {
+    const ta = editor(ctl, id);
+    ta.value = value;
+    ta.setSelectionRange(value.length, value.length);
+    ctl.onTextInput(id, ta);
+  };
+  type(a, '[ ] ');
+  expect(ctl.store.node(a)).toMatchObject({ text: '', task: true, completed: false });
+  type(b, '［x］ ');
+  expect(ctl.store.node(b)).toMatchObject({ text: '', task: true, completed: true });
+  type(a, 'buy milk');
+  press(ctl, editor(ctl, a), 'Backspace');
+  expect(ctl.store.node(a)).toMatchObject({ text: 'buy milk', task: false });
+  press(ctl, editor(ctl, a), 'Backspace'); // now it joins the row above
+  expect(texts(ctl, ctl.store.rootId)[0]).toBe('beforebuy milk');
+});

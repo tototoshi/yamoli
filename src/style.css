@@ -434,6 +434,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   white-space: nowrap;
 }
 .view-badge:hover { border-color: var(--accent); color: var(--accent); }
+.task-check { flex: none; align-self: center; margin: 0 6px 0 0; accent-color: var(--accent); cursor: pointer; }
 .bookmark-mark {
   flex: none;
   align-self: center;

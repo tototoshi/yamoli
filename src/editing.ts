@@ -23,6 +23,9 @@ const DONE_KEY = 'completed';
 /** Fields whose values are not worth offering again: dates, and links (which have the `[[` picker). */
 const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'end', 'due', DONE_KEY]);
 
+/** `[ ] ` (or `[x] ` done, `[] `, full-width too) typed at the start of a row. */
+const CHECKBOX_TYPED = /^[[［]([ 　xX]?)[\]］][ 　]/;
+
 export class Editing extends ViewState {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -325,7 +328,9 @@ export class Editing extends ViewState {
 
   /**
    * Text typed into a row. Typing `name: ` at the start of an ordinary row
-   * turns it into a field (Backspace at the start of the value turns it back).
+   * turns it into a field (Backspace at the start of the value turns it back);
+   * `[ ] ` makes it a task (`[x] ` a completed one), Backspace at its start a
+   * plain row again.
    */
   onTextInput(id: string, ta: HTMLTextAreaElement) {
     const { store } = this;
@@ -337,6 +342,14 @@ export class Editing extends ViewState {
       store.setText(id, value.slice(m[1].length + 2));
       this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
       this.suggestValues(id);
+      return this.rerender();
+    }
+    const box = n.key === null && id !== this.zoomId ? value.match(CHECKBOX_TYPED) : null;
+    if (box && ta.selectionStart === box[0].length && !n.text.startsWith(box[0])) {
+      store.setText(id, value.slice(box[0].length));
+      store.setTask(id, true);
+      if (box[1].trim()) this.setDone(id, true);
+      this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
       return this.rerender();
     }
     store.setText(id, value);
