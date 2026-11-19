@@ -518,10 +518,7 @@ export function GanttView({ rootId, embedded, edit }: { rootId?: string; embedde
   const addButton = editable && (
     <button
       class="mini"
-      title={t(
-        '最後に作業の行を足す（バーは行の上をドラッグして描く）',
-        'Add a task row at the end (then drag along its row to draw its bar)'
-      )}
+      title={t('最後に作業の行を足す（1 日のバーが付く）', 'Add a task row at the end (with a bar of a day)')}
       onClick={addRow}
     >
       {t('+ 作業', '+ Task')}

@@ -77,7 +77,7 @@ test('Japanese holidays apply once loaded', () => {
   expect(r.byId.get(tst)!.late).toBe(4);
 });
 
-test('calendar days, delayed starts, phase dependencies, unscheduled and invalid items', () => {
+test('calendar days, delayed starts, phase dependencies, items with no start and invalid ones', () => {
   const { s, p, design, tst } = project();
   const wait = s.addChild(p, -1, '審査待ち');
   s.addField(wait.id, 'duration', '10cd');
@@ -97,7 +97,7 @@ test('calendar days, delayed starts, phase dependencies, unscheduled and invalid
   expect(r.byId.get(wait.id)!.delayed).toBe(true);
   expect(dates(r.byId.get(ops.id))).toEqual(['2026-11-24', '2026-11-24']);
   expect(dates(r.byId.get(phase.id))).toEqual(['2026-11-24', '2026-11-24']);
-  expect(r.unscheduled.has(lonely.id)).toBe(true);
+  expect(r.byId.has(lonely.id)).toBe(true); // no start anywhere: from today
   expect(r.invalid.get(lonely.id)).toBe('due: someday');
 });
 
@@ -200,4 +200,21 @@ test('typing in an ordinary row leaves the schedule inputs alone; fields and mov
   expect(afterField).not.toBe(before);
   s.indent(api);
   expect(scheduleInputs(s)).not.toBe(afterField);
+});
+
+test('with no start anywhere a task starts today; in a Gantt chart a row with nothing set takes a day', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'Project').id;
+  const a = s.addChild(p, -1, 'A').id;
+  s.addField(a, 'duration', '2d');
+  const b = s.addChild(p, -1, 'B').id;
+  s.addField(b, 'after', `[[${a}]]`);
+  const now = parseDate('2026-11-19')!; // a Thursday
+  let r = computeSchedule(s, findCycles(s), null, now);
+  expect(dates(r.byId.get(a))).toEqual(['2026-11-19', '2026-11-20']);
+  expect(r.byId.has(b)).toBe(false); // not a Gantt chart: a row without a duration is no task
+  s.addField(p, 'views', 'gantt');
+  r = computeSchedule(s, findCycles(s), null, now);
+  expect(dates(r.byId.get(b))).toEqual(['2026-11-23', '2026-11-23']); // a day, after A
+  expect(r.byId.get(p)?.kind).toBe('summary');
 });

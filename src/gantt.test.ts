@@ -57,7 +57,8 @@ test('rows without a bar say why', () => {
   expect(issue(group)).toBeNull();
   expect(issue(c)).toBe('⚠ due: someday');
 
-  s.remove(s.field(p, 'start')!.id); // no start anywhere
-  const unstarted = computeSchedule(s, findCycles(s));
-  expect(scheduleIssue(s, a, unstarted, new Set())).toBe('開始日未設定');
+  s.remove(s.field(p, 'start')!.id); // no start anywhere: from today
+  expect(scheduleIssue(s, a, computeSchedule(s, findCycles(s)), new Set())).toBeNull();
+  s.addField(p, 'views', 'gantt'); // in a Gantt chart, a row with nothing set takes a day
+  expect(scheduleIssue(s, fresh, computeSchedule(s, findCycles(s)), new Set())).toBeNull();
 });

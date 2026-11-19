@@ -90,3 +90,12 @@ test('a bar drawn on a row with none gives it a start and working days, either w
   drawBar(s, id, mon + 5, mon + 6, cal); // a weekend: calendar days
   expect(s.fieldValue(id, 'duration')).toBe('2cd');
 });
+
+test('a bar a Gantt row took by default (no duration, no end) is given a duration when its end is dragged', () => {
+  const { store, p, id, sched } = project({});
+  store.addField(p, 'views', 'gantt');
+  expect(sched()).toMatchObject({ start: day('2026-11-16'), end: day('2026-11-16') }); // a day
+  resizeTo(store, id, sched()!, day('2026-11-18'), cal);
+  expect(store.fieldValue(id, 'duration')).toBe('3d');
+  expect(store.field(id, 'end')).toBeUndefined();
+});

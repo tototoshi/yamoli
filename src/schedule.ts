@@ -11,12 +11,14 @@
  *                         dependencies also hold for its descendants
  *
  * A task starts on the first working day after all its dependencies end, but
- * not before its (inherited) start. Items without a duration that contain
- * scheduled items become summaries spanning them. Tasks with no start
- * anywhere and no scheduled dependency are left unscheduled.
+ * not before its (inherited) start; with neither, today. Items without a
+ * duration that contain scheduled items become summaries spanning them. In a
+ * Gantt chart (`views: gantt` on it or above), a row with nothing under it
+ * and no duration or end takes a day, so every row there has a bar to edit.
  */
-import { parseDate, parseDuration, parseHolidays, parseWorkdays, WorkCalendar, type Day } from './calendar';
+import { parseDate, parseDuration, parseHolidays, parseWorkdays, today, WorkCalendar, type Day } from './calendar';
 import { dependencies } from './deps';
+import { enabledViews } from './views';
 import type { OutlineStore } from './model';
 
 export interface Sched {
@@ -34,7 +36,7 @@ export interface Sched {
 
 export interface ScheduleResult {
   byId: Map<string, Sched>;
-  /** Tasks (with a duration or an end) that could not be placed: no start anywhere. */
+  /** Items given an end that could not be placed: no start anywhere, nor dependencies. */
   unscheduled: Set<string>;
   /** Items with an attribute value that could not be parsed, and which one. */
   invalid: Map<string, string>;
@@ -63,7 +65,8 @@ export function scheduleInputs(store: OutlineStore): string {
 export function computeSchedule(
   store: OutlineStore,
   cycles: Set<string>,
-  jpDays: ReadonlyMap<string, string> | null = null
+  jpDays: ReadonlyMap<string, string> | null = null,
+  now: Day = today()
 ): ScheduleResult {
   const res: ScheduleResult = { byId: new Map(), unscheduled: new Set(), invalid: new Map(), needsJp: false };
   const memo = new Map<string, Sched | null>();
@@ -175,12 +178,9 @@ export function computeSchedule(
 
   const task = (id: string, dur: { amount: number; unit: 'd' | 'w' | 'cd' }): Sched | null => {
     const own = dateAttr(id, 'start');
-    const base = inheritedStart(id);
     const { after, by } = afterDeps(id);
-    if (after === undefined && base === undefined) {
-      res.unscheduled.add(id);
-      return null;
-    }
+    // No start anywhere, nor anything to wait for: today.
+    const base = inheritedStart(id) ?? (after === undefined ? now : undefined);
     const cal = calendarFor(id);
     // Work in working days starts on the next one: a dependency ending on a
     // Friday holds back a Monday start as much as one ending on Sunday would.
@@ -256,6 +256,7 @@ export function computeSchedule(
     }
     const last = dateAttr(id, 'end');
     if (last !== undefined) return until(id, last);
+    if (!store.items(id).length && enabledViews(store, id).has('gantt')) return task(id, { amount: 1, unit: 'd' });
     return summary(id);
   };
 

@@ -24,8 +24,9 @@ export function moveTo(store: OutlineStore, id: string, s: Sched, day: Day) {
 export function resizeTo(store: OutlineStore, id: string, s: Sched, day: Day, cal: WorkCalendar) {
   if (day < s.start) return;
   const duration = store.fieldValue(id, 'duration');
-  if (duration !== undefined) {
-    const calendarDays = parseDuration(duration)?.unit === 'cd';
+  if (duration !== undefined || store.fieldValue(id, 'end') === undefined) {
+    // Given a duration, or neither (the day a Gantt row takes by default): a duration it is.
+    const calendarDays = duration !== undefined && parseDuration(duration)?.unit === 'cd';
     store.setField(id, 'duration', calendarDays ? `${day - s.start + 1}cd` : `${Math.max(cal.workdaysBetween(s.start, day), 1)}d`);
   } else {
     // The end field is the last day from where the item would start without
