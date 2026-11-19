@@ -17,6 +17,7 @@
  * being cluttered. A field named like one of those keys wins, and the item's
  * own entry gets a leading `_` instead.
  */
+import { headingOf } from './doc';
 import { refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 
@@ -112,8 +113,10 @@ function scalar(text: string): Value {
 /**
  * The rows under id as a nested Markdown list, for pasting elsewhere: links
  * become the linked item's label, tasks are checklist items (`[ ]`, `[x]`)
- * and fields read `name: value`. Blocks (multi-line values) are left out.
- * children(id) picks the rows to include, so the view's filters apply.
+ * and fields read `name: value`. A `#` row is a heading, its rows the list
+ * after it (one inside a list ends it, as in the Document view). Blocks
+ * (multi-line values) are left out. children(id) picks the rows to include,
+ * so the view's filters apply.
  */
 export function toMarkdownList(store: OutlineStore, id: string, children: (id: string) => string[]): string {
   return toMarkdownRows(store, children(id), children);
@@ -122,18 +125,40 @@ export function toMarkdownList(store: OutlineStore, id: string, children: (id: s
 /** The given rows (and what children picks under them) as a Markdown list. */
 export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id: string) => string[]): string {
   const lines: string[] = [];
-  const add = (c: string, depth: number) => {
+  const isHeading = (c: string) => store.node(c).key === null && headingOf(store.node(c).text) !== null;
+  /** c as a list item; a heading among the rows under it, and those after it, go to out (to come after the list). */
+  const add = (c: string, depth: number, out: string[]) => {
     const n = store.node(c);
     if (n.format !== null) return;
     const pad = '  '.repeat(depth);
     let text = withLabels(store, n.text).trim();
     if (n.key !== null) text = `${n.key}: ${text}`.trimEnd();
-    else if (store.isTask(c)) text = `[${n.completed ? 'x' : ' '}] ${text}`;
+    else if (n.task || n.completed) text = `[${n.completed ? 'x' : ' '}] ${text}`;
     lines.push(`${pad}- ${text}`.trimEnd().replace(/\n/g, `\n${pad}  `));
-    for (const k of children(c)) add(k, depth + 1);
+    const kids = children(c);
+    const at = kids.findIndex(isHeading);
+    for (const k of at < 0 ? kids : kids.slice(0, at)) add(k, depth + 1, out);
+    if (at >= 0) out.push(...kids.slice(at));
   };
-  for (const c of ids) add(c, 0);
-  return lines.length ? lines.join('\n') + '\n' : '';
+  const write = (rows: string[]) => {
+    for (const c of rows) {
+      if (isHeading(c)) {
+        lines.push('', withLabels(store, store.node(c).text).trim().replace(/\n/g, ' '), '');
+        write(children(c));
+        continue;
+      }
+      const out: string[] = [];
+      add(c, 0, out);
+      write(out);
+    }
+  };
+  write(ids);
+  // One empty line around a heading, none at the start or end.
+  const text = lines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return text ? text + '\n' : '';
 }
 
 // ---------------------------------------------------------------- YAML

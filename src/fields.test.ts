@@ -117,3 +117,8 @@ test('a sentence running on to a colon is text, not a field', () => {
     { key: '担当者', text: '田中', children: [] },
   ]);
 });
+
+test('a Markdown document: headings are rows of their own, the list items after them its siblings', () => {
+  const md = ['- intro', '', '# 背景', '', '- 古い', '  - スマホで', '    見づらい', '', '## 要件定義', '- ヒアリング'].join('\n');
+  expect(show(parseOutlineText(md))).toEqual([['intro'], ['# 背景'], ['古い', [['スマホで\n見づらい']]], ['## 要件定義'], ['ヒアリング']]);
+});

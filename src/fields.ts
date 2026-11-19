@@ -25,6 +25,9 @@ export interface TextRow {
   task?: 'open' | 'done';
 }
 
+/** A Markdown heading (`# ` to `### `), a row of its own among a list's items. */
+const HEADING_LINE = /^#{1,3}[ \u3000]/;
+
 /** A field value opening a block scalar: `|`, `|-`, `>` …, optionally tagged `!format`. */
 const BLOCK_START = /^(?:!([\w-]+)\s+)?[|>][-+]?\d?\s*$/;
 /** A tagged single-line value: `!markdown **bold**`. */
@@ -53,7 +56,7 @@ export function parseOutlineText(text: string): TextRow[] {
     let indent = raw.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length;
     let line = raw.trim();
     const marker = line.match(/^(?:[-*+]|\d+[.)])\s+/);
-    if (list && !marker) {
+    if (list && !marker && !(indent === 0 && HEADING_LINE.test(raw))) {
       // More of the text of the item above.
       const above = stack[stack.length - 1].row;
       above.text += '\n' + line;
@@ -102,7 +105,8 @@ function isMarkdownList(lines: string[]): boolean {
     if (blockAt >= 0 && indent > blockAt) continue;
     blockAt = -1;
     const marker = raw.trim().match(/^(?:[-*+]|\d+[.)])\s+/);
-    if (marker) {
+    if (!indent && HEADING_LINE.test(raw)) textAt = -1;
+    else if (marker) {
       const field = raw.trim().slice(marker[0].length).match(FIELD_LINE);
       if (field && BLOCK_START.test(field[2] ?? '')) blockAt = indent;
       textAt = field ? -1 : indent + marker[0].length;

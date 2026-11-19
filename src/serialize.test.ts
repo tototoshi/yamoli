@@ -97,3 +97,19 @@ test('toMarkdownList: a nested list with link labels, fields and tasks as checkl
   expect(toMarkdownList(s, s.rootId, all)).toMatch(/^- plan\n  - \[x\]/);
   expect(toMarkdownList(s, a, all)).toBe('');
 });
+
+test('toMarkdownList: a # row is a heading, its rows the list after it; one inside a list ends it', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const p = add(s.rootId, 'Doc');
+  add(p, 'intro');
+  const why = add(p, '# 背景');
+  add(add(why, '古い'), 'スマホで見づらい');
+  const plan = add(why, '企画');
+  add(plan, 'キックオフ');
+  add(add(plan, '## 要件定義'), 'ヒアリング');
+  const all = (id: string) => s.node(id).children;
+  expect(toMarkdownList(s, p, all)).toBe(
+    '- intro\n\n# 背景\n\n- 古い\n  - スマホで見づらい\n- 企画\n  - キックオフ\n\n## 要件定義\n\n- ヒアリング\n'
+  );
+});

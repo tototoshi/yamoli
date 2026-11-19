@@ -231,7 +231,7 @@ Using Yamoli
       **Diagram** — the rows drawn as boxes and arrows (see Diagrams). Turned on with `views: diagram`.
       **Mind map** — the rows branching out from the zoomed item, as they are nested. Turned on with `views: mindmap` (`マインドマップ`).
       **Slides** — the rows as a slide deck (see Slides). Turned on with `views: slides`.
-      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, tasks are checklist items; the Tasks only, Completed and Fields toggles apply.
+      **Text** — the rows as a plain Markdown list, ready to paste elsewhere. Links show the linked item's name, `#` rows are headings and tasks checklist items; the Tasks only, Completed and Fields toggles apply.
       **YAML / JSON** — the zoomed item as data, coloured, read-only, with a copy button. Items that something links to carry their `id`.
     ## The Document view
       The Document view writes the rows out as they are, a bulleted list nested as the outline is, to read from the top. It doesn’t guess headings or paragraphs from how the rows are laid out. What is written as Markdown is drawn as such:
