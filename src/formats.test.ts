@@ -54,3 +54,10 @@ test('a file block links to the file, downloaded under its own name, with its si
   // Markdown links to kept files work too.
   expect(renderFormat('markdown', '[minutes](files/x.pdf)')).toContain('href="./api/files/x.pdf"');
 });
+
+test('a code block carries its language in its format name: code:ts', () => {
+  expect(getFormat('code:ts').name).toBe('code');
+  const html = renderFormat('code:ts', 'let a = <b>;');
+  expect(html).toMatch(/<pre class="fmt-code" data-lang="ts"><code class="language-ts">let a = &lt;b&gt;;<\/code><\/pre>/);
+  expect(renderFormat('code', 'x')).toMatch(/<pre class="fmt-code"><code>x<\/code>/);
+});

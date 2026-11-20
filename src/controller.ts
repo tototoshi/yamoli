@@ -218,6 +218,8 @@ export class Controller extends Editing {
     if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !isMod(e)) {
       e.preventDefault();
       if (isTitle) return this.commit(fText(store.addChild(id, 0).id, 0));
+      // ``` (or ```ts) and Enter, as a Markdown fence opens: a code block.
+      if (end === ta.value.length && this.makeCode(id, ta.value)) return;
       const before = ta.value.slice(0, start);
       const after = ta.value.slice(end);
       // A slide's title: Enter goes on to its first bullet (not a slide after it), the text after the caret in it.

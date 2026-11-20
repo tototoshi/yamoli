@@ -122,3 +122,9 @@ test('a Markdown document: headings are rows of their own, the list items after 
   const md = ['- intro', '', '# 背景', '', '- 古い', '  - スマホで', '    見づらい', '', '## 要件定義', '- ヒアリング'].join('\n');
   expect(show(parseOutlineText(md))).toEqual([['intro'], ['# 背景'], ['古い', [['スマホで\n見づらい']]], ['## 要件定義'], ['ヒアリング']]);
 });
+
+test('a code block written with its language (`!code:ts |`) keeps it', () => {
+  const [row] = parseOutlineText('sample: !code:c++ |\n  int main() {}\n');
+  expect(row).toMatchObject({ key: 'sample', format: 'code:c++', text: 'int main() {}' });
+  expect(parseOutlineText('one: !code:ts let a = 1')[0]).toMatchObject({ format: 'code:ts', text: 'let a = 1' });
+});

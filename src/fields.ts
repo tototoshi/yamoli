@@ -28,10 +28,10 @@ export interface TextRow {
 /** A Markdown heading (`# ` to `### `), a row of its own among a list's items. */
 const HEADING_LINE = /^#{1,3}[ \u3000]/;
 
-/** A field value opening a block scalar: `|`, `|-`, `>` …, optionally tagged `!format`. */
-const BLOCK_START = /^(?:!([\w-]+)\s+)?[|>][-+]?\d?\s*$/;
+/** A field value opening a block scalar: `|`, `|-`, `>` …, optionally tagged `!format` (or `!code:ts`). */
+const BLOCK_START = /^(?:!([\w-]+(?::[\w+#.-]+)?)\s+)?[|>][-+]?\d?\s*$/;
 /** A tagged single-line value: `!markdown **bold**`. */
-const TAGGED = /^!([\w-]+)\s+(.*)$/;
+const TAGGED = /^!([\w-]+(?::[\w+#.-]+)?)\s+(.*)$/;
 
 /**
  * Indented lines to a tree. Indentation (spaces or tabs) nests; list markers

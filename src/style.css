@@ -624,6 +624,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
   cursor: pointer;
 }
 .block-format:hover { background: var(--hover); }
+.block-lang { width: 7em; padding: 0 4px; font: 12px var(--mono); border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--muted); }
+.block-lang:hover, .block-lang:focus { border-color: var(--faint); outline: none; color: var(--fg); }
 .block-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 .data-view { padding: 8px 12px; cursor: text; overflow-x: auto; }
@@ -759,6 +761,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc pre { overflow-x: auto; font-size: 13px; line-height: 1.5; }
 /* A code block among the lines reads as one: shaded, as a Markdown block's fence is. */
 .doc .fmt-code { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--code-bg); }
+/* A code block's language, named in its corner. */
+.fmt-code[data-lang] { position: relative; }
+.fmt-code[data-lang]::after { content: attr(data-lang); position: absolute; top: 4px; right: 8px; font-size: 11px; color: var(--muted); font-family: var(--font); }
 @media (max-width: 1100px) {
   .doc-page.with-contents { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .doc-toc { position: static; max-height: none; }

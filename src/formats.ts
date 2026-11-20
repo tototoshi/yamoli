@@ -11,6 +11,9 @@
  *   });
  *
  * Whatever render() returns is passed through DOMPurify before display.
+ *
+ * A format name can carry an argument after a colon: `code:ts` is code in
+ * TypeScript, rendered by `code` with `ts` passed on.
  */
 import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
@@ -23,7 +26,8 @@ export interface Format {
   label: string;
   /** Hint in the empty editor (a function when it depends on the language). */
   placeholder: string | (() => string);
-  render: (content: string) => string;
+  /** arg: what the name carries after its colon (`code:ts`: `ts`), or ''. */
+  render: (content: string, arg: string) => string;
 }
 
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -35,8 +39,20 @@ export function registerFormat(name: string, def: Omit<Format, 'name' | 'placeho
   registry.set(name, { name, placeholder: '', ...def });
 }
 
-export const hasFormat = (name: string) => registry.has(name);
-export const getFormat = (name: string): Format => registry.get(name) ?? registry.get('text')!;
+/** A format name and its argument: `code:ts` → ['code', 'ts']. */
+const split = (name: string): [string, string] => {
+  const at = name.indexOf(':');
+  return at < 0 ? [name, ''] : [name.slice(0, at), name.slice(at + 1)];
+};
+export const hasFormat = (name: string) => registry.has(split(name)[0]);
+export const getFormat = (name: string): Format => registry.get(split(name)[0]) ?? registry.get('text')!;
+/** What a format name carries after its colon (a code block's language), or ''. */
+export const formatArg = (name: string) => split(name)[1];
+
+/** ``` and a language, as a Markdown code fence opens: `ts`, `c++`, `objective-c` … */
+export const CODE_FENCE = /^```([\w+#.-]*)$/;
+/** A code block's format, in lang (none: plain code). */
+export const codeFormat = (lang: string) => (lang ? 'code:' + lang : 'code');
 export const listFormats = () => [...registry.values()];
 export const placeholderOf = (f: Format) => (typeof f.placeholder === 'function' ? f.placeholder() : f.placeholder);
 
@@ -54,7 +70,7 @@ export function renderFormat(name: string, content: string): string {
   if (!content.trim()) return `<div class="fmt-empty">${t('(空 — クリックして編集)', '(empty — click to edit)')}</div>`;
   let html: string;
   try {
-    html = getFormat(name).render(content);
+    html = getFormat(name).render(content, formatArg(name));
   } catch (e) {
     html = `<div class="fmt-error">${escapeHtml((e as Error).message)}</div><pre>${escapeHtml(content)}</pre>`;
   }
@@ -171,5 +187,9 @@ registerFormat('csv', {
 registerFormat('code', {
   label: 'Code',
   placeholder: 'function hello() {}',
-  render: (c) => `<pre class="fmt-code"><code>${escapeHtml(c)}</code></pre>`,
+  // The language as Markdown's fences mark it, and named in a corner.
+  render: (c, lang) =>
+    lang
+      ? `<pre class="fmt-code" data-lang="${escapeHtml(lang)}"><code class="language-${escapeHtml(lang)}">${escapeHtml(c)}</code></pre>`
+      : `<pre class="fmt-code"><code>${escapeHtml(c)}</code></pre>`,
 });

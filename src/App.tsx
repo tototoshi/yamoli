@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } fro
 import { Controller } from './controller';
 import { applyFocus, fKey, fText } from './focus';
 import { IS_MAC } from './keys';
-import { hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
+import { codeFormat, formatArg, hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
 import { t } from './i18n';
 import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
@@ -567,31 +567,46 @@ function Actions({ id, class: cls }: { id: string; class: string }) {
 
 // ================================================================ blocks
 
-/** A block's format, and its first line while folded. */
+/** A block's format (a code block's language beside it), and its first line while folded. */
 function BlockHead({ node }: { node: OutlineNode }) {
   const ctl = useCtl();
+  const name = node.format!.split(':')[0];
+  const set = (format: string) => {
+    if (format === node.format) return;
+    ctl.store.setFormat(node.id, format);
+    ctl.commit();
+  };
   return (
     <span class="block-head">
       <select
         class="block-format"
         title={t('フォーマット', 'Format')}
-        value={node.format!}
-        onChange={(e) => {
-          ctl.store.setFormat(node.id, e.currentTarget.value);
-          ctl.commit();
-        }}
+        value={name}
+        onChange={(e) => set(e.currentTarget.value === 'code' ? codeFormat(formatArg(node.format!)) : e.currentTarget.value)}
       >
         {listFormats().map((f) => (
           <option key={f.name} value={f.name}>
             {f.label}
           </option>
         ))}
-        {!hasFormat(node.format!) && (
-          <option value={node.format!}>
-            {node.format} {t('(未定義)', '(unknown)')}
+        {!hasFormat(name) && (
+          <option value={name}>
+            {name} {t('(未定義)', '(unknown)')}
           </option>
         )}
       </select>
+      {name === 'code' && (
+        <input
+          class="block-lang"
+          size={8}
+          spellcheck={false}
+          placeholder={t('言語', 'language')}
+          title={t('コードの言語（ts、python …）', "The code's language (ts, python …)")}
+          value={formatArg(node.format!)}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          onChange={(e) => set(codeFormat(e.currentTarget.value.trim().replace(/[^\w+#.-]/g, '')))}
+        />
+      )}
       {node.collapsed && <span class="block-preview">{node.text.split('\n')[0].slice(0, 80)}</span>}
     </span>
   );

@@ -697,22 +697,35 @@ test('typing // offers dates: Enter writes today in its place, a date typed afte
   expect(ctl.picker).toBeNull();
 });
 
-test('``` typed on an empty row makes it a code block where it is, being written in', () => {
+test('``` and a space (or Enter) on a row makes it a code block where it is, ```ts one in TypeScript', () => {
   let a = '';
   let b = '';
+  let c = '';
   const ctl = setup((s, add) => {
     add(s.rootId, 'before');
     a = add(s.rootId, '');
-    b = add(s.rootId, 'after');
+    b = add(s.rootId, '');
+    c = add(s.rootId, 'after');
   });
   const ta = editor(ctl, a);
   ta.value = '```';
   ta.setSelectionRange(3, 3);
   ctl.onTextInput(a, ta);
+  expect(ctl.store.node(a).key).toBeNull(); // a language may follow
+  ta.value = '``` ';
+  ta.setSelectionRange(4, 4);
+  ctl.onTextInput(a, ta);
   expect(ctl.store.node(a)).toMatchObject({ key: 'code', format: 'code', text: '' });
   expect(ctl.store.node(ctl.store.rootId).children.indexOf(a)).toBe(1);
   expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + a }));
-  expect(ctl.store.node(b).key).toBeNull();
+
+  const tb = editor(ctl, b);
+  tb.value = '```ts';
+  tb.setSelectionRange(5, 5);
+  press(ctl, tb, 'Enter');
+  expect(ctl.store.node(b)).toMatchObject({ format: 'code:ts', text: '' });
+  expect(ctl.store.node(b).key).not.toBe('code'); // a key of its own beside a's
+  expect(ctl.store.node(c).key).toBeNull();
 });
 
 test('in the document view, ⌘Enter in a block goes on to a new line right after it', () => {

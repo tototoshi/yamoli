@@ -10,6 +10,7 @@ import { headingOf } from './doc';
 import { t } from './i18n';
 import { dateQueryAt, keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED } from './fields';
+import { CODE_FENCE, codeFormat } from './formats';
 import { fKey, fText, type Focus } from './focus';
 import { arrowOf } from './keys';
 import { ViewState } from './viewState';
@@ -57,6 +58,23 @@ export class Editing extends ViewState {
   // ================================================================ link picker
 
   /** Open, update or close the picker after the field's value or caret changed (`[[` for a link, `//` for a date). */
+  /**
+   * text (```, or ```ts with its language) on row id: the row becomes a code block where it is, being written
+   * in, as its own undo step. Not a row holding rows (a block holds none), the title or a field. Whether it did.
+   */
+  makeCode(id: string, text: string): boolean {
+    const { store } = this;
+    const m = text.match(CODE_FENCE);
+    const n = store.node(id);
+    if (!m || n.key !== null || id === this.zoomId || store.items(id).length) return false;
+    store.setKey(id, store.freeKey(store.parentOf(id)!, 'code'));
+    store.setFormat(id, codeFormat(m[1]));
+    store.setText(id, '');
+    this.revealFields();
+    this.commit(fText(id, 0));
+    return true;
+  }
+
   updatePicker(el: HTMLTextAreaElement | HTMLInputElement, selfId: string) {
     const caret = el.selectionStart ?? 0;
     const key = el.dataset.fk!;
@@ -420,14 +438,9 @@ export class Editing extends ViewState {
       this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
       return this.rerender();
     }
-    // ``` typed on an empty row makes it a code block where it is (a block holds no rows: not on one that does).
-    if (n.key === null && id !== this.zoomId && value === '```' && !store.items(id).length) {
-      store.setKey(id, store.freeKey(store.parentOf(id)!, 'code'));
-      store.setFormat(id, 'code');
-      store.setText(id, '');
-      this.revealFields();
-      return this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
-    }
+    // ``` and a space (```ts and a space for its language) on a row makes it a code block.
+    const fence = value.match(/^(```[\w+#.-]*) $/);
+    if (fence && this.makeCode(id, fence[1])) return;
     // `- ` typed at the start of a paragraph makes it a list item again.
     const bullet = n.paragraph && n.key === null ? value.match(/^[-*・][ \u3000]/) : null;
     if (bullet && ta.selectionStart === 2 && !n.text.startsWith(bullet[0])) {
