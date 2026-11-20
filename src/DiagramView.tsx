@@ -523,7 +523,6 @@ export function routeAll(d: Diagram, L: Layout, measure: Measure) {
     const n = d.nodes.get(nid)!;
     if (b.frame && n.desc) heads.set(nid, { x: b.x, y: b.y + 4, w: b.w, h: frameHead(n, b.w, measure) - 4, frame: false });
   }
-  const all = [...L.boxes.values()];
   // The sides each arrow joins its boxes by: where pinned, else facing each other.
   const sidesOf = new Map(
     d.edges.map((e) => {
@@ -555,8 +554,20 @@ export function routeAll(d: Diagram, L: Layout, measure: Measure) {
     ends.sort((p, q) => centre(p.other) - centre(q.other));
     ends.forEach(({ e, end }, i) => (at.get(e)![end] = 0.5 + (i - (ends.length - 1) / 2) * step));
   }
+  // A frame is in the way of lines too, but of those to or from what is in it.
+  const parent = new Map<string, string>();
+  for (const [nid, n] of d.nodes) for (const c of n.children) parent.set(c, nid);
+  const around = (nid: string) => {
+    const out = new Set<string>();
+    for (let p = parent.get(nid); p; p = parent.get(p)) out.add(p);
+    return out;
+  };
   const routeOf = (e: DiagramEdge, taken?: Taken) => {
-    const others = [...all, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
+    const holding = new Set([...around(e.from), ...around(e.to)]);
+    const boxes = [...L.boxes].map(([nid, b]) =>
+      b.frame && !holding.has(nid) && nid !== e.from && nid !== e.to ? { ...b, frame: false } : b
+    );
+    const others = [...boxes, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
     const labelWidth = e.label ? edgeLabelWidth(e, measure) + 8 : 0;
     return route(L.boxes.get(e.from)!, L.boxes.get(e.to)!, d.direction, others, labelWidth, sidesOf.get(e), at.get(e), taken);
   };

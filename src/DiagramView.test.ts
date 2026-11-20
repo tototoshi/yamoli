@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { expect, test } from 'vitest';
-import type { Box } from './diagram';
-import { aroundBoxes, route, Taken } from './DiagramView';
+import { buildDiagram, estimate, layout, type Box } from './diagram';
+import { aroundBoxes, route, routeAll, Taken } from './DiagramView';
+import { OutlineStore } from './model';
 
 const box = (x: number, y: number, w = 100, h = 50): Box => ({ x, y, w, h, frame: false });
 
@@ -92,4 +93,32 @@ test('an arrow with a box in its way picks the lane round it that crosses no oth
   ]);
   const r = route(a, b, 'LR', [a, b, c], 0, undefined, undefined, taken);
   expect(lane(r)).toBeLessThan(-30);
+});
+
+test('a frame between two boxes is in the way of a line between them, not of one into it', () => {
+  const s = OutlineStore.create();
+  const sys = s.addChild(s.rootId, -1, 'sys').id;
+  const a = s.addChild(sys, -1, 'A').id;
+  const f = s.addChild(sys, -1, 'F').id;
+  s.addField(f, 'shape', 'frame');
+  const inner = s.addChild(f, -1, 'in').id;
+  const c = s.addChild(sys, -1, 'C').id;
+  s.addField(a, 'to', `[[${f}]], [[${c}]], [[${inner}]]`);
+  s.addField(f, 'to', `[[${c}]]`);
+  const d = buildDiagram(s, sys);
+  const L = layout(d);
+  const { routes } = routeAll(d, L, estimate);
+  const frame = L.boxes.get(f)!;
+  // Along each stretch, not only at the corners.
+  const through = (r: { trace: [number, number][] }) =>
+    r.trace.slice(1).some((q, i) => {
+      const p = r.trace[i];
+      return Array.from({ length: 21 }, (_, k) => k / 20).some((t) => {
+        const [x, y] = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+        return x > frame.x + 2 && x < frame.x + frame.w - 2 && y > frame.y + 2 && y < frame.y + frame.h - 2;
+      });
+    });
+  const edge = (to: string) => routes.get(d.edges.find((e) => e.from === a && e.to === to)!)!;
+  expect(through(edge(c))).toBe(false);
+  expect(through(edge(inner))).toBe(true);
 });
