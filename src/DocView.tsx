@@ -327,32 +327,43 @@ function toLineAt(e: MouseEvent, ctl: Controller) {
 }
 
 /**
- * Copies the document: formatted (headings, lists, code, tables) for pasting into mail or other documents, and as
- * Markdown where only plain text goes.
+ * Copies the document: formatted (headings, lists, code, tables) for pasting into mail or other documents, with
+ * Markdown where only plain text goes; or as Markdown alone, to paste as such anywhere.
  */
 function CopyDoc() {
   const ctl = useCtl();
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
+  const [copied, setCopied] = useState<'rich' | 'md' | null>(null);
+  const copy = (as: 'rich' | 'md') => {
     const text = toDocMarkdown(ctl.store, ctl.zoomId, (id) => ctl.shownChildren(id));
-    const html = DOMPurify.sanitize(markdown(text));
     const blob = (s: string, type: string) => new Blob([s], { type });
-    navigator.clipboard
-      .write([new ClipboardItem({ 'text/html': blob(html, 'text/html'), 'text/plain': blob(text, 'text/plain') })])
-      .catch(() => navigator.clipboard.writeText(text))
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      });
+    const written =
+      as === 'md'
+        ? navigator.clipboard.writeText(text)
+        : navigator.clipboard
+            .write([
+              new ClipboardItem({
+                'text/html': blob(DOMPurify.sanitize(markdown(text)), 'text/html'),
+                'text/plain': blob(text, 'text/plain'),
+              }),
+            ])
+            .catch(() => navigator.clipboard.writeText(text));
+    void written.then(() => {
+      setCopied(as);
+      setTimeout(() => setCopied(null), 1500);
+    });
   };
+  const done = t('コピーしました', 'Copied');
   return (
     <div class="doc-tools">
       <button
         class="mini"
         title={t('書式付きでコピー（プレーンテキストの貼り先には Markdown）', 'Copy formatted (Markdown where only plain text goes)')}
-        onClick={copy}
+        onClick={() => copy('rich')}
       >
-        {copied ? t('コピーしました', 'Copied') : t('文書をコピー', 'Copy document')}
+        {copied === 'rich' ? done : t('文書をコピー', 'Copy document')}
+      </button>
+      <button class="mini" title={t('Markdown のテキストとしてコピー', 'Copy as Markdown text')} onClick={() => copy('md')}>
+        {copied === 'md' ? done : t('Markdown でコピー', 'Copy as Markdown')}
       </button>
     </div>
   );

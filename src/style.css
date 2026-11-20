@@ -796,7 +796,7 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 ::highlight(doc-find) { background-color: rgb(255 214 0 / 0.4); }
 ::highlight(doc-find-at) { background-color: rgb(255 150 0 / 0.75); }
 /* Copy document: at the top right, faint until the pointer is over the document. */
-.doc-tools { display: flex; justify-content: flex-end; height: 0; position: relative; z-index: 1; }
+.doc-tools { display: flex; justify-content: flex-end; gap: 6px; height: 0; position: relative; z-index: 1; }
 .doc-tools .mini { opacity: 0.35; transition: opacity 0.15s; }
 .doc-main:hover .doc-tools .mini, .doc-tools .mini:focus-visible { opacity: 1; }
 .doc-title { margin: 8px 0 16px; font-size: 1.8em; line-height: 1.3; }
