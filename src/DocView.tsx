@@ -583,6 +583,7 @@ function Block({ id }: { id: string }) {
     <div
       class="data-view doc-block"
       data-format={n.format}
+      data-id={id}
       title={t('クリックして編集（Esc で終了）', 'Click to edit (Esc to finish)')}
       dangerouslySetInnerHTML={{ __html: html }}
       onClick={(e) => !(e.target as Element).closest('a') && !document.getSelection()?.toString() && ctl.focus(fText(id, 'end'))}

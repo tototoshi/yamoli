@@ -1,6 +1,6 @@
 /*
- * Moving rows in the Document view: a row is dragged by the grip shown beside
- * the line under the pointer, with the rows under it. Where it goes is decided
+ * Moving rows in the Document view: a row (or a block) is dragged by the grip
+ * shown beside the line under the pointer, with the rows under it. Where it goes is decided
  * by the line under the pointer, as in the outline:
  *   upper half                        -> before that row
  *   lower half, rows shown under it   -> first of the rows under it
@@ -33,9 +33,9 @@ const CLIMB = 12;
 const START_DISTANCE = 5;
 const SCROLL_EDGE = 60;
 
-/** The rows' lines drawn in main, top to bottom (the one being typed in too; an embedded drawing's own left out). */
+/** The rows' lines and blocks drawn in main, top to bottom (the one being typed in too; an embedded drawing's own left out). */
 export function docLines(main: Element): (Line & { el: HTMLElement })[] {
-  return [...main.querySelectorAll<HTMLElement>('.text-view[data-id], textarea[data-fk^="text:"]')]
+  return [...main.querySelectorAll<HTMLElement>('.text-view[data-id], .doc-block[data-id], textarea[data-fk^="text:"]')]
     .filter((v) => !v.closest('.doc-embed'))
     .map((el) => {
       const rs = [...el.getClientRects()];
@@ -70,9 +70,19 @@ export function docDrop(store: OutlineStore, zoomId: string, lines: Line[], src:
   return { parentId, beforeId: sibs[sibs.indexOf(target) + 1] ?? null, left: leftOf(target)!, top: line.bottom };
 }
 
-/** Where the grip goes beside a line: left of its bullet, number or quotation bar, by its first line's middle. */
+/** Whether el is a block (drawn, or being written in), not a row's line of text. */
+const isBlock = (el: Element) => el.matches('.doc-block, .block-editor');
+
+/** What is drawn for el's row, to dim while it is dragged: its list item, line, or block. */
+const boxOf = (el: Element) =>
+  (isBlock(el)
+    ? (el.closest('.doc-code, .block') ?? el)
+    : (el.closest('.doc-line')?.closest('li') ?? el.closest('.doc-line') ?? el)) as HTMLElement;
+
+/** Where the grip goes beside a line: left of its bullet, number or quotation bar, by its first line's middle (a block's top). */
 export function gripAt(line: Line & { el: HTMLElement }): { x: number; y: number } {
-  const li = line.el.closest('li');
+  if (isBlock(line.el)) return { x: line.left - 24, y: line.top + 14 };
+  const li = line.el.closest('.doc-line')?.parentElement?.closest('li');
   const quote = line.el.closest('.doc-quote');
   const edge = li ? li.getBoundingClientRect().left - 22 : quote ? quote.getBoundingClientRect().left : line.left;
   const first = line.el.getClientRects()[0] ?? line.el.getBoundingClientRect();
@@ -88,7 +98,7 @@ export function startDocDrag(e: PointerEvent, id: string, ctl: Controller, main:
   let active = false;
   let drop: DocDrop | null = null;
   const source = docLines(main).find((l) => l.id === id)?.el;
-  const box = source?.closest('li, .doc-line') as HTMLElement | null;
+  const box = source ? boxOf(source) : null;
   const indicator = document.createElement('div');
   indicator.className = 'drop-indicator';
 

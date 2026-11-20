@@ -58,3 +58,18 @@ test('not onto itself or the rows under it', () => {
   expect(docDrop(s, doc, lines, step1, 100, 65)).toBeNull();
   expect(docDrop(s, doc, lines, step1, 100, 95)).toBeNull();
 });
+
+test('a block moves as a row does, and rows go before or after it', () => {
+  const { s, doc, intro, plan, step1, step2, lines } = setup();
+  const note = s.addBlock(step1, 'note', 'markdown', 'Some **notes**').id;
+  // The block drawn after step 1's line, before detail: 40 high.
+  const withNote = [
+    ...lines.slice(0, 3),
+    { id: note, top: 85, bottom: 125, left: 20 },
+    ...lines.slice(3).map((l) => ({ ...l, top: l.top + 50, bottom: l.bottom + 50 })),
+  ];
+  expect(docDrop(s, doc, withNote, note, 100, 5)).toMatchObject({ parentId: doc, beforeId: intro });
+  expect(docDrop(s, doc, withNote, step2, 100, 90)).toMatchObject({ parentId: step1, beforeId: note });
+  expect(docDrop(s, doc, withNote, intro, 100, 120)).toMatchObject({ parentId: step1 });
+  expect(docDrop(s, doc, withNote, note, 100, 45)).toMatchObject({ parentId: plan, beforeId: step1 });
+});
