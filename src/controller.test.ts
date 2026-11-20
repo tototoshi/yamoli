@@ -878,7 +878,7 @@ test('Esc leaves the line: in the outline the row is then selected, in the docum
   expect(document.activeElement).not.toBe(ta);
 });
 
-test('in the outline, Tab with nowhere to indent the row to opens it a level further at each press', () => {
+test('in the outline, Tab with nowhere to indent the row to opens it a level further at each press, the next level folded', () => {
   let a = '';
   let b = '';
   let c = '';
@@ -887,19 +887,19 @@ test('in the outline, Tab with nowhere to indent the row to opens it a level fur
     b = add(a, 'under');
     c = add(b, 'deeper');
     add(c, 'deepest');
-    s.setCollapsed(a, true);
-    s.setCollapsed(b, true);
-    s.setCollapsed(c, true);
+    s.setCollapsed(a, true); // b and c open inside it: still a level at a time
   });
   const ta = editor(ctl, a);
   ta.setSelectionRange(0, 0);
+  const folded = () => [a, b, c].map((id) => ctl.store.node(id).collapsed);
   press(ctl, ta, 'Tab');
-  expect([a, b, c].map((id) => ctl.store.node(id).collapsed)).toEqual([false, true, true]);
+  expect(folded().slice(0, 2)).toEqual([false, true]); // first, its rows shown, under them folded
   press(ctl, ta, 'Tab');
-  expect([a, b, c].map((id) => ctl.store.node(id).collapsed)).toEqual([false, false, true]);
+  expect(folded()).toEqual([false, false, true]);
   press(ctl, ta, 'Tab');
-  press(ctl, ta, 'Tab'); // all open: nothing
-  expect([a, b, c].map((id) => ctl.store.node(id).collapsed)).toEqual([false, false, false]);
+  expect(folded()).toEqual([false, false, false]);
+  expect(press(ctl, ta, 'Tab').defaultPrevented).toBe(true); // all open: nothing more
+  expect(folded()).toEqual([false, false, false]);
   expect(ctl.store.parentOf(a)).toBe(ctl.store.rootId);
   press(ctl, ta, 'Tab', { shiftKey: true });
   expect(ctl.store.node(a).collapsed).toBe(false); // Shift+Tab doesn't fold

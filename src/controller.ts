@@ -470,19 +470,24 @@ export class Controller extends Editing {
 
   /**
    * Open the row a level further: itself when folded, else the folded rows shown under it (the ones whose rows are
-   * hidden nearest it). Whether anything opened.
+   * hidden nearest it); the rows they hold with rows under them are folded, so only that one level shows. Whether
+   * anything opened.
    */
   private openLevel(id: string): boolean {
     const { store } = this;
+    const holds = (c: string) => store.node(c).children.length > 0 && store.node(c).format === null;
     const folded: string[] = [];
     const walk = (c: string) => {
-      const n = store.node(c);
-      if (!n.children.length || n.format !== null) return;
-      if (n.collapsed) folded.push(c);
-      else n.children.forEach(walk);
+      if (!holds(c)) return;
+      if (store.node(c).collapsed) folded.push(c);
+      else store.node(c).children.forEach(walk);
     };
     walk(id);
-    return folded.map((c) => store.setCollapsed(c, false)).includes(true);
+    for (const c of folded) {
+      store.setCollapsed(c, false);
+      for (const k of store.node(c).children) if (holds(k)) store.setCollapsed(k, true);
+    }
+    return folded.length > 0;
   }
 
   /** Like store.indent, but under the previous *displayed* sibling. */
