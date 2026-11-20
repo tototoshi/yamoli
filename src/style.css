@@ -882,6 +882,28 @@ span.doc-lang { width: auto; border: 0; }
 /* A diagram is drawn as in its own view: fitted when opened, zoomed with its buttons, scrolled sideways. */
 .doc-embed .diagram-wrap { padding: 0; }
 /* The list or paragraphs switch, at the side of the rows it is for, while the pointer is over them. */
+/* The grip beside the line under the pointer, to drag the row by. */
+.doc-grip {
+  position: fixed;
+  z-index: 5;
+  width: 18px;
+  height: 22px;
+  margin-top: -11px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 22px;
+  cursor: grab;
+  opacity: 0.6;
+}
+.doc-grip:hover { opacity: 1; background: var(--attr-bg); }
+.doc .drag-source { opacity: 0.4; }
+@media (hover: none) {
+  .doc-grip { display: none; }
+}
 .doc-rows { position: relative; }
 .doc-style { position: absolute; top: 0; right: 100%; margin-right: 36px; font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.1s; }
 .doc-rows:hover > .doc-style, .doc-style:focus-visible { opacity: 1; }

@@ -19,6 +19,7 @@ import { GanttView } from './GanttView';
 import { t } from './i18n';
 import { BlockBody, LangInput, NodeText, useRendered } from './App';
 import { fText } from './focus';
+import { docLines, gripAt, startDocDrag } from './docDrag';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
 import { setStyle, type OutlineStore } from './model';
@@ -53,8 +54,29 @@ export function DocView({
   const doc = buildDoc(from, rootId ?? ctl.zoomId, { showCompleted: store ? true : ctl.prefs.showCompleted });
   const contents = docContents(from, doc.parts);
   const withContents = contents.length >= CONTENTS_FROM;
+  const grip = useRef<HTMLButtonElement>(null);
   const body = (
-    <div class={'doc-page' + (withContents || aside ? ' with-contents' : '') + (store ? ' read-only' : '')}>
+    <div
+      class={'doc-page' + (withContents || aside ? ' with-contents' : '') + (store ? ' read-only' : '')}
+      onPointerMove={store ? undefined : (e) => showGrip(e, grip.current)}
+      onPointerLeave={() => grip.current && (grip.current.hidden = true)}
+    >
+      {!store && (
+        <button
+          ref={grip}
+          class="doc-grip"
+          hidden
+          tabIndex={-1}
+          title={t('ドラッグで移動（下の行も一緒に）', 'Drag to move (with the rows under it)')}
+          onPointerDown={(e) => {
+            const main = e.currentTarget.parentElement!.querySelector('.doc-main');
+            const id = e.currentTarget.dataset.id;
+            if (main && id) startDocDrag(e, id, ctl, main);
+          }}
+        >
+          ⠿
+        </button>
+      )}
       {(withContents || aside) && (
         <nav class="doc-toc" aria-label={t('目次', 'Contents')}>
           {aside}
@@ -75,6 +97,21 @@ export function DocView({
       {body}
     </>
   );
+}
+
+/** The grip beside the line under the pointer (not while dragging, or away from the lines). */
+function showGrip(e: PointerEvent, grip: HTMLButtonElement | null) {
+  const main = (e.currentTarget as Element).querySelector('.doc-main');
+  if (!grip || !main || document.body.classList.contains('dragging') || e.target === grip) return;
+  const y = e.clientY;
+  const line = docLines(main).find((l) => y >= l.top - 4 && y <= l.bottom + 4);
+  const r = main.getBoundingClientRect();
+  if (!line || e.clientX < r.left - 80 || e.clientX > r.right) return void (grip.hidden = true);
+  const at = gripAt(line);
+  grip.hidden = false;
+  grip.dataset.id = line.id;
+  grip.style.left = at.x + 'px';
+  grip.style.top = at.y + 'px';
 }
 
 /** An occurrence found in the document: row id's k-th, of count in its text as drawn, and where it is drawn. */
@@ -281,16 +318,7 @@ function toLineAt(e: MouseEvent, ctl: Controller) {
   const hit = e.target as Element;
   const own = '.text-view, .rich, a, button, input, select, textarea, label, .doc-block, .doc-code, .doc-embed, .doc-rule, .doc-lead';
   if (hit.closest(own) || document.getSelection()?.toString()) return;
-  // Each line's text as far down the page as it goes (the one being typed in too; an embedded drawing's own left out).
-  const lines = [...main.querySelectorAll<HTMLElement>('.text-view[data-id], textarea[data-fk^="text:"]')]
-    .filter((v) => !v.closest('.doc-embed'))
-    .map((v) => {
-      const rs = [...v.getClientRects()];
-      const box = v.getBoundingClientRect();
-      const id = v.dataset.id ?? v.dataset.fk!.slice('text:'.length);
-      return { id, top: rs[0]?.top ?? box.top, bottom: rs.at(-1)?.bottom ?? box.bottom, left: rs[0]?.left ?? box.left };
-    });
-  const line = lineAt(lines, e.clientX, e.clientY);
+  const line = lineAt(docLines(main), e.clientX, e.clientY);
   if (!line) return;
   const text = ctl.store.node(line.id).text;
   const start = ctl.store.node(line.id).key === null ? (headingOf(text)?.prefix ?? 0) : 0;
