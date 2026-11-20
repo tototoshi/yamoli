@@ -14,7 +14,7 @@ Using Yamoli
       Bookmark items you often open with **⌘D** (or from a row's menu) to open them from the bookmark button at the top; ⌘P lists them first too (⌘D again takes one out).
       On macOS, **Ctrl+K** deletes to the end of the line and **Ctrl+Y** puts it back; at the end of a row, Ctrl+K (like Ctrl+D) joins the next row.
     ## Selecting, copying and pasting
-      Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Shift+Enter then act on all of them, and dragging one's ● moves them together.
+      Select several rows with **Shift+↑↓** at a row's ends, **Shift+click** or by dragging across them. **Esc** while typing in a row selects it (Esc again lets it go; in the Document view and others Esc just leaves the line). Tab / Shift+Tab, Backspace, ⌘C / ⌘X and ⌘Shift+Enter then act on all of them, and dragging one's ● moves them together.
       **Copy tree** in a row's menu (right-click its ●) copies the item with everything under it, folded and hidden rows too.
       Rows copied in Yamoli paste back as they were: fields, blocks, multi-line text, done or not. Elsewhere they paste as a Markdown list.
       Pasted text with several lines becomes rows. A Markdown list keeps its nesting (`- name: value` becoming a field of the row above); YAML comes in as fields, nesting and blocks; a checklist (`- [ ]` / `- [x]`) as tasks; fenced code (` ```ts ` …) as a code block in its language (so the Text view's Markdown pasted back keeps its code blocks where they were).
@@ -243,6 +243,7 @@ Using Yamoli
         A row of just `---` is a dividing line (the `---` shows while it is typed in).
         `/` typed on an empty row opens a menu of what to make it (a heading, list, numbered list, task, paragraph, quote, divider, code block, Markdown block or date). Type on (`/quo`, `/h2`) to narrow it; ↑↓ and Enter, or a click, picks one. On the right is the way to write each without the menu. Two, `//`, are the dates as before.
         Tasks made with `[ ]` have checkboxes.
+        **Copy document**, at the top right, copies the whole document formatted (headings, lists, code and tables as they are, for mail or other documents; as Markdown where only plain text goes). Fields and embedded drawings are left out.
         `embed: [[item]] diagram` draws that item’s diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item’s `description` leads the document.
       On the line being typed in, **⌘⌥1** / **⌘⌥2** / **⌘⌥3** make it a heading (writing the `#`s at its start) and **⌘⌥0** a plain row again (Ctrl+Alt outside macOS; in the outline too).
       A document with three headings or more has its contents on the left (down to `##` headings): click one to go to it, and the section being read is marked. A narrow window leaves them out.

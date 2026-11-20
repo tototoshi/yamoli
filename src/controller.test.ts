@@ -844,3 +844,28 @@ test('in the document `/` at the start of a row opens what to make it, narrowed 
   type(other, '/');
   expect(ctl.picker).toBeNull(); // only in the document
 });
+
+test('Esc leaves the line: in the outline the row is then selected, in the document it is just left', () => {
+  let doc = '';
+  let a = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    a = add(doc, 'line');
+  });
+  location.hash = `#/${doc}`;
+  ctl.onHashChange();
+  press(ctl, editor(ctl, a), 'Escape');
+  expect(ctl.selection).toEqual({ anchor: a, head: a });
+  expect(ctl.activeField).toBeNull();
+
+  ctl.selection = null;
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  const ta = editor(ctl, a);
+  ta.focus();
+  const e = press(ctl, ta, 'Escape');
+  expect(e.defaultPrevented).toBe(true);
+  expect(ctl.selection).toBeNull();
+  expect(document.activeElement).not.toBe(ta);
+});

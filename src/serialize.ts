@@ -132,6 +132,17 @@ export function toMarkdownList(store: OutlineStore, id: string, children: (id: s
   return toMarkdownRows(store, children(id), children);
 }
 
+/**
+ * The document under id, as the Document view writes it out, in Markdown: its `description` leading, then its rows
+ * and blocks (of those children picks), with fields left out.
+ */
+export function toDocMarkdown(store: OutlineStore, id: string, children: (id: string) => string[]): string {
+  const rows = (c: string) => children(c).filter((k) => store.node(k).key === null || store.node(k).format !== null);
+  const lead = id !== store.rootId ? store.fieldValue(id, 'description')?.trim() : '';
+  const body = toMarkdownList(store, id, rows);
+  return lead ? `${lead}\n${body && '\n' + body}` : body;
+}
+
 /** The given rows (and what children picks under them) as a Markdown list. */
 export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id: string) => string[]): string {
   const lines: string[] = [];

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { OutlineStore } from './model';
-import { Tagged, toMarkdownList, toValue, toYaml } from './serialize';
+import { Tagged, toDocMarkdown, toMarkdownList, toValue, toYaml } from './serialize';
 
 function project() {
   const s = OutlineStore.create();
@@ -197,4 +197,18 @@ test('toMarkdownList: numbered rows a numbered list, a quotation `> `, `---` a d
     { text: 'after' },
     { text: 'again', numbered: true },
   ]);
+});
+
+test('toDocMarkdown: the document as the Document view writes it, its description leading and fields left out', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, 'Doc').id;
+  s.addField(p, 'description', 'What this is about.');
+  s.addField(p, 'owner', 'me');
+  s.addChild(p, -1, '# Plan');
+  const step = s.addChild(p, -1, 'step').id;
+  s.addField(step, 'duration', '3d');
+  s.addBlock(step, 'code', 'code:ts', 'let a = 1;');
+  const all = (id: string) => s.node(id).children;
+  expect(toDocMarkdown(s, p, all)).toBe('What this is about.\n\n# Plan\n\n- step\n  ```ts\n  let a = 1;\n  ```\n');
+  expect(toDocMarkdown(s, step, all)).toBe('```ts\nlet a = 1;\n```\n');
 });

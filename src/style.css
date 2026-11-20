@@ -772,6 +772,10 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc-page:not(.read-only) .doc-main { padding-bottom: 30vh; cursor: text; }
 .doc-page.with-contents { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
 .doc-main { min-width: 0; max-width: 860px; }
+/* Copy document: at the top right, faint until the pointer is over the document. */
+.doc-tools { display: flex; justify-content: flex-end; height: 0; position: relative; z-index: 1; }
+.doc-tools .mini { opacity: 0.35; transition: opacity 0.15s; }
+.doc-main:hover .doc-tools .mini, .doc-tools .mini:focus-visible { opacity: 1; }
 .doc-title { margin: 8px 0 16px; font-size: 1.8em; line-height: 1.3; }
 .doc-toc { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 1px; max-height: calc(100vh - 80px); margin-top: 8px; overflow-y: auto; font-size: 13px; }
 .doc-toc-item { padding: 3px 8px; border: 0; border-left: 2px solid transparent; border-radius: 0 4px 4px 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }

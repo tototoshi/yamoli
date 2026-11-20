@@ -12,7 +12,9 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
-import { formatArg, getFormat } from './formats';
+import DOMPurify from 'dompurify';
+import { formatArg, getFormat, markdown } from './formats';
+import { toDocMarkdown } from './serialize';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
 import { BlockBody, LangInput, NodeText, useRendered } from './App';
@@ -60,6 +62,7 @@ export function DocView({
         </nav>
       )}
       <div class="doc-main" onClick={store ? undefined : (e) => toLineAt(e, ctl)}>
+        {!store && (doc.lead || doc.parts.length > 0) && <CopyDoc />}
         {title && <h1 class="doc-title">{title}</h1>}
         <DocBody lead={doc.lead} parts={doc.parts} />
       </div>
@@ -91,6 +94,38 @@ function toLineAt(e: MouseEvent, ctl: Controller) {
   const text = ctl.store.node(line.id).text;
   const start = ctl.store.node(line.id).key === null ? (headingOf(text)?.prefix ?? 0) : 0;
   ctl.focus(fText(line.id, line.start ? start : 'end'));
+}
+
+/**
+ * Copies the document: formatted (headings, lists, code, tables) for pasting into mail or other documents, and as
+ * Markdown where only plain text goes.
+ */
+function CopyDoc() {
+  const ctl = useCtl();
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    const text = toDocMarkdown(ctl.store, ctl.zoomId, (id) => ctl.shownChildren(id));
+    const html = DOMPurify.sanitize(markdown(text));
+    const blob = (s: string, type: string) => new Blob([s], { type });
+    navigator.clipboard
+      .write([new ClipboardItem({ 'text/html': blob(html, 'text/html'), 'text/plain': blob(text, 'text/plain') })])
+      .catch(() => navigator.clipboard.writeText(text))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+  };
+  return (
+    <div class="doc-tools">
+      <button
+        class="mini"
+        title={t('書式付きでコピー（プレーンテキストの貼り先には Markdown）', 'Copy formatted (Markdown where only plain text goes)')}
+        onClick={copy}
+      >
+        {copied ? t('コピーしました', 'Copied') : t('文書をコピー', 'Copy document')}
+      </button>
+    </div>
+  );
 }
 
 /** The headings to go to, the one being read marked. */

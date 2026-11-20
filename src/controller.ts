@@ -218,6 +218,13 @@ export class Controller extends Editing {
     const zoomFocus = zoomId !== store.rootId ? fText(zoomId) : null;
     if (n.format !== null && !isTitle && this.blockKeydown(e, ta, n.id)) return;
 
+    // ---- Esc leaves the line: in the outline it is then selected (to move or indent with the keys), elsewhere just left
+    if (e.key === 'Escape' && !isMod(e) && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      if (this.view === 'outline' && !isTitle) return this.selectRows(id, id);
+      return ta.blur();
+    }
+
     // ---- ⌘⌥1 to ⌘⌥3 make the line a heading (`# ` to `### `), ⌘⌥0 a plain row again (as in word processors)
     const level = /^Digit([0-3])$/.exec(e.code);
     if (level && isMod(e) && e.altKey && !e.shiftKey && !isTitle && n.key === null) {
