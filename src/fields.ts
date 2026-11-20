@@ -28,6 +28,9 @@ export interface TextRow {
 /** A Markdown heading (`# ` to `### `), a row of its own among a list's items. */
 const HEADING_LINE = /^#{1,3}[ \u3000]/;
 
+/** A Markdown code fence opening (```, or more backquotes, and a language): the code is a code block. */
+const FENCE = /^(`{3,})([\w+#.-]*)\s*$/;
+
 /** A field value opening a block scalar: `|`, `|-`, `>` …, optionally tagged `!format` (or `!code:ts`). */
 const BLOCK_START = /^(?:!([\w-]+(?::[\w+#.-]+)?)\s+)?[|>][-+]?\d?\s*$/;
 /** A tagged single-line value: `!markdown **bold**`. */
@@ -44,6 +47,9 @@ const TAGGED = /^!([\w-]+(?::[\w+#.-]+)?)\s+(.*)$/;
  * A Markdown list (every line a list item, as copied rows are written) is
  * read as rows instead: `- name: value` is a field of the row above, and a
  * line indented under an item's text continues that text.
+ *
+ * Fenced code (```ts … ```) is a code block in its language, among the rows
+ * where it is (under the item it is indented under).
  */
 export function parseOutlineText(text: string): TextRow[] {
   const root: TextRow = { key: null, text: '', children: [] };
@@ -55,6 +61,18 @@ export function parseOutlineText(text: string): TextRow[] {
     if (!raw.trim()) continue; // (a `#` line is a row: a heading, as in Markdown)
     let indent = raw.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length;
     let line = raw.trim();
+    const fence = line.match(FENCE);
+    if (fence) {
+      const [code, end] = fenced(lines, i, indent, fence[1]);
+      i = end;
+      while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
+      const parent = stack[stack.length - 1].row;
+      // Its own name beside other code blocks there.
+      let key = 'code';
+      for (let n = 2; parent.children.some((c) => c.key === key); n++) key = 'code' + n;
+      parent.children.push({ key, text: code, children: [], format: fence[2] ? 'code:' + fence[2] : 'code' });
+      continue;
+    }
     const marker = line.match(/^(?:[-*+]|\d+[.)])\s+/);
     if (list && !marker && !(indent === 0 && HEADING_LINE.test(raw))) {
       // More of the text of the item above.
@@ -99,9 +117,15 @@ export function parseOutlineText(text: string): TextRow[] {
 function isMarkdownList(lines: string[]): boolean {
   let textAt = -1; // where the last item's text starts, for lines continuing it
   let blockAt = -1; // the indentation of a block field, for its value's lines
-  for (const raw of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
     if (!raw.trim()) continue;
     const indent = raw.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length;
+    const fence = raw.trim().match(FENCE);
+    if (fence && !(blockAt >= 0 && indent > blockAt)) {
+      i = fenced(lines, i, indent, fence[1])[1]; // code, whatever is in it
+      continue;
+    }
     if (blockAt >= 0 && indent > blockAt) continue;
     blockAt = -1;
     const marker = raw.trim().match(/^(?:[-*+]|\d+[.)])\s+/);
@@ -113,6 +137,22 @@ function isMarkdownList(lines: string[]): boolean {
     } else if (textAt < 0 || indent < textAt) return false;
   }
   return true;
+}
+
+/**
+ * The code in a fence opened on line i (indented by indent, with fence's backquotes): its lines up to the closing
+ * fence (or the end), dedented; and the line it ends on.
+ */
+function fenced(lines: string[], i: number, indent: number, fence: string): [string, number] {
+  const body: string[] = [];
+  let j = i + 1;
+  for (; j < lines.length; j++) {
+    const t = lines[j].trim();
+    if (t.startsWith(fence) && /^`+$/.test(t)) break;
+    body.push(lines[j].replace(/\t/g, '  '));
+  }
+  const cut = (l: string) => l.slice(Math.min(indent, l.match(/^ */)![0].length));
+  return [body.map(cut).join('\n'), Math.min(j, lines.length - 1)];
 }
 
 function fieldRow(m: RegExpMatchArray): TextRow {

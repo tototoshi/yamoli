@@ -534,8 +534,10 @@ export class Controller extends Editing {
 
   /** A row (and the rows under it) from text: `key: value` lines as fields, checklist lines as tasks. */
   private addTextRow(parent: string, index: number, r: TextRow): string {
+    // A block keeps clear of the names of those already there (a pasted code block beside another).
+    const key = r.key !== null && r.format ? this.store.freeKey(parent, r.key) : r.key;
     const n = this.store.addChild(parent, index, r.text);
-    n.key = r.key;
+    n.key = key;
     n.format = r.key !== null ? (r.format ?? null) : null;
     // A checklist line (`- [ ]`, `- [x]`) comes in as a task.
     if (r.task) n.task = true;

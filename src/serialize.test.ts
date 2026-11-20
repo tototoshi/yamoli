@@ -154,3 +154,20 @@ test('a paragraph row says so in its data, as a task does', () => {
   expect(toValue(s, p.id)).toEqual({ text: '前のサイトは古い。', paragraph: true });
   expect(toYaml(toValue(s, p.id))).toBe('text: 前のサイトは古い。\nparagraph: true\n');
 });
+
+test("the Text view's Markdown comes back as the rows it was written from, code blocks and all", async () => {
+  const { parseOutlineText } = await import('./fields');
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const p = add(s.rootId, 'Doc');
+  const a = add(p, 'setup');
+  const code = add(a, 'npm i\nnpm test');
+  s.setKey(code, 'code');
+  s.setFormat(code, 'code:sh');
+  add(a, 'done');
+  const all = (id: string) => s.node(id).children;
+  const back = parseOutlineText(toMarkdownList(s, p, all));
+  expect(back).toMatchObject([
+    { text: 'setup', children: [{ key: 'code', format: 'code:sh', text: 'npm i\nnpm test' }, { text: 'done' }] },
+  ]);
+});

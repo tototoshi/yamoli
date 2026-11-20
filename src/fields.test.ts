@@ -128,3 +128,18 @@ test('a code block written with its language (`!code:ts |`) keeps it', () => {
   expect(row).toMatchObject({ key: 'sample', format: 'code:c++', text: 'int main() {}' });
   expect(parseOutlineText('one: !code:ts let a = 1')[0]).toMatchObject({ format: 'code:ts', text: 'let a = 1' });
 });
+
+test('fenced code comes in as a code block in its language, where it is, under the item it is indented under', () => {
+  const rows = parseOutlineText('- run\n```sh\nnpm test\n```\n- then\n  ````\n  a ``` in it\n\n    indented\n  ````\n- last\n');
+  expect(rows).toMatchObject([
+    { text: 'run' },
+    { key: 'code', format: 'code:sh', text: 'npm test' },
+    { text: 'then', children: [{ key: 'code', format: 'code', text: 'a ``` in it\n\n  indented' }] },
+    { text: 'last' },
+  ]);
+  // Two in one place, each its own name; a fence alone too.
+  expect(parseOutlineText('```\na\n```\n```py\nb\n```').map((r) => [r.key, r.format, r.text])).toEqual([
+    ['code', 'code', 'a'],
+    ['code2', 'code:py', 'b'],
+  ]);
+});
