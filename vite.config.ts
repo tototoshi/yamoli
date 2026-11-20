@@ -31,7 +31,23 @@ function dataFile(): Plugin {
   };
 }
 
+/**
+ * A change to a plain module (src/*.ts: the controller, the model, formats …) reloads the page. Fast refresh swaps
+ * components but keeps their state, which holds the one Controller made at the start: it would go on with the old
+ * code. Components (.tsx) are still refreshed in place.
+ */
+function reloadOnLogic(): Plugin {
+  return {
+    name: 'yamoli-reload-on-logic',
+    hotUpdate({ file }) {
+      if (this.environment.name !== 'client' || !/\/src\/[^/]+\.ts$/.test(file) || /\.test\.ts$/.test(file)) return;
+      this.environment.hot.send({ type: 'full-reload' });
+      return [];
+    },
+  };
+}
+
 export default defineConfig({
   base: './',
-  plugins: [preact(), dataFile()],
+  plugins: [preact(), dataFile(), reloadOnLogic()],
 });
