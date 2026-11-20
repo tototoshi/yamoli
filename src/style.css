@@ -768,6 +768,8 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* ---------------------------------------------------------------- document */
 .doc { margin: 8px 0 48px 28px; font-size: 16px; line-height: 1.8; }
 /* Contents at the side, kept in view; on a narrow window only what goes above them. */
+/* Room below the last line, to click in to go on writing there. */
+.doc-page:not(.read-only) .doc-main { padding-bottom: 30vh; cursor: text; }
 .doc-page.with-contents { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
 .doc-main { min-width: 0; max-width: 860px; }
 .doc-title { margin: 8px 0 16px; font-size: 1.8em; line-height: 1.3; }

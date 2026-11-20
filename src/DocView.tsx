@@ -20,7 +20,8 @@ import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
 import { setStyle, type OutlineStore } from './model';
-import { withHeading } from './doc';
+import { headingOf, withHeading } from './doc';
+import type { Controller } from './controller';
 
 /** The outline written out, and whether it is only to be read (none: the one being edited). */
 const Source = createContext<{ store: OutlineStore; readOnly: boolean } | null>(null);
@@ -58,13 +59,40 @@ export function DocView({
           {withContents && <Contents items={contents} />}
         </nav>
       )}
-      <div class="doc-main">
+      <div class="doc-main" onClick={store ? undefined : (e) => toLineAt(e, ctl)}>
         {title && <h1 class="doc-title">{title}</h1>}
         <DocBody lead={doc.lead} parts={doc.parts} />
       </div>
     </div>
   );
   return store ? <Source.Provider value={{ store, readOnly: true }}>{body}</Source.Provider> : body;
+}
+
+/**
+ * A click in the document away from any text (beside a line, between lines, below the last): the caret goes into the
+ * line at that height, at its start when left of its text, else at its end; below them all, at the end of the last.
+ */
+function toLineAt(e: MouseEvent, ctl: Controller) {
+  const main = e.currentTarget as HTMLElement;
+  const hit = e.target as Element;
+  const own = '.text-view, .rich, a, button, input, select, textarea, label, .doc-block, .doc-code, .doc-embed, .doc-rule, .doc-lead';
+  if (hit.closest(own) || document.getSelection()?.toString()) return;
+  // Each line's text, as far down the page as it goes (an embedded drawing's own text left out).
+  const lines = [...main.querySelectorAll<HTMLElement>('.text-view[data-id]')]
+    .filter((v) => !v.closest('.doc-embed'))
+    .map((v) => {
+      const rs = [...v.getClientRects()];
+      const box = v.getBoundingClientRect();
+      return { id: v.dataset.id!, top: rs[0]?.top ?? box.top, bottom: rs.at(-1)?.bottom ?? box.bottom, left: rs[0]?.left ?? box.left };
+    });
+  if (!lines.length) return;
+  const y = e.clientY;
+  const line =
+    lines.find((l) => y >= l.top && y <= l.bottom) ??
+    (y > lines.at(-1)!.bottom ? lines.at(-1)! : lines.reduce((m, l) => (Math.abs(l.top - y) < Math.abs(m.top - y) ? l : m)));
+  const text = ctl.store.node(line.id).text;
+  const start = ctl.store.node(line.id).key === null ? (headingOf(text)?.prefix ?? 0) : 0;
+  ctl.focus(fText(line.id, e.clientX < line.left ? start : 'end'));
 }
 
 /** The headings to go to, the one being read marked. */
