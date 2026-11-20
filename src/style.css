@@ -781,7 +781,12 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .doc-code > .doc-block:hover { background: none; }
 .doc-code > .doc-block:hover .fmt-code { box-shadow: inset 0 0 0 1px var(--faint); }
 .doc-code .fmt-code[data-lang]::after { content: none; }
-.doc-lang { position: absolute; top: 4px; right: 6px; width: 7em; padding: 0 4px; text-align: right; font: 11px var(--font); color: var(--muted); border: 1px solid transparent; border-radius: 4px; background: transparent; }
+.doc-corner { position: absolute; top: 4px; right: 6px; display: flex; align-items: center; gap: 4px; }
+/* The copy button shows with the pointer over the code (or once pressed, to say it copied). */
+.doc-copy { padding: 0 6px; font-size: 11px; opacity: 0; }
+.doc-code:hover .doc-copy, .doc-copy:focus-visible { opacity: 1; }
+span.doc-lang { width: auto; border: 0; }
+.doc-lang { width: 7em; padding: 0 4px; text-align: right; font: 11px var(--font); color: var(--muted); border: 1px solid transparent; border-radius: 4px; background: transparent; }
 .doc-lang:placeholder-shown { opacity: 0; }
 .doc-code:hover .doc-lang, .doc-lang:focus { opacity: 1; }
 .doc-lang:hover, .doc-lang:focus { border-color: var(--faint); background: var(--bg); color: var(--fg); outline: none; }

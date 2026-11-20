@@ -12,7 +12,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
-import { getFormat } from './formats';
+import { formatArg, getFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
 import { BlockBody, LangInput, NodeText, useRendered } from './App';
@@ -285,9 +285,11 @@ function Block({ id }: { id: string }) {
   const { store, readOnly, ctl } = useSource();
   const n = store.node(id);
   const html = useRendered(n.format!, n.text);
-  if (readOnly) return <div class="data-view doc-block" data-format={n.format} dangerouslySetInnerHTML={{ __html: html }} />;
-  if (ctl.activeField === fText(id).key) return <BlockBody node={n} />;
-  const view = (
+  const code = getFormat(n.format!).name === 'code';
+  if (!readOnly && ctl.activeField === fText(id).key) return <BlockBody node={n} />;
+  const view = readOnly ? (
+    <div class="data-view doc-block" data-format={n.format} dangerouslySetInnerHTML={{ __html: html }} />
+  ) : (
     <div
       class="data-view doc-block"
       data-format={n.format}
@@ -296,12 +298,41 @@ function Block({ id }: { id: string }) {
       onClick={(e) => !(e.target as Element).closest('a') && !document.getSelection()?.toString() && ctl.focus(fText(id, 'end'))}
     />
   );
-  if (getFormat(n.format!).name !== 'code') return view;
-  // Code: its language in the corner, to change there.
+  if (!code) return view;
+  // Code: in its corner, a button copying it and its language (to change there, where it can be edited).
   return (
     <div class="doc-code">
       {view}
-      <LangInput node={n} class="doc-lang" />
+      <span class="doc-corner">
+        <CopyCode text={n.text} />
+        {readOnly ? <span class="doc-lang">{formatArg(n.format!)}</span> : <LangInput node={n} class="doc-lang" />}
+      </span>
     </div>
+  );
+}
+
+/** Copies a code block's text, saying so on itself for a moment. */
+function CopyCode({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(() => setDone(false), 1500);
+    return () => clearTimeout(timer);
+  }, [done]);
+  return (
+    <button
+      class="mini doc-copy"
+      title={t('コードをコピー', 'Copy the code')}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(text).then(
+          () => setDone(true),
+          () => {}
+        );
+      }}
+    >
+      {done ? t('コピーしました', 'Copied') : t('コピー', 'Copy')}
+    </button>
   );
 }
