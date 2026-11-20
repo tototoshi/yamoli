@@ -32,6 +32,10 @@ export interface OutlineNode {
   bookmarked: boolean;
   /** Written as a paragraph in the document (and its Markdown), not a list item. */
   paragraph: boolean;
+  /** An item of a numbered list in the document (`1. `). */
+  numbered: boolean;
+  /** A quotation in the document (`> `). */
+  quote: boolean;
   children: string[];
   /** Set on field rows: the field's name. null on ordinary rows. */
   key: string | null;
@@ -43,6 +47,18 @@ export interface OutlineJSON {
   version: number;
   rootId: string;
   nodes: Record<string, OutlineNode>;
+}
+
+/** How a row is written in the document: a list item, a paragraph, an item of a numbered list or a quotation. */
+export type RowStyle = 'list' | 'paragraph' | 'numbered' | 'quote';
+
+export const styleOf = (n: OutlineNode): RowStyle => (n.paragraph ? 'paragraph' : n.numbered ? 'numbered' : n.quote ? 'quote' : 'list');
+
+/** Write n in the document as style (one at a time). */
+export function setStyle(n: OutlineNode, style: RowStyle) {
+  n.paragraph = style === 'paragraph';
+  n.numbered = style === 'numbered';
+  n.quote = style === 'quote';
 }
 
 export function uid(): string {
@@ -58,6 +74,8 @@ function makeNode(text = ''): OutlineNode {
     task: false,
     bookmarked: false,
     paragraph: false,
+    numbered: false,
+    quote: false,
     children: [],
     key: null,
     format: null,
@@ -74,6 +92,8 @@ function normalizeNode(id: string, raw: any): OutlineNode {
     task: !!n.task,
     bookmarked: !!n.bookmarked,
     paragraph: !!n.paragraph,
+    numbered: !!n.numbered,
+    quote: !!n.quote,
     children: Array.isArray(n.children) ? n.children.slice() : [],
     key: typeof n.key === 'string' ? n.key : null,
     format: typeof n.key === 'string' && typeof n.format === 'string' ? n.format : null,

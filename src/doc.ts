@@ -11,6 +11,10 @@
  *   a row marked as a paragraph     a paragraph instead (Backspace at the start
  *                                    of an item; `- ` typed makes it one again),
  *                                    the rows under it a list after it
+ *   a row marked numbered (`1. `)    an item of a numbered list (numbered in order)
+ *   a row marked as a quote (`> `)   a quotation; quotations one after another
+ *                                    are one
+ *   ---                             a dividing line
  *   a task ([ ] / done)             an item with a checkbox
  *   a block (Markdown, code, image …) drawn where it is among the rows (```
  *                                    typed on a row makes it a code block)
@@ -32,6 +36,9 @@ export function headingOf(text: string): { level: 1 | 2 | 3; prefix: number } | 
   return m ? { level: m[1].length as 1 | 2 | 3, prefix: m[0].length } : null;
 }
 
+/** `---` (or `***`, `___`) alone on a row: a dividing line in the document. */
+export const isRule = (text: string) => /^(?:-{3,}|\*{3,}|_{3,})$/.test(text.trim());
+
 /** text with a heading's `#`s set to level (0: none, a plain row). */
 export function withHeading(text: string, level: 0 | 1 | 2 | 3): string {
   const rest = text.slice(headingOf(text)?.prefix ?? 0);
@@ -51,6 +58,12 @@ export interface DocItem {
   task: boolean;
   /** A paragraph, not a list item. */
   para: boolean;
+  /** An item of a numbered list. */
+  numbered: boolean;
+  /** A quotation. */
+  quote: boolean;
+  /** A dividing line (`---`). */
+  rule: boolean;
   /** The rows under it, and the blocks among them. */
   items: (DocItem | Extra)[];
   /** What its `embed` draws, after its line. */
@@ -102,7 +115,18 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
     const items = (at < 0 ? kids : kids.slice(0, at)).map((c) => (isBlock(c) ? block(c) : item(c, out)));
     if (at >= 0) out.push(...kids.slice(at));
     const n = store.node(id);
-    return { kind: 'item', id, task: n.task || n.completed, para: n.paragraph, items, extras: extrasOf(id) };
+    const rule = isRule(n.text) && !n.task && !kids.length;
+    return {
+      kind: 'item',
+      id,
+      task: n.task || n.completed,
+      para: n.paragraph && !rule,
+      numbered: n.numbered && !rule,
+      quote: n.quote && !rule,
+      rule,
+      items,
+      extras: extrasOf(id),
+    };
   };
 
   const parts: DocPart[] = [];

@@ -23,10 +23,14 @@ export interface TextRow {
   format?: string;
   /** A checklist line: `- [ ]` open, `- [x]` done. */
   task?: 'open' | 'done';
+  /** An item of a numbered list (`1. `), in a Markdown list. */
+  numbered?: boolean;
+  /** A quotation (`> `), in a Markdown list. */
+  quote?: boolean;
 }
 
-/** A Markdown heading (`# ` to `### `), a row of its own among a list's items. */
-const HEADING_LINE = /^#{1,3}[ \u3000]/;
+/** A Markdown heading (`# ` to `### `), a quotation (`> `) or a dividing line: a row of its own among a list's items. */
+const HEADING_LINE = /^(?:#{1,3}[ \u3000]|>(?:[ \u3000]|$)|(?:-{3,}|\*{3,}|_{3,})\s*$)/;
 
 /** A Markdown code fence opening (```, or more backquotes, and a language): the code is a code block. */
 const FENCE = /^(`{3,})([\w+#.-]*)\s*$/;
@@ -81,11 +85,13 @@ export function parseOutlineText(text: string): TextRow[] {
       continue;
     }
     if (marker) line = line.slice(marker[0].length);
+    const quoted = list && !marker && indent === 0 ? line.match(/^>[ \u3000]?/) : null;
+    if (quoted) line = line.slice(quoted[0].length);
     const check = marker ? line.match(/^\[([ xX])\]\s+/) : null;
     if (check) line = line.slice(check[0].length);
     while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
     const parent = stack[stack.length - 1].row;
-    const field = line.match(FIELD_LINE);
+    const field = quoted ? null : line.match(FIELD_LINE); // a quotation is words, whatever they look like
     if (marker && field && !list) {
       // `- name: value`: an object in a list.
       const item: TextRow = { key: null, text: '', children: [] };
@@ -103,6 +109,8 @@ export function parseOutlineText(text: string): TextRow[] {
     }
     const row: TextRow = field ? fieldRow(field) : { key: null, text: line, children: [] };
     if (check && !field) row.task = check[1] === ' ' ? 'open' : 'done';
+    if (list && marker && /^\d/.test(marker[0]) && !field) row.numbered = true;
+    if (quoted) row.quote = true;
     if (field) i = readBlock(lines, i, indent, row);
     parent.children.push(row);
     stack.push({ indent, row });

@@ -748,3 +748,49 @@ test('in the document view, ⌘Enter in a block goes on to a new line right afte
   expect(ctl.store.node(next)).toMatchObject({ text: '', key: null });
   expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + next }));
 });
+
+test('in the document `1. ` makes a numbered item and `> ` a quotation; Enter keeps it, Backspace at the start takes it off', () => {
+  let doc = '';
+  let a = '';
+  let b = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    a = add(doc, '');
+    b = add(doc, '');
+  });
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  const type = (id: string, value: string) => {
+    const ta = editor(ctl, id);
+    ta.value = value;
+    ta.setSelectionRange(value.length, value.length);
+    ctl.onTextInput(id, ta);
+  };
+  type(a, '1. ');
+  expect(ctl.store.node(a)).toMatchObject({ numbered: true, text: '' });
+  type(b, '> ');
+  expect(ctl.store.node(b)).toMatchObject({ quote: true, text: '' });
+  ctl.store.setText(a, 'first');
+  const ta = editor(ctl, a);
+  ta.setSelectionRange(5, 5);
+  press(ctl, ta, 'Enter');
+  const kids = ctl.store.node(doc).children;
+  expect(ctl.store.node(kids[kids.indexOf(a) + 1]).numbered).toBe(true);
+  const tb = editor(ctl, b);
+  tb.setSelectionRange(0, 0);
+  press(ctl, tb, 'Backspace');
+  expect(ctl.store.node(b)).toMatchObject({ quote: false, paragraph: false });
+});
+
+test('outside the document `1. ` is only text', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, '');
+  });
+  const ta = editor(ctl, a);
+  ta.value = '1. ';
+  ta.setSelectionRange(3, 3);
+  ctl.onTextInput(a, ta);
+  expect(ctl.store.node(a)).toMatchObject({ numbered: false, text: '1. ' });
+});

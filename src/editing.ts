@@ -17,6 +17,7 @@ import { ViewState } from './viewState';
 import { VIEWS_KEY, type DrawnView } from './views';
 import { isImageRef, uploadFile } from './files';
 import { canAddFiles } from './storage';
+import { setStyle, styleOf } from './model';
 import { addImage } from './slides';
 
 /** The field that records when an item was completed. */
@@ -441,11 +442,14 @@ export class Editing extends ViewState {
     // ``` and a space (```ts and a space for its language) on a row makes it a code block.
     const fence = value.match(/^(```[\w+#.-]*) $/);
     if (fence && this.makeCode(id, fence[1])) return;
-    // `- ` typed at the start of a paragraph makes it a list item again.
-    const bullet = n.paragraph && n.key === null ? value.match(/^[-*・][ \u3000]/) : null;
-    if (bullet && ta.selectionStart === 2 && !n.text.startsWith(bullet[0])) {
-      store.setText(id, value.slice(2));
-      n.paragraph = false;
+    // Typed at the start of a row in the document, as in Markdown: `1. ` an item of a numbered list, `> ` a quotation,
+    // and `- ` a list item again (from a paragraph or those).
+    const mark = n.key === null && !headingOf(value) ? value.match(/^(?:(\d{1,3})[.)]|(>)|([-*・]))[ \u3000]/) : null;
+    const style = !mark ? null : mark[1] ? 'numbered' : mark[2] ? 'quote' : 'list';
+    const typed = mark && ta.selectionStart === mark[0].length && !n.text.startsWith(mark[0]);
+    if (typed && style && style !== styleOf(n) && (style === 'list' || this.view === 'doc')) {
+      store.setText(id, value.slice(mark[0].length));
+      setStyle(n, style);
       return this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
     }
     // `# ` typed (or taken away): in the document the line is drawn anew, as a heading or in a list, the caret kept in it.

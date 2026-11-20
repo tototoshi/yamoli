@@ -138,3 +138,25 @@ test('a block among rows is drawn between them, in a list item too', () => {
   add(a, 'two');
   expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[before, data, after(one, data, two)]']);
 });
+
+test('numbered rows are a numbered list, quotations one after another one quotation, `---` a dividing line', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const p = add(s.rootId, 'Doc');
+  const a = add(p, 'one');
+  const b = add(p, 'two');
+  const q = add(p, 'said');
+  add(p, '---');
+  const r = add(p, '---');
+  add(r, 'under'); // with rows under it, a row like any other
+  s.node(a).numbered = s.node(b).numbered = true;
+  s.node(q).quote = true;
+  const [rows] = buildDoc(s, p).parts;
+  expect(rows.kind === 'rows' && rows.items.map((i) => i.kind === 'item' && [i.numbered, i.quote, i.rule])).toEqual([
+    [true, false, false],
+    [true, false, false],
+    [false, true, false],
+    [false, false, true],
+    [false, false, false],
+  ]);
+});

@@ -10,6 +10,8 @@
  *   done: true            when completed
  *   todo: true            when marked as a task, not yet done
  *   paragraph: true       when written as a paragraph in the document
+ *   numbered: true        an item of a numbered list there
+ *   quote: true           a quotation there
  *   duration: 3d          its fields
  *   children: [...]       its sub-items
  *
@@ -18,7 +20,7 @@
  * being cluttered. A field named like one of those keys wins, and the item's
  * own entry gets a leading `_` instead.
  */
-import { headingOf } from './doc';
+import { headingOf, isRule } from './doc';
 import { refIds, withLabels } from './links';
 import type { OutlineStore } from './model';
 
@@ -57,7 +59,8 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   const items = store.items(id);
   const hasId = linked.has(id);
   const todo = n.task && !n.completed;
-  if (!fields.length && !items.length && !n.completed && !todo && !n.paragraph && !hasId) return n.text;
+  const styled = n.paragraph || n.numbered || n.quote;
+  if (!fields.length && !items.length && !n.completed && !todo && !styled && !hasId) return n.text;
 
   const fieldValues: Record<string, Value> = {};
   for (const f of fields) fieldValues[store.node(f).key!] = rowValue(store, f);
@@ -72,6 +75,8 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   if (n.completed) own('done', true);
   if (todo) own('todo', true);
   if (n.paragraph) own('paragraph', true);
+  if (n.numbered) own('numbered', true);
+  if (n.quote) own('quote', true);
   Object.assign(out, fieldValues);
   if (items.length)
     own(
@@ -117,7 +122,8 @@ function scalar(text: string): Value {
  * become the linked item's label, tasks are checklist items (`[ ]`, `[x]`)
  * and fields read `name: value`. A `#` row is a heading, its rows the list
  * after it (one inside a list ends it, as in the Document view); a row
- * marked as a paragraph is one. A Markdown block is written as it is, a code
+ * marked as a paragraph is one, numbered rows a numbered list (`1. `), a
+ * quotation `> `, and `---` a dividing line. A Markdown block is written as it is, a code
  * block (or CSV, text) fenced with ``` and its language, where it is among
  * the rows; images and files are left out. children(id) picks the rows to
  * include, so the view's filters apply.
@@ -131,22 +137,33 @@ export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id
   const lines: string[] = [];
   const isHeading = (c: string) => store.node(c).key === null && headingOf(store.node(c).text) !== null;
   /**
-   * c as a list item (or a paragraph); a heading among the rows under it, and those after it, go to out (to come
-   * after the list). The rows under a paragraph are a list after it, not indented.
+   * c as a list item (a paragraph, a quotation, an item of a numbered list, a dividing line), indented by pad; a
+   * heading among the rows under it, and those after it, go to out (to come after the list). The rows under a
+   * paragraph or a quotation are a list after it, not indented.
    */
-  const add = (c: string, depth: number, out: string[]) => {
+  const add = (c: string, pad: string, out: string[]) => {
     const n = store.node(c);
-    const para = n.paragraph && n.key === null;
-    const pad = '  '.repeat(depth);
     if (n.format !== null) return void lines.push(...blockLines(n.format, n.text, pad));
-    let text = withLabels(store, n.text).trim();
-    if (n.key !== null) text = `${n.key}: ${text}`.trimEnd();
-    else if (n.task || n.completed) text = `[${n.completed ? 'x' : ' '}] ${text}`;
-    if (para) lines.push('', `${pad}${text}`.trimEnd().replace(/\n/g, `\n${pad}`), '');
-    else lines.push(`${pad}- ${text}`.trimEnd().replace(/\n/g, `\n${pad}  `));
     const kids = children(c);
+    const row = n.key === null;
+    let text = withLabels(store, n.text).trim();
+    if (!row) text = `${n.key}: ${text}`.trimEnd();
+    else if (n.task || n.completed) text = `[${n.completed ? 'x' : ' '}] ${text}`;
+    let under = pad;
+    if (row && isRule(n.text) && !n.task && !kids.length) lines.push('', pad + '---', '');
+    else if (row && n.paragraph) lines.push('', `${pad}${text}`.trimEnd().replace(/\n/g, `\n${pad}`), '');
+    else if (row && n.quote) lines.push('', `${pad}> ${text}`.trimEnd().replace(/\n/g, `\n${pad}> `), '');
+    else {
+      // An item of a numbered list is numbered along those one after another before it.
+      const sibs = children(store.parentOf(c)!);
+      let k = 1;
+      for (let i = sibs.indexOf(c) - 1; i >= 0 && store.node(sibs[i]).numbered && store.node(sibs[i]).key === null; i--) k++;
+      const marker = row && n.numbered ? `${k}. ` : '- ';
+      under = pad + ' '.repeat(marker.length);
+      lines.push(`${pad}${marker}${text}`.trimEnd().replace(/\n/g, `\n${under}`));
+    }
     const at = kids.findIndex(isHeading);
-    for (const k of at < 0 ? kids : kids.slice(0, at)) add(k, para ? depth : depth + 1, out);
+    for (const k of at < 0 ? kids : kids.slice(0, at)) add(k, under, out);
     if (at >= 0) out.push(...kids.slice(at));
   };
   const write = (rows: string[]) => {
@@ -157,7 +174,7 @@ export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id
         continue;
       }
       const out: string[] = [];
-      add(c, 0, out);
+      add(c, '', out);
       write(out);
     }
   };

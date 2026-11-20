@@ -19,7 +19,7 @@ import { BlockBody, LangInput, NodeText, useRendered } from './App';
 import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
-import type { OutlineStore } from './model';
+import { setStyle, type OutlineStore } from './model';
 import { withHeading } from './doc';
 
 /** The outline written out, and whether it is only to be read (none: the one being edited). */
@@ -183,7 +183,7 @@ function Rows({ items }: { items: (DocItem | Extra)[] }) {
           )}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            for (const it of rows) ctl.store.node(it.id).paragraph = para;
+            for (const it of rows) setStyle(ctl.store.node(it.id), para ? 'paragraph' : 'list');
             ctl.commit(null);
           }}
         >
@@ -195,27 +195,53 @@ function Rows({ items }: { items: (DocItem | Extra)[] }) {
   );
 }
 
-/** Rows in order: list items together in a list, paragraphs and blocks between. */
+/** How a row is drawn among its neighbours: rows drawn the same way one after another go together (but paragraphs). */
+const runOf = (it: DocItem) => (it.rule ? 'rule' : it.para ? 'p' : it.quote ? 'quote' : it.numbered ? 'ol' : 'ul');
+
+/** Rows in order: list items together in a list (numbered ones in a numbered list), quotations together, paragraphs,
+ * dividing lines and blocks between. */
 function Flow({ items }: { items: (DocItem | Extra)[] }) {
   const runs: (DocItem[] | Extra)[] = [];
   for (const it of items) {
     const last = runs.at(-1);
     if (it.kind !== 'item') runs.push(it);
-    else if (Array.isArray(last) && !it.para && !last[0].para) last.push(it);
+    else if (Array.isArray(last) && runOf(it) === runOf(last[0]) && !['p', 'rule'].includes(runOf(it))) last.push(it);
     else runs.push([it]);
   }
   return (
     <>
-      {runs.map((r) =>
-        !Array.isArray(r) ? (
-          <ExtraView key={r.id} extra={r} />
-        ) : r[0].para ? (
-          <Paragraph key={r[0].id} item={r[0]} />
-        ) : (
-          <List key={r[0].id} items={r} />
-        )
-      )}
+      {runs.map((r) => {
+        if (!Array.isArray(r)) return <ExtraView key={r.id} extra={r} />;
+        const run = runOf(r[0]);
+        if (run === 'rule') return <Rule key={r[0].id} id={r[0].id} />;
+        if (run === 'p') return <Paragraph key={r[0].id} item={r[0]} />;
+        if (run === 'quote')
+          return (
+            <blockquote key={r[0].id} class="doc-quote">
+              {r.map((it) => (
+                <Paragraph key={it.id} item={it} />
+              ))}
+            </blockquote>
+          );
+        return <List key={r[0].id} items={r} numbered={run === 'ol'} />;
+      })}
     </>
+  );
+}
+
+/** A dividing line (a `---` row): its `---` shows only while it is typed in. */
+function Rule({ id }: { id: string }) {
+  const { readOnly, ctl } = useSource();
+  const ref = useRef<HTMLDivElement>(null);
+  useFlowEditor(ref);
+  return (
+    <div
+      ref={ref}
+      class="doc-line doc-p doc-rule"
+      onClick={(e) => !readOnly && !(e.target as Element).closest('.rich') && ctl.focus(fText(id, 'end'))}
+    >
+      <Text id={id} />
+    </div>
   );
 }
 
@@ -239,14 +265,15 @@ function Paragraph({ item }: { item: DocItem }) {
   );
 }
 
-function List({ items }: { items: DocItem[] }) {
+function List({ items, numbered }: { items: DocItem[]; numbered: boolean }) {
   const { store } = useSource();
+  const L = numbered ? 'ol' : 'ul';
   return (
-    <ul class={items.every((it) => it.task) ? 'doc-tasks' : undefined}>
+    <L class={items.every((it) => it.task) ? 'doc-tasks' : undefined}>
       {items.map((it) => (
         <ListItem key={it.id} item={it} done={store.node(it.id).completed} />
       ))}
-    </ul>
+    </L>
   );
 }
 

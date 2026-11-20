@@ -171,3 +171,30 @@ test("the Text view's Markdown comes back as the rows it was written from, code 
     { text: 'setup', children: [{ key: 'code', format: 'code:sh', text: 'npm i\nnpm test' }, { text: 'done' }] },
   ]);
 });
+
+test('toMarkdownList: numbered rows a numbered list, a quotation `> `, `---` a dividing line; and back again', async () => {
+  const { parseOutlineText } = await import('./fields');
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const p = add(s.rootId, 'Doc');
+  const steps = ['install', 'build', 'ship'].map((t) => add(p, t));
+  steps.forEach((id) => (s.node(id).numbered = true));
+  add(steps[1], 'with care');
+  s.node(add(p, 'Measure twice.')).quote = true;
+  add(p, '---');
+  add(p, 'after');
+  s.node(add(p, 'again')).numbered = true;
+  const all = (id: string) => s.node(id).children;
+  const md = toMarkdownList(s, p, all);
+  expect(md).toBe('1. install\n2. build\n   - with care\n3. ship\n\n> Measure twice.\n\n---\n\n- after\n1. again\n');
+  expect(toYaml(toValue(s, steps[0]))).toBe('text: install\nnumbered: true\n');
+  expect(parseOutlineText(md)).toMatchObject([
+    { text: 'install', numbered: true },
+    { text: 'build', numbered: true, children: [{ text: 'with care' }] },
+    { text: 'ship', numbered: true },
+    { text: 'Measure twice.', quote: true },
+    { text: '---' },
+    { text: 'after' },
+    { text: 'again', numbered: true },
+  ]);
+});

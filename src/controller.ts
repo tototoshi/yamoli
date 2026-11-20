@@ -5,7 +5,7 @@
  */
 import { t } from './i18n';
 import { parseOutlineText, type TextRow } from './fields';
-import { OutlineStore } from './model';
+import { OutlineStore, setStyle, styleOf } from './model';
 import { toMarkdownRows } from './serialize';
 import { headingOf, withHeading } from './doc';
 import { fKey, fText } from './focus';
@@ -25,13 +25,27 @@ interface Copied {
   completed: boolean;
   task: boolean;
   paragraph: boolean;
+  numbered: boolean;
+  quote: boolean;
   collapsed: boolean;
   children: Copied[];
 }
 
 const copyOf = (store: OutlineStore, id: string): Copied => {
-  const { text, key, format, completed, task, paragraph, collapsed, children } = store.node(id);
-  return { id, text, key, format, completed, task, paragraph, collapsed, children: children.map((c) => copyOf(store, c)) };
+  const { text, key, format, completed, task, paragraph, numbered, quote, collapsed, children } = store.node(id);
+  return {
+    id,
+    text,
+    key,
+    format,
+    completed,
+    task,
+    paragraph,
+    numbered,
+    quote,
+    collapsed,
+    children: children.map((c) => copyOf(store, c)),
+  };
 };
 
 export class Controller extends Editing {
@@ -229,9 +243,9 @@ export class Controller extends Editing {
         const bullet = store.addChild(id, first ? store.indexOf(first) : -1, after);
         return this.commit(fText(bullet.id, 0));
       }
-      // A paragraph is followed by a paragraph, a list item by a list item.
+      // A paragraph is followed by a paragraph, a list item by a list item (numbered, quoted …).
       if (start === 0 && end === 0 && after) {
-        store.addSiblingBefore(id).paragraph = n.paragraph;
+        setStyle(store.addSiblingBefore(id), styleOf(n));
         return this.commit(fText(id, 0));
       }
       store.setText(id, before);
@@ -239,7 +253,7 @@ export class Controller extends Editing {
       const firstItem = this.shownChildren(id).find((c) => !store.isField(c));
       const next =
         firstItem && this.isExpanded(id) ? store.addChild(id, store.indexOf(firstItem), after) : store.addSiblingAfter(id, after);
-      if (store.parentOf(next.id) !== id) next.paragraph = n.paragraph;
+      if (store.parentOf(next.id) !== id) setStyle(next, styleOf(n));
       return this.commit(fText(next.id, 0));
     }
     if (e.key === 'Tab' && !isMod(e) && !e.altKey) {
@@ -269,6 +283,12 @@ export class Controller extends Editing {
       e.preventDefault();
       this.setDone(id, false);
       store.setTask(id, false);
+      return this.commit(fText(id, 0));
+    }
+    // An item of a numbered list or a quotation is a plain list item first, as a task is a plain row.
+    if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && n.key === null && (n.numbered || n.quote)) {
+      e.preventDefault();
+      setStyle(n, 'list');
       return this.commit(fText(id, 0));
     }
     // In the document a list item is a paragraph first (as in word processors), before joining anything.
@@ -541,6 +561,8 @@ export class Controller extends Editing {
     n.format = r.key !== null ? (r.format ?? null) : null;
     // A checklist line (`- [ ]`, `- [x]`) comes in as a task.
     if (r.task) n.task = true;
+    if (r.numbered) n.numbered = true;
+    if (r.quote) n.quote = true;
     if (r.task === 'done') this.setDone(n.id, true);
     r.children.forEach((c) => this.addTextRow(n.id, -1, c));
     return n.id;
@@ -558,6 +580,8 @@ export class Controller extends Editing {
       completed: r.completed,
       task: r.task,
       paragraph: r.paragraph,
+      numbered: r.numbered,
+      quote: r.quote,
       collapsed: r.collapsed,
     });
     return n.id;
