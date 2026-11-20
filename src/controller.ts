@@ -382,9 +382,9 @@ export class Controller extends Editing {
     }
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isMod(e) && !e.altKey) {
       e.preventDefault();
-      // ⌘↓ opens a level at a time, as Tab does where it can't indent (a block: its text).
+      // ⌘↓ opens a level at a time, as Tab does where it can't indent, and ⌘↑ folds one (a block: its text).
       const up = e.key === 'ArrowUp';
-      const changed = up || n.format !== null ? store.setCollapsed(id, up) : this.openLevel(id);
+      const changed = n.format !== null ? store.setCollapsed(id, up) : up ? this.foldLevel(id) : this.openLevel(id);
       if (!isTitle && changed) this.commit(fText(id, start, end));
       return;
     }
@@ -491,6 +491,24 @@ export class Controller extends Editing {
       for (const k of store.node(c).children) if (holds(k)) store.setCollapsed(k, true);
     }
     return folded.length > 0;
+  }
+
+  /**
+   * Fold the row a level: the open rows shown under it (or itself) that show no open rows of their own, so the
+   * lowest level showing goes first, and the row itself last. Whether anything folded.
+   */
+  private foldLevel(id: string): boolean {
+    const { store } = this;
+    const open = (c: string) => store.node(c).children.length > 0 && store.node(c).format === null && !store.node(c).collapsed;
+    const lowest: string[] = [];
+    const walk = (c: string) => {
+      const inner = store.node(c).children.filter(open);
+      if (inner.length) inner.forEach(walk);
+      else lowest.push(c);
+    };
+    if (open(id)) walk(id);
+    for (const c of lowest) store.setCollapsed(c, true);
+    return lowest.length > 0;
   }
 
   /** Like store.indent, but under the previous *displayed* sibling. */

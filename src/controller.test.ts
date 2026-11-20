@@ -904,9 +904,15 @@ test('in the outline, Tab with nowhere to indent the row to opens it a level fur
   press(ctl, ta, 'Tab', { shiftKey: true });
   expect(ctl.store.node(a).collapsed).toBe(false); // Shift+Tab doesn't fold
 
-  // ⌘↓ the same, a level at a time.
+  // ⌘↑ folds a level at a time, the lowest first; ⌘↓ opens as Tab does.
   press(ctl, ta, 'ArrowUp', { metaKey: true });
-  expect(folded()[0]).toBe(true);
+  expect(folded()).toEqual([false, false, true]);
+  press(ctl, ta, 'ArrowUp', { metaKey: true });
+  expect(folded()).toEqual([false, true, true]);
+  press(ctl, ta, 'ArrowUp', { metaKey: true });
+  expect(folded()).toEqual([true, true, true]);
+  press(ctl, ta, 'ArrowUp', { metaKey: true }); // folded already: nothing
+  expect(folded()).toEqual([true, true, true]);
   press(ctl, ta, 'ArrowDown', { metaKey: true });
   expect(folded().slice(0, 2)).toEqual([false, true]);
   press(ctl, ta, 'ArrowDown', { metaKey: true });
