@@ -122,3 +122,23 @@ test('a frame between two boxes is in the way of a line between them, not of one
   expect(through(edge(c))).toBe(false);
   expect(through(edge(inner))).toBe(true);
 });
+
+test('a line-up drawn as nothing is not in the way: a line goes between the boxes in it, round one with a border', () => {
+  const drawn = (look: string) => {
+    const s = OutlineStore.create();
+    const sys = s.addChild(s.rootId, -1, 'sys').id;
+    const a = s.addChild(sys, -1, 'A').id;
+    const g = s.addChild(sys, -1, 'G').id;
+    s.addField(g, 'shape', look);
+    const x = s.addChild(g, -1, 'X').id;
+    s.addChild(g, -1, 'Y');
+    const c = s.addChild(sys, -1, 'C').id;
+    s.addField(a, 'to', `[[${x}]], [[${c}]]`);
+    s.addField(x, 'to', `[[${c}]]`);
+    const d = buildDiagram(s, sys);
+    const { routes } = routeAll(d, layout(d), estimate);
+    return routes.get(d.edges.find((e) => e.from === a && e.to === c)!)!;
+  };
+  expect(drawn('column').pts).toEqual([]); // straight on, a curve
+  expect(drawn('column solid').pts.length).toBeGreaterThan(0); // around it
+});

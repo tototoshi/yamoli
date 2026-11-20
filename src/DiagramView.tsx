@@ -554,7 +554,9 @@ export function routeAll(d: Diagram, L: Layout, measure: Measure) {
     ends.sort((p, q) => centre(p.other) - centre(q.other));
     ends.forEach(({ e, end }, i) => (at.get(e)![end] = 0.5 + (i - (ends.length - 1) / 2) * step));
   }
-  // A frame is in the way of lines too, but of those to or from what is in it.
+  // A frame is in the way of lines too, but of those to or from what is in it, and but a line-up drawn as nothing
+  // (`shape: row` alone), which lines go through as through empty space; the boxes in it are still in their way.
+  const unseen = new Set([...d.nodes].filter(([, n]) => n.frame === 'hidden').map(([nid]) => nid));
   const parent = new Map<string, string>();
   for (const [nid, n] of d.nodes) for (const c of n.children) parent.set(c, nid);
   const around = (nid: string) => {
@@ -565,7 +567,7 @@ export function routeAll(d: Diagram, L: Layout, measure: Measure) {
   const routeOf = (e: DiagramEdge, taken?: Taken) => {
     const holding = new Set([...around(e.from), ...around(e.to)]);
     const boxes = [...L.boxes].map(([nid, b]) =>
-      b.frame && !holding.has(nid) && nid !== e.from && nid !== e.to ? { ...b, frame: false } : b
+      b.frame && !unseen.has(nid) && !holding.has(nid) && nid !== e.from && nid !== e.to ? { ...b, frame: false } : b
     );
     const others = [...boxes, ...[...heads].filter(([nid]) => nid !== e.from && nid !== e.to).map(([, h]) => h)];
     const labelWidth = e.label ? edgeLabelWidth(e, measure) + 8 : 0;
