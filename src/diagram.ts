@@ -410,7 +410,8 @@ export function buildDiagram(
   const add = (id: string, children = rows(id)) => {
     const props: string[] = [];
     const about = descOf(id);
-    const label = nodeLabel(store, id);
+    // A row with no text is a box with nothing written in it (not one called Untitled).
+    const label = store.node(id).text.trim() ? nodeLabel(store, id) : '';
     const marks = { label: labelMarks(store, id, label), desc: about?.marks };
     for (const c of store.node(id).children) {
       const f = store.node(c);

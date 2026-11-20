@@ -1236,7 +1236,8 @@ export function DiagramView({
 
   const rename = (nid: string, text: string | null) => {
     setRenaming(null);
-    if (text === null || !text.trim() || text === store.node(nid).text) return;
+    // Emptied: a box with nothing written in it.
+    if (text === null || text.trim() === store.node(nid).text.trim()) return;
     store.setText(nid, text.trim());
     ctl.commit();
   };
@@ -1248,14 +1249,10 @@ export function DiagramView({
     if (setLabel(store, e, text)) ctl.commit();
     select(null); // its key goes with its label
   };
-  /** A new box under parent (before another, or last), named at once. */
+  /** A new box under parent (before another, or last), to name at once; left unnamed, it has nothing written in it. */
   function addBox(parent: string, before: string | null = null) {
     const kids = store.node(parent).children;
-    const n = store.addChild(
-      parent,
-      before ? kids.indexOf(before) : -1,
-      d.kind === 'tree' ? t('新しいトピック', 'New topic') : t('新しい箱', 'New box')
-    );
+    const n = store.addChild(parent, before ? kids.indexOf(before) : -1, '');
     ctl.commit();
     select({ box: n.id });
     setRenaming(n.id);
@@ -1588,7 +1585,13 @@ export function DiagramView({
             )}
             {renaming && renamed && (
               <foreignObject {...nameAt(renamed)}>
-                <CellInput key={renaming} class="dg-rename" value={store.node(renaming).text} onDone={(text) => rename(renaming, text)} />
+                <CellInput
+                  key={renaming}
+                  class="dg-rename"
+                  placeholder={t('名前（なしでもよい）', 'Name (or none)')}
+                  value={store.node(renaming).text}
+                  onDone={(text) => rename(renaming, text)}
+                />
               </foreignObject>
             )}
             {labeling &&

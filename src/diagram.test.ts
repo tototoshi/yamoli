@@ -640,3 +640,15 @@ test("an arrow's label is measured as drawn: its bold or code stretches as such"
   expect(width).toBe(3 * 2 + ' read'.length);
   expect(kindsSeen).toEqual(['strong', '']);
 });
+
+test('a row with no text is a box with nothing written in it, sized as one with a short name', () => {
+  const s = OutlineStore.create();
+  const sys = s.addChild(s.rootId, -1, 'sys').id;
+  const blank = s.addChild(sys, -1, '').id;
+  s.addField(blank, 'shape', 'circle');
+  const d = buildDiagram(s, sys);
+  expect(d.nodes.get(blank)!.label).toBe('');
+  const b = layout(d).boxes.get(blank)!;
+  expect(b.w).toBeGreaterThanOrEqual(64);
+  expect(b.h).toBeGreaterThan(20);
+});
