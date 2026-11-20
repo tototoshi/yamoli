@@ -188,3 +188,22 @@ export function lineAt(
   const line = lines.find((l) => y >= l.top && y <= l.bottom) ?? lines.reduce((m, l) => (gap(l) < gap(m) ? l : m));
   return { id: line.id, start: x < line.left };
 }
+
+/** Where query is in text, ignoring case: the start of each occurrence, not overlapping. */
+export function occurrences(text: string, query: string): number[] {
+  const at: number[] = [];
+  if (!query) return at;
+  const t = text.toLowerCase();
+  const q = query.toLowerCase();
+  for (let i = t.indexOf(q); i >= 0; i = t.indexOf(q, i + q.length)) at.push(i);
+  return at;
+}
+
+/** text with its k-th occurrence of query (ignoring case; all of them for k null) replaced by by. */
+export function replaceIn(text: string, query: string, by: string, k: number | null): string {
+  const at = occurrences(text, query);
+  const pick = k === null ? at : at.slice(k, k + 1);
+  let out = text;
+  for (const i of pick.reverse()) out = out.slice(0, i) + by + out.slice(i + query.length);
+  return out;
+}

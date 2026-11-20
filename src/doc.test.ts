@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDoc, docContents, headingOf, lineAt, withHeading, type DocPart } from './doc';
+import { buildDoc, docContents, headingOf, lineAt, occurrences, replaceIn, withHeading, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
 /** The parts in short: `h1 Text`, `list[A, B(C)]` (a paragraph `¶A`), `data`, `embed diagram`. */
@@ -174,4 +174,14 @@ test('a click away from the text goes into the line at that height, or the neare
   expect(lineAt(lines, 10, 400)).toEqual({ id: 'c', start: false }); // below them all: the end of the last
   expect(lineAt(lines, 500, -30)).toEqual({ id: 'a', start: false });
   expect(lineAt([], 0, 0)).toBeNull();
+});
+
+test('occurrences and replaceIn: by case, without overlapping, one or all', () => {
+  expect(occurrences('Plan the plan, PLAN!', 'plan')).toEqual([0, 9, 15]);
+  expect(occurrences('aaaa', 'aa')).toEqual([0, 2]);
+  expect(occurrences('abc', '')).toEqual([]);
+  expect(replaceIn('Plan the plan, PLAN!', 'plan', 'map', 1)).toBe('Plan the map, PLAN!');
+  expect(replaceIn('Plan the plan, PLAN!', 'plan', 'map', null)).toBe('map the map, map!');
+  expect(replaceIn('abc', 'x', 'y', 0)).toBe('abc');
+  expect(replaceIn('要件の要件', '要件', '仕様', null)).toBe('仕様の仕様');
 });

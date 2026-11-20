@@ -55,6 +55,8 @@ export function App() {
       // ⌘F on macOS, where Ctrl+F moves the caret.
       if ((IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyF') {
         e.preventDefault();
+        // In the document: find (and replace) in its text, rather than the search for rows.
+        if (ctl.view === 'doc') return ctl.askFind();
         const box = document.querySelector<HTMLInputElement>('input.search');
         box?.focus();
         box?.select();

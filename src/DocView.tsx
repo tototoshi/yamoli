@@ -22,7 +22,7 @@ import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
 import { setStyle, type OutlineStore } from './model';
-import { headingOf, lineAt, withHeading } from './doc';
+import { headingOf, lineAt, occurrences, replaceIn, withHeading } from './doc';
 import type { Controller } from './controller';
 
 /** The outline written out, and whether it is only to be read (none: the one being edited). */
@@ -68,7 +68,208 @@ export function DocView({
       </div>
     </div>
   );
-  return store ? <Source.Provider value={{ store, readOnly: true }}>{body}</Source.Provider> : body;
+  if (store) return <Source.Provider value={{ store, readOnly: true }}>{body}</Source.Provider>;
+  return (
+    <>
+      <DocFind />
+      {body}
+    </>
+  );
+}
+
+/** An occurrence found in the document: row id's k-th, of count in its text as drawn, and where it is drawn. */
+interface Hit {
+  id: string;
+  k: number;
+  count: number;
+  range: Range;
+}
+
+/** Where query is in the rows drawn in main (not in an embedded drawing's), top to bottom. */
+function findHits(main: Element, query: string): Hit[] {
+  const hits: Hit[] = [];
+  for (const el of main.querySelectorAll<HTMLElement>('.text-view[data-id]')) {
+    if (el.closest('.doc-embed')) continue;
+    // The row's text nodes, and where each starts in its text.
+    const nodes: [Text, number][] = [];
+    let text = '';
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      nodes.push([n, text.length]);
+      text += n.data;
+    }
+    const at = occurrences(text, query);
+    const point = (i: number, end: boolean): [Text, number] => {
+      // The node it falls in: for an end, the one it closes (not the next, starting there).
+      let j = nodes.length - 1;
+      while (j > 0 && (end ? nodes[j][1] >= i : nodes[j][1] > i)) j--;
+      return [nodes[j][0], i - nodes[j][1]];
+    };
+    at.forEach((i, k) => {
+      const range = document.createRange();
+      range.setStart(...point(i, false));
+      range.setEnd(...point(i + query.length, true));
+      hits.push({ id: el.dataset.id!, k, count: at.length, range });
+    });
+  }
+  return hits;
+}
+
+/**
+ * The Document view's find bar (⌘F): the text found marked where it is drawn, Enter / Shift+Enter going from one to
+ * the next, and what it is replaced by, one at a time or all at once (as one undo step). A place whose row is written
+ * otherwise than drawn (a link's label) is left as it is.
+ */
+function DocFind() {
+  const ctl = useCtl();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [by, setBy] = useState('');
+  const [at, setAt] = useState(0);
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [note, setNote] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  const jump = useRef(false);
+  const asked = ctl.findAsked;
+  useEffect(() => {
+    if (!asked) return;
+    setOpen(true);
+    requestAnimationFrame(() => (input.current?.focus(), input.current?.select()));
+  }, [asked]);
+  // The places found, again whenever the document is drawn anew.
+  useEffect(() => {
+    const main = document.querySelector('.doc-main');
+    if (!open || !query || !main) return setHits([]);
+    let frame = 0;
+    const scan = () => {
+      frame = 0;
+      setHits(findHits(main, query));
+    };
+    scan();
+    const watch = new MutationObserver(() => (frame ||= requestAnimationFrame(scan)));
+    watch.observe(main, { subtree: true, childList: true, characterData: true });
+    return () => (watch.disconnect(), cancelAnimationFrame(frame));
+  }, [open, query]);
+  const cur = hits.length ? Math.min(at, hits.length - 1) : -1;
+  useEffect(() => {
+    const marks = typeof CSS !== 'undefined' ? CSS.highlights : undefined;
+    if (!marks || !hits.length) return;
+    marks.set('doc-find', new Highlight(...hits.map((h) => h.range)));
+    if (cur >= 0) marks.set('doc-find-at', new Highlight(hits[cur].range));
+    if (cur >= 0 && jump.current) reveal(hits[cur].range);
+    jump.current = false;
+    return () => (marks.delete('doc-find'), marks.delete('doc-find-at'));
+  }, [hits, cur]);
+  if (!open) return null;
+
+  const go = (i: number) => {
+    if (!hits.length) return;
+    jump.current = true;
+    setAt((i + hits.length) % hits.length);
+    if (i % hits.length === cur) reveal(hits[cur].range);
+  };
+  const { store } = ctl;
+  /** The caret back in the bar from a button, which (nothing found any more) may be turned off and lose it. */
+  const keep = () => document.activeElement?.tagName === 'BUTTON' && input.current?.focus();
+  /** Whether the row's text, as written, has query where it is drawn (so the k-th there is the k-th drawn). */
+  const same = (h: Hit) => occurrences(store.node(h.id).text, query).length === h.count;
+  const replaceOne = () => {
+    const h = hits[cur];
+    if (!h) return;
+    if (!same(h)) return setNote(t('ここは置き換えられません（リンクなど）', "This one can't be replaced (a link …)"));
+    store.setText(h.id, replaceIn(store.node(h.id).text, query, by, h.k));
+    jump.current = true;
+    // Past what was put in, when it has the text found in it too.
+    if (by.toLowerCase().includes(query.toLowerCase())) setAt(cur + 1);
+    setNote('');
+    ctl.commit();
+    keep();
+  };
+  const replaceAll = () => {
+    let done = 0;
+    let left = 0;
+    for (const id of new Set(hits.map((h) => h.id))) {
+      const h = hits.find((x) => x.id === id)!;
+      if (!same(h)) {
+        left += h.count;
+        continue;
+      }
+      store.setText(id, replaceIn(store.node(id).text, query, by, null));
+      done += h.count;
+    }
+    if (done) ctl.commit();
+    keep();
+    setNote(
+      t(`${done} 件置き換えました`, `Replaced ${done}`) +
+        (left ? t(`（${left} 件はリンクなどで残しました）`, ` (${left} left: links …)`) : '')
+    );
+  };
+  const close = () => {
+    setOpen(false);
+    setNote('');
+  };
+  return (
+    <div
+      class="doc-find"
+      role="search"
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape') close();
+      }}
+    >
+      <input
+        ref={input}
+        class="doc-find-query"
+        value={query}
+        placeholder={t('文書内を検索', 'Find in document')}
+        onInput={(e) => {
+          setQuery(e.currentTarget.value);
+          setAt(0);
+          setNote('');
+          jump.current = true;
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.isComposing) return;
+          e.preventDefault();
+          go(cur + (e.shiftKey ? -1 : 1));
+        }}
+      />
+      <span class="doc-find-count">{query ? (hits.length ? `${cur + 1} / ${hits.length}` : t('なし', 'None')) : ''}</span>
+      <button class="mini" title={t('前へ（Shift+Enter）', 'Previous (Shift+Enter)')} disabled={!hits.length} onClick={() => go(cur - 1)}>
+        ↑
+      </button>
+      <button class="mini" title={t('次へ（Enter）', 'Next (Enter)')} disabled={!hits.length} onClick={() => go(cur + 1)}>
+        ↓
+      </button>
+      <input
+        class="doc-find-by"
+        value={by}
+        placeholder={t('置換後', 'Replace with')}
+        onInput={(e) => setBy(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.isComposing) return;
+          e.preventDefault();
+          replaceOne();
+        }}
+      />
+      <button class="mini" disabled={!hits.length} onClick={replaceOne}>
+        {t('置換', 'Replace')}
+      </button>
+      <button class="mini" disabled={!hits.length} onClick={replaceAll}>
+        {t('すべて置換', 'Replace all')}
+      </button>
+      <button class="mini" title={t('閉じる（Esc）', 'Close (Esc)')} onClick={close}>
+        ×
+      </button>
+      {note && <span class="doc-find-note">{note}</span>}
+    </div>
+  );
+}
+
+/** Scroll the place found into the middle of the window, unless it is in sight already. */
+function reveal(range: Range) {
+  const r = range.getBoundingClientRect();
+  if (r.top < 100 || r.bottom > innerHeight - 40) scrollBy({ top: r.top - innerHeight / 2, behavior: 'smooth' });
 }
 
 /**

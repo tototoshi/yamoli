@@ -74,6 +74,9 @@ export class ViewState {
   /** Active search result for the zoomed view, or null when not searching. */
   search: SearchResult | null = null;
 
+  /** Times ⌘F asked for the Document view's find bar (a change opens it and puts the caret in it). */
+  findAsked = 0;
+
   prefs = loadPrefs();
 
   /**
@@ -194,6 +197,12 @@ export class ViewState {
     if (this.search) this.extendSearch(focus);
     if (rows && !this.search) this.rerenderRows(rows);
     else this.rerender();
+  }
+
+  /** Open the Document view's find bar (again), the caret put in it. */
+  askFind() {
+    this.findAsked++;
+    this.rerender();
   }
 
   /** Move focus (switching a row into edit mode if needed) and re-render. */
