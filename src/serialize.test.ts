@@ -89,11 +89,13 @@ test('toMarkdownList: a nested list with link labels, fields and tasks as checkl
   s.setCompleted(a, true);
   const b = s.addChild(p, -1, 'build\nsecond line').id;
   s.addField(b, 'after', `[[${a}]]`);
-  s.addBlock(b, 'note', 'markdown', '# left out');
+  s.addBlock(b, 'note', 'markdown', 'some **words**');
   s.addChild(b, -1, 'step');
   s.setTask(s.addChild(p, -1, 'ship').id, true);
   const all = (id: string) => s.node(id).children;
-  expect(toMarkdownList(s, p, all)).toBe('- [x] **design**\n- build\n  second line\n  - after: design\n  - step\n- [ ] ship\n');
+  expect(toMarkdownList(s, p, all)).toBe(
+    '- [x] **design**\n- build\n  second line\n  - after: design\n\n  some **words**\n\n  - step\n- [ ] ship\n'
+  );
   expect(toMarkdownList(s, s.rootId, all)).toMatch(/^- plan\n  - \[x\]/);
   expect(toMarkdownList(s, a, all)).toBe('');
 });
@@ -125,6 +127,24 @@ test('toMarkdownList: a row marked as a paragraph is one, the rows under it a li
   s.node(a).paragraph = s.node(b).paragraph = true;
   const rows = (id: string) => s.items(id);
   expect(toMarkdownList(s, p, rows)).toBe('- 検索\n\n前のサイトは古い。\n\n問い合わせが増えている。\n\n- 電話\n');
+});
+
+test('toMarkdownList: a code block is fenced with its language where it is, in a list item indented under it', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  const code = (parent: string, format: string, text: string) => {
+    const id = add(parent, text);
+    s.setKey(id, s.freeKey(parent, 'code'));
+    s.setFormat(id, format);
+  };
+  const p = add(s.rootId, 'Doc');
+  add(p, 'run');
+  code(p, 'code:sh', 'npm test');
+  const a = add(p, 'then');
+  code(a, 'code', 'a ``` in it\nline 2');
+  s.addBlock(a, 'pic', 'image', 'files/x.png');
+  const all = (id: string) => s.node(id).children;
+  expect(toMarkdownList(s, p, all)).toBe('- run\n```sh\nnpm test\n```\n- then\n  ````\n  a ``` in it\n  line 2\n  ````\n');
 });
 
 test('a paragraph row says so in its data, as a task does', () => {

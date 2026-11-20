@@ -117,9 +117,10 @@ function scalar(text: string): Value {
  * become the linked item's label, tasks are checklist items (`[ ]`, `[x]`)
  * and fields read `name: value`. A `#` row is a heading, its rows the list
  * after it (one inside a list ends it, as in the Document view); a row
- * marked as a paragraph is one. Blocks
- * (multi-line values) are left out. children(id) picks the rows to include,
- * so the view's filters apply.
+ * marked as a paragraph is one. A Markdown block is written as it is, a code
+ * block (or CSV, text) fenced with ``` and its language, where it is among
+ * the rows; images and files are left out. children(id) picks the rows to
+ * include, so the view's filters apply.
  */
 export function toMarkdownList(store: OutlineStore, id: string, children: (id: string) => string[]): string {
   return toMarkdownRows(store, children(id), children);
@@ -136,8 +137,8 @@ export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id
   const add = (c: string, depth: number, out: string[]) => {
     const n = store.node(c);
     const para = n.paragraph && n.key === null;
-    if (n.format !== null) return;
     const pad = '  '.repeat(depth);
+    if (n.format !== null) return void lines.push(...blockLines(n.format, n.text, pad));
     let text = withLabels(store, n.text).trim();
     if (n.key !== null) text = `${n.key}: ${text}`.trimEnd();
     else if (n.task || n.completed) text = `[${n.completed ? 'x' : ' '}] ${text}`;
@@ -167,6 +168,19 @@ export function toMarkdownRows(store: OutlineStore, ids: string[], children: (id
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   return text ? text + '\n' : '';
+}
+
+/** A block in a Markdown list, indented by pad: Markdown as it is, the rest fenced (none for images and files). */
+function blockLines(format: string, text: string, pad: string): string[] {
+  const [name, lang] = format.split(':');
+  if (name === 'image' || name === 'file' || !text.trim()) return [];
+  const indent = (t: string) => t.replace(/^(?=.)/gm, pad);
+  // Apart from the lines around it, so it is not read as more of an item's text.
+  if (name === 'markdown') return ['', indent(text.trim()), ''];
+  // A fence longer than any run of backquotes in it.
+  const fence = '`'.repeat(Math.max(3, ...(text.match(/`{3,}/g) ?? []).map((r) => r.length + 1)));
+  const tag = name === 'code' ? (lang ?? '') : name === 'text' ? '' : name;
+  return [pad + fence + tag, indent(text.replace(/\n+$/, '')), pad + fence];
 }
 
 // ---------------------------------------------------------------- YAML
