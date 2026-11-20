@@ -8,7 +8,7 @@ import { imeActive } from './RowEditor';
 
 // ================================================================ link picker and completions
 
-/** Candidate list for the `[[` link picker, positioned under its field. */
+/** Candidate list for the `[[` link picker (or the `//` date picker), positioned under its field. */
 export function LinkPickerMenu() {
   const ctl = useCtl();
   const p = ctl.picker;
@@ -23,6 +23,24 @@ export function LinkPickerMenu() {
   });
   if (!p) return null;
   const { store } = ctl;
+  if (p.dates) {
+    return (
+      <ul ref={ref} class="link-picker date-picker">
+        {p.dates.map((d, i) => (
+          <li
+            key={d.label}
+            class={i === p.selected ? 'selected' : undefined}
+            onMouseDown={(e) => {
+              e.preventDefault(); // keep the field focused
+              ctl.insertDate(d.day);
+            }}
+          >
+            <span class="pick-label">{d.label}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
   return (
     <ul ref={ref} class="link-picker">
       {p.candidates.length ? (

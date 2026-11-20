@@ -436,6 +436,7 @@ const shortcuts = (): [string, string][] => [
     t('使ったことのある名前・値から選ぶ（Enter で決定）', 'Pick a name or value already in use (Enter takes it)'),
   ],
   ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
+  ['//', t('日付を入れる（//12/24、//+3 も可）', 'Insert a date (//12/24 or //+3 too)')],
   [
     IS_MAC ? '⌘K' : 'Ctrl+K',
     t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)'),

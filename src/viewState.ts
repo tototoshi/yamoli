@@ -28,13 +28,17 @@ export interface Toast {
   undo: boolean;
 }
 
-/** State of the `[[` link picker attached to one editable field. */
+/** State of the `[[` link picker attached to one editable field, or of the `//` date picker. */
 export interface LinkPicker {
   /** Focus key of the field (text:… or value:…). */
   key: string;
-  /** Index of the `[[` being completed. */
+  /** Index of the `[[` (or `//`) being completed. */
   from: number;
+  /** Where what was typed after it ends (the caret). */
+  to: number;
   candidates: string[];
+  /** For `//`: the dates offered, in place of items (day null: pick one from a calendar). */
+  dates?: { label: string; day: number | null }[];
   selected: number;
 }
 

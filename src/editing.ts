@@ -3,12 +3,12 @@
  * `[[` link picker and completions, the jump box, the item menu and toasts,
  * tasks and completion, fields, blocks, dependencies and the samples.
  */
-import { formatDate, today } from './calendar';
+import { formatDate, parseDate, parseDateInput, shortDate, today, weekday } from './calendar';
 import { DEP_KEY } from './deps';
 import { addDfdSample, addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } from './sample';
 import { headingOf } from './doc';
 import { t } from './i18n';
-import { keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, valueCandidates } from './links';
+import { dateQueryAt, keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED } from './fields';
 import { fKey, fText, type Focus } from './focus';
 import { arrowOf } from './keys';
@@ -27,18 +27,47 @@ const NO_VALUE_SUGGEST = new Set([DEP_KEY, 'start', 'end', 'due', DONE_KEY]);
 /** `[ ] ` (or `[x] ` done, `[] `, full-width too) typed at the start of a row. */
 const CHECKBOX_TYPED = /^[[［]([ 　xX]?)[\]］][ 　]/;
 
+/**
+ * What `//` offers: today and the days around it, or the date typed after it
+ * (`11/25`, `2026-12-01`, `+3` for days from today); last, a calendar.
+ */
+export function dateChoices(query: string, now: number): { label: string; day: number | null }[] {
+  const q = query.trim().toLowerCase();
+  const week = t('日 月 火 水 木 金 土', 'Sun Mon Tue Wed Thu Fri Sat').split(' ');
+  const named = (label: string, day: number) => ({ label: `${label}  ${shortDate(day, now)} (${week[weekday(day)]})`, day });
+  const nextMonday = now + ((8 - weekday(now)) % 7 || 7);
+  const words: [string[], number][] = [
+    [[t('今日', 'Today'), 'today', 'きょう'], now],
+    [[t('明日', 'Tomorrow'), 'tomorrow', 'あした'], now + 1],
+    [[t('昨日', 'Yesterday'), 'yesterday', 'きのう'], now - 1],
+    [[t('来週の月曜', 'Next Monday'), 'monday', 'らいしゅう'], nextMonday],
+  ];
+  const plus = q.match(/^\+(\d{1,3})$/);
+  const typed = plus ? now + Number(plus[1]) : q ? parseDateInput(q, now) : null;
+  const choices =
+    typed !== null
+      ? [named(plus ? `+${plus[1]}` : formatDate(typed), typed)]
+      : words.filter(([names]) => !q || names.some((w) => w.toLowerCase().startsWith(q))).map(([names, day]) => named(names[0], day));
+  return [...choices, { label: t('カレンダーで選ぶ…', 'Pick from a calendar…'), day: null }];
+}
+
 export class Editing extends ViewState {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ================================================================ link picker
 
-  /** Open, update or close the picker after the field's value or caret changed. */
+  /** Open, update or close the picker after the field's value or caret changed (`[[` for a link, `//` for a date). */
   updatePicker(el: HTMLTextAreaElement | HTMLInputElement, selfId: string) {
-    const q = pickerQueryAt(el.value, el.selectionStart ?? 0);
-    const deps = this.inDependencies(selfId);
-    this.picker = q
-      ? { key: el.dataset.fk!, from: q.from, candidates: linkCandidates(this.store, q.query, selfId, { deps }), selected: 0 }
-      : null;
+    const caret = el.selectionStart ?? 0;
+    const key = el.dataset.fk!;
+    const q = pickerQueryAt(el.value, caret);
+    if (q) {
+      const candidates = linkCandidates(this.store, q.query, selfId, { deps: this.inDependencies(selfId) });
+      this.picker = { key, from: q.from, to: caret, candidates, selected: 0 };
+      return;
+    }
+    const d = key.startsWith('text:') ? dateQueryAt(el.value, caret) : null;
+    this.picker = d ? { key, from: d.from, to: caret, candidates: [], dates: dateChoices(d.query, today()), selected: 0 } : null;
   }
 
   /** Whether id is (or is inside) its item's `after` field. */
@@ -54,7 +83,7 @@ export class Editing extends ViewState {
   protected pickerKeydown(e: KeyboardEvent, el: HTMLTextAreaElement | HTMLInputElement): boolean {
     const p = this.picker;
     if (!p || p.key !== el.dataset.fk) return false;
-    const n = p.candidates.length;
+    const n = p.dates?.length ?? p.candidates.length;
     const key = arrowOf(e);
     if ((key === 'ArrowDown' || key === 'ArrowUp') && n) {
       e.preventDefault();
@@ -64,7 +93,8 @@ export class Editing extends ViewState {
     }
     if ((e.key === 'Enter' || e.key === 'Tab') && n) {
       e.preventDefault();
-      this.insertLink(p.candidates[p.selected]);
+      if (p.dates) this.insertDate(p.dates[p.selected].day);
+      else this.insertLink(p.candidates[p.selected]);
       return true;
     }
     if (e.key === 'Escape') {
@@ -87,6 +117,43 @@ export class Editing extends ViewState {
     this.store.setText(p.key.slice('text:'.length), next);
     this.picker = null;
     this.commit({ key: p.key, start: p.from + link.length });
+  }
+
+  /** Replace the `//query` before the caret with day (null: one picked from a calendar, first). */
+  insertDate(day: number | null) {
+    const p = this.picker;
+    if (!p?.dates) return;
+    const id = p.key.slice('text:'.length);
+    if (day === null) return this.pickFromCalendar(p.key, (d) => this.writeDate(id, p.from, p.to, d));
+    this.writeDate(id, p.from, p.to, day);
+  }
+
+  private writeDate(id: string, from: number, to: number, day: number) {
+    const text = this.store.node(id).text;
+    const date = formatDate(day);
+    this.store.setText(id, text.slice(0, from) + date + text.slice(to));
+    this.picker = null;
+    this.commit(fText(id, from + date.length));
+  }
+
+  /** The browser's own calendar, opened under the field with focus key; picked calls back with the day. */
+  private pickFromCalendar(key: string, picked: (day: number) => void) {
+    const field = document.querySelector(`[data-fk="${CSS.escape(key)}"]`);
+    const r = field?.getBoundingClientRect();
+    const input = Object.assign(document.createElement('input'), { type: 'date', value: formatDate(today()) });
+    Object.assign(input.style, { position: 'fixed', left: `${r?.left ?? 0}px`, top: `${r?.bottom ?? 0}px`, opacity: '0', width: '1px' });
+    document.body.append(input);
+    input.addEventListener('change', () => {
+      const d = parseDate(input.value);
+      input.remove();
+      if (d !== null) picked(d);
+    });
+    input.addEventListener('blur', () => setTimeout(() => input.remove(), 0));
+    try {
+      input.showPicker();
+    } catch {
+      input.focus();
+    }
   }
 
   // ================================================================ suggestions
@@ -517,7 +584,8 @@ export class Editing extends ViewState {
     }
     const key = 'text:' + f.id;
     this.commitField({ key, start: 'end' });
-    this.picker = { key, from: f.text.length - 2, candidates: linkCandidates(this.store, '', id, { deps: true }), selected: 0 };
+    const candidates = linkCandidates(this.store, '', id, { deps: true });
+    this.picker = { key, from: f.text.length - 2, to: f.text.length, candidates, selected: 0 };
     this.rerender();
   }
 

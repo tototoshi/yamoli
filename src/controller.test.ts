@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { expect, test, vi } from 'vitest';
+import { formatDate, today } from './calendar';
 import { OutlineStore } from './model';
 
 // The controller starts from whatever storage loaded; give it a store per test, and save nowhere.
@@ -670,4 +671,28 @@ test('in the document view, Backspace at the start of a list item makes it a par
   ta.setSelectionRange(2, 2);
   ctl.onTextInput(b, ta);
   expect(ctl.store.node(b)).toMatchObject({ text: 'second', paragraph: false });
+});
+
+test('typing // offers dates: Enter writes today in its place, a date typed after it that date', () => {
+  let a = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, '締切 ');
+  });
+  const type = (value: string) => {
+    const ta = editor(ctl, a, value.length);
+    ta.value = value;
+    ta.setSelectionRange(value.length, value.length);
+    ctl.onTextInput(a, ta);
+    return ta;
+  };
+  let ta = type('締切 //');
+  expect(ctl.picker?.dates?.map((d) => d.day)).toEqual([today(), today() + 1, today() - 1, expect.any(Number), null]);
+  press(ctl, ta, 'Enter');
+  expect(ctl.store.node(a).text).toBe(`締切 ${formatDate(today())}`);
+  ta = type('締切 //12/24');
+  expect(ctl.picker?.dates?.[0].label).toMatch(/12-24/);
+  press(ctl, ta, 'Enter');
+  expect(ctl.store.node(a).text).toMatch(/^締切 \d{4}-12-24$/);
+  type('https://');
+  expect(ctl.picker).toBeNull();
 });

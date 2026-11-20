@@ -164,6 +164,12 @@ export function pickerQueryAt(value: string, caret: number): { from: number; que
   return m ? { from: caret - m[0].length, query: m[1] } : null;
 }
 
+/** If the caret is right after `//` (at the start or after a space: not a URL's) and what follows it, where it starts and that. */
+export function dateQueryAt(value: string, caret: number): { from: number; query: string } | null {
+  const m = value.slice(0, caret).match(/(?:^|[\s\u3000(（])\/\/([^\s]*)$/);
+  return m ? { from: caret - m[1].length - 2, query: m[1] } : null;
+}
+
 /** Field names in use, most used first, starting with (or else containing) prefix; prefix itself is left out. */
 export function keyCandidates(store: OutlineStore, prefix: string, limit = 8): string[] {
   const count = new Map<string, number>();

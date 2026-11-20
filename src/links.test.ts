@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { findBacklinks, keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, refIds, valueCandidates } from './links';
+import { dateQueryAt, findBacklinks, keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, refIds, valueCandidates } from './links';
 import { OutlineStore } from './model';
 
 function sample() {
@@ -91,4 +91,11 @@ test('values a field name already has are offered, leaving out links and nested 
   expect(valueCandidates(s, 'status', '')).toEqual(['完了', '進行中']);
   expect(valueCandidates(s, 'Status', '進')).toEqual(['進行中']);
   expect(valueCandidates(s, 'status', '完了')).toEqual([]);
+});
+
+test('dateQueryAt finds // typed at the start or after a space, not in a URL', () => {
+  expect(dateQueryAt('//', 2)).toEqual({ from: 0, query: '' });
+  expect(dateQueryAt('締切 //11/2', 9)).toEqual({ from: 3, query: '11/2' });
+  expect(dateQueryAt('https://', 8)).toBeNull();
+  expect(dateQueryAt('a//', 3)).toBeNull();
 });

@@ -10,7 +10,7 @@ Using Yamoli
       Select words and press **⌘B** (bold), **⌘I** (italic), **⌘⇧X** (strike) or **⌘E** (code) to mark them, and again to unmark; **⌘⇧H** shows a bubble of colours, 1–7 picking one and 0 taking it off (Ctrl in place of ⌘ outside macOS). The name and description in a diagram box's menu, and an arrow's label (in its menu or typed in place), take them too.
       The colours are `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex`, with other formatting inside if you like (`[**key**]{red}`); they show in the diagram's names, descriptions and arrow labels too.
       With the caret on a link, a bubble shows where it goes; **⌘K** (Ctrl+K outside macOS) adds or edits a link, and pasting a URL over selected text links it.
-      `[[` inserts a link to another item. **⌘P** (Ctrl+P outside macOS) jumps to an item by part of its name.
+      `[[` inserts a link to another item. `//` offers dates (today, tomorrow, yesterday, next Monday, or a calendar) and writes the one picked as `2026-11-20`; type on, as in `//12/24` or `//+3` (three days on), for that day. **⌘P** (Ctrl+P outside macOS) jumps to an item by part of its name.
       Bookmark items you often open with **⌘D** (or from a row's menu) to open them from the bookmark button at the top; ⌘P lists them first too (⌘D again takes one out).
       On macOS, **Ctrl+K** deletes to the end of the line and **Ctrl+Y** puts it back; at the end of a row, Ctrl+K (like Ctrl+D) joins the next row.
     ## Selecting, copying and pasting
