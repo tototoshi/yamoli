@@ -5,7 +5,7 @@ Using Yamoli
   This guide is an outline too, shown in the Document view. **Open as an outline** on the left adds it to your outline, to see how it is written or to make slides of it.
   # Writing
     ## Rows
-      **Enter** starts a new row (splitting the row at the caret), **⌘Enter** a new row below wherever the caret is (after the rows under it). **Tab / Shift+Tab** indents and outdents (on a row with nowhere to indent to, Tab opens what is folded under it a level at a time). Click a ● to zoom into that item; the breadcrumbs at the top zoom back out.
+      **Enter** starts a new row (splitting the row at the caret), **⌘Enter** a new row below wherever the caret is (after the rows under it). **Tab / Shift+Tab** indents and outdents (on a row with nowhere to indent to, Tab opens what is folded under it a level at a time). **⌘↑ / ⌘↓** fold and open (⌘↓ a level at a time too). Click a ● to zoom into that item; the breadcrumbs at the top zoom back out.
       Formatting (`**bold**`, `*italic*`, `~~struck~~`, code in backquotes, `[text](https://…)`, and `[text]{red}` for a colour) is styled as you type, its markup dimmed.
       Select words and press **⌘B** (bold), **⌘I** (italic), **⌘⇧X** (strike) or **⌘E** (code) to mark them, and again to unmark; **⌘⇧H** shows a bubble of colours, 1–7 picking one and 0 taking it off (Ctrl in place of ⌘ outside macOS). The name and description in a diagram box's menu, and an arrow's label (in its menu or typed in place), take them too.
       The colours are `red` / `orange` / `yellow` / `green` / `blue` / `purple` / `gray` or `#hex`, with other formatting inside if you like (`[**key**]{red}`); they show in the diagram's names, descriptions and arrow labels too.

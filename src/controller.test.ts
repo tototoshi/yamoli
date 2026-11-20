@@ -742,7 +742,7 @@ test('in the document view, ⌘Enter in a block goes on to a new line right afte
   });
   location.hash = `#/${doc}?view=doc`;
   ctl.onHashChange();
-  press(ctl, editor(ctl, code), 'Enter', { metaKey: true, ctrlKey: true });
+  press(ctl, editor(ctl, code), 'Enter', { metaKey: true });
   const kids = ctl.store.node(doc).children;
   const next = kids[kids.indexOf(code) + 1];
   expect(ctl.store.node(next)).toMatchObject({ text: '', key: null });
@@ -903,4 +903,12 @@ test('in the outline, Tab with nowhere to indent the row to opens it a level fur
   expect(ctl.store.parentOf(a)).toBe(ctl.store.rootId);
   press(ctl, ta, 'Tab', { shiftKey: true });
   expect(ctl.store.node(a).collapsed).toBe(false); // Shift+Tab doesn't fold
+
+  // ⌘↓ the same, a level at a time.
+  press(ctl, ta, 'ArrowUp', { metaKey: true });
+  expect(folded()[0]).toBe(true);
+  press(ctl, ta, 'ArrowDown', { metaKey: true });
+  expect(folded().slice(0, 2)).toEqual([false, true]);
+  press(ctl, ta, 'ArrowDown', { metaKey: true });
+  expect(folded()).toEqual([false, false, true]);
 });

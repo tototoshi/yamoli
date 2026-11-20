@@ -382,7 +382,10 @@ export class Controller extends Editing {
     }
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isMod(e) && !e.altKey) {
       e.preventDefault();
-      if (!isTitle && store.setCollapsed(id, e.key === 'ArrowUp')) this.commit(fText(id, start, end));
+      // ⌘↓ opens a level at a time, as Tab does where it can't indent (a block: its text).
+      const up = e.key === 'ArrowUp';
+      const changed = up || n.format !== null ? store.setCollapsed(id, up) : this.openLevel(id);
+      if (!isTitle && changed) this.commit(fText(id, start, end));
       return;
     }
     if (e.key === 'Enter' && isMod(e) && !e.altKey) {

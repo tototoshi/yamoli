@@ -406,7 +406,7 @@ const shortcuts = (): [string, string][] => [
       'Select rows: Tab, Shift+Tab, delete, ⌘C, ⌘X, ⌘Shift+Enter; drag a ● to move them all'
     ),
   ],
-  ['⌘/Ctrl+↑ ↓', t('折りたたみ / 展開', 'Collapse / expand')],
+  ['⌘/Ctrl+↑ ↓', t('折りたたみ / 一段ずつ展開', 'Collapse / expand a level at a time')],
   [
     '⌘/Ctrl+Enter',
     t('下に新しい行（カーソルの位置によらず、子の行の後ろに）', 'A new row below (wherever the caret is, after the rows under it)'),
