@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildDoc, docContents, headingOf, withHeading, type DocPart } from './doc';
+import { buildDoc, docContents, headingOf, lineAt, withHeading, type DocPart } from './doc';
 import { OutlineStore } from './model';
 
 /** The parts in short: `h1 Text`, `list[A, B(C)]` (a paragraph `¶A`), `data`, `embed diagram`. */
@@ -159,4 +159,19 @@ test('numbered rows are a numbered list, quotations one after another one quotat
     [false, false, true],
     [false, false, false],
   ]);
+});
+
+test('a click away from the text goes into the line at that height, or the nearest, or the last below them all', () => {
+  const lines = [
+    { id: 'a', top: 0, bottom: 20, left: 40 },
+    { id: 'b', top: 30, bottom: 70, left: 60 }, // two lines of text
+    { id: 'c', top: 80, bottom: 100, left: 40 },
+  ];
+  expect(lineAt(lines, 500, 10)).toEqual({ id: 'a', start: false }); // right of it: its end
+  expect(lineAt(lines, 50, 50)).toEqual({ id: 'b', start: true }); // left of it: its start
+  expect(lineAt(lines, 500, 22)).toEqual({ id: 'a', start: false }); // between, nearer the one above
+  expect(lineAt(lines, 500, 76)).toEqual({ id: 'c', start: false }); // between, nearer the one below
+  expect(lineAt(lines, 10, 400)).toEqual({ id: 'c', start: false }); // below them all: the end of the last
+  expect(lineAt(lines, 500, -30)).toEqual({ id: 'a', start: false });
+  expect(lineAt([], 0, 0)).toBeNull();
 });

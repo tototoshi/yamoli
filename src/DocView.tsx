@@ -20,7 +20,7 @@ import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
 import { setStyle, type OutlineStore } from './model';
-import { headingOf, withHeading } from './doc';
+import { headingOf, lineAt, withHeading } from './doc';
 import type { Controller } from './controller';
 
 /** The outline written out, and whether it is only to be read (none: the one being edited). */
@@ -77,22 +77,20 @@ function toLineAt(e: MouseEvent, ctl: Controller) {
   const hit = e.target as Element;
   const own = '.text-view, .rich, a, button, input, select, textarea, label, .doc-block, .doc-code, .doc-embed, .doc-rule, .doc-lead';
   if (hit.closest(own) || document.getSelection()?.toString()) return;
-  // Each line's text, as far down the page as it goes (an embedded drawing's own text left out).
-  const lines = [...main.querySelectorAll<HTMLElement>('.text-view[data-id]')]
+  // Each line's text as far down the page as it goes (the one being typed in too; an embedded drawing's own left out).
+  const lines = [...main.querySelectorAll<HTMLElement>('.text-view[data-id], textarea[data-fk^="text:"]')]
     .filter((v) => !v.closest('.doc-embed'))
     .map((v) => {
       const rs = [...v.getClientRects()];
       const box = v.getBoundingClientRect();
-      return { id: v.dataset.id!, top: rs[0]?.top ?? box.top, bottom: rs.at(-1)?.bottom ?? box.bottom, left: rs[0]?.left ?? box.left };
+      const id = v.dataset.id ?? v.dataset.fk!.slice('text:'.length);
+      return { id, top: rs[0]?.top ?? box.top, bottom: rs.at(-1)?.bottom ?? box.bottom, left: rs[0]?.left ?? box.left };
     });
-  if (!lines.length) return;
-  const y = e.clientY;
-  const line =
-    lines.find((l) => y >= l.top && y <= l.bottom) ??
-    (y > lines.at(-1)!.bottom ? lines.at(-1)! : lines.reduce((m, l) => (Math.abs(l.top - y) < Math.abs(m.top - y) ? l : m)));
+  const line = lineAt(lines, e.clientX, e.clientY);
+  if (!line) return;
   const text = ctl.store.node(line.id).text;
   const start = ctl.store.node(line.id).key === null ? (headingOf(text)?.prefix ?? 0) : 0;
-  ctl.focus(fText(line.id, e.clientX < line.left ? start : 'end'));
+  ctl.focus(fText(line.id, line.start ? start : 'end'));
 }
 
 /** The headings to go to, the one being read marked. */

@@ -172,3 +172,19 @@ export const docContents = (store: OutlineStore, parts: DocPart[]): { id: string
       ? [{ id: p.id, level: p.level as 1 | 2, text: withHeading(store.node(p.id).text, 0).replace(/[`*~]/g, '') }]
       : []
   );
+
+/**
+ * The line a click at x, y away from the text goes into, of lines (top to bottom, in page coordinates): the one at
+ * that height, else the nearest, at its start when left of its text, else its end; below them all, the end of the last.
+ */
+export function lineAt(
+  lines: { id: string; top: number; bottom: number; left: number }[],
+  x: number,
+  y: number
+): { id: string; start: boolean } | null {
+  if (!lines.length) return null;
+  if (y > lines.at(-1)!.bottom) return { id: lines.at(-1)!.id, start: false };
+  const gap = (l: (typeof lines)[number]) => (y < l.top ? l.top - y : y > l.bottom ? y - l.bottom : 0);
+  const line = lines.find((l) => y >= l.top && y <= l.bottom) ?? lines.reduce((m, l) => (gap(l) < gap(m) ? l : m));
+  return { id: line.id, start: x < line.left };
+}
