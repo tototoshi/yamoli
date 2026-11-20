@@ -23,6 +23,25 @@ export function LinkPickerMenu() {
   });
   if (!p) return null;
   const { store } = ctl;
+  if (p.commands) {
+    return (
+      <ul ref={ref} class="link-picker slash-menu">
+        {p.commands.map((c, i) => (
+          <li
+            key={c.id}
+            class={i === p.selected ? 'selected' : undefined}
+            onMouseDown={(e) => {
+              e.preventDefault(); // keep the field focused
+              ctl.runCommand(c.id);
+            }}
+          >
+            <span class="pick-label">{c.label}</span>
+            <span class="pick-path">{c.hint}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
   if (p.dates) {
     return (
       <ul ref={ref} class="link-picker date-picker">

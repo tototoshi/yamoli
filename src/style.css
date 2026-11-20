@@ -430,6 +430,9 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .link-picker .pick-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .link-picker .pick-path { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .link-picker li.empty { color: var(--muted); cursor: default; }
+/* The `/` menu: what to make the row, and the way to write it in Markdown beside it. */
+.slash-menu li { flex-direction: row; justify-content: space-between; gap: 16px; }
+.slash-menu .pick-path { font-family: var(--mono); }
 
 /* the views an item turns on */
 .view-badge {

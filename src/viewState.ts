@@ -32,13 +32,15 @@ export interface Toast {
 export interface LinkPicker {
   /** Focus key of the field (text:… or value:…). */
   key: string;
-  /** Index of the `[[` (or `//`) being completed. */
+  /** Index of the `[[` (or `//`, `/`) being completed. */
   from: number;
   /** Where what was typed after it ends (the caret). */
   to: number;
   candidates: string[];
   /** For `//`: the dates offered, in place of items (day null: pick one from a calendar). */
   dates?: { label: string; day: number | null }[];
+  /** For `/` at the start of a row in the document: what it can be made, in place of items. */
+  commands?: { id: string; label: string; hint: string }[];
   selected: number;
 }
 

@@ -794,3 +794,53 @@ test('outside the document `1. ` is only text', () => {
   ctl.onTextInput(a, ta);
   expect(ctl.store.node(a)).toMatchObject({ numbered: false, text: '1. ' });
 });
+
+test('in the document `/` at the start of a row opens what to make it, narrowed as typed; `//` is still the dates', () => {
+  let doc = '';
+  let a = '';
+  let other = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    a = add(doc, '');
+    other = add(s.rootId, '');
+  });
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  const type = (id: string, value: string) => {
+    const ta = editor(ctl, id);
+    ta.value = value;
+    ta.setSelectionRange(value.length, value.length);
+    ctl.onTextInput(id, ta);
+    return ta;
+  };
+  type(a, '/');
+  expect(ctl.picker?.commands?.length).toBeGreaterThan(8);
+  let ta = type(a, '/quo');
+  expect(ctl.picker?.commands?.map((c) => c.id)).toEqual(['quote']);
+  press(ctl, ta, 'Enter');
+  expect(ctl.store.node(a)).toMatchObject({ quote: true, text: '' });
+  expect(ctl.picker).toBeNull();
+
+  type(a, '/');
+  ctl.runCommand('rule');
+  const kids = ctl.store.node(doc).children;
+  expect(ctl.store.node(a).text).toBe('---');
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + kids[kids.indexOf(a) + 1] }));
+
+  const b = kids[kids.indexOf(a) + 1];
+  ctl.store.node(b).numbered = true;
+  type(b, '/');
+  ctl.runCommand('h2');
+  expect(ctl.store.node(b)).toMatchObject({ text: '## ', numbered: false });
+  ta = type(b, '//');
+  expect(ctl.picker?.commands).toBeUndefined();
+  expect(ctl.picker?.dates?.length).toBeGreaterThan(0);
+
+  type(b, '/nothing-like-this');
+  expect(ctl.picker).toBeNull();
+  location.hash = '#/';
+  ctl.onHashChange();
+  type(other, '/');
+  expect(ctl.picker).toBeNull(); // only in the document
+});

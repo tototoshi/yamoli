@@ -6,7 +6,7 @@
 import { formatDate, parseDate, parseDateInput, shortDate, today, weekday } from './calendar';
 import { DEP_KEY } from './deps';
 import { addDfdSample, addDiagramSample, addGuideSlides, addMindMapSample, addScheduleSample } from './sample';
-import { headingOf } from './doc';
+import { headingOf, withHeading } from './doc';
 import { t } from './i18n';
 import { dateQueryAt, keyCandidates, linkCandidates, nodeLabel, pickerQueryAt, valueCandidates } from './links';
 import { FIELD_TYPED } from './fields';
@@ -17,7 +17,7 @@ import { ViewState } from './viewState';
 import { VIEWS_KEY, type DrawnView } from './views';
 import { isImageRef, uploadFile } from './files';
 import { canAddFiles } from './storage';
-import { setStyle, styleOf } from './model';
+import { setStyle, styleOf, type RowStyle } from './model';
 import { addImage } from './slides';
 
 /** The field that records when an item was completed. */
@@ -53,12 +53,35 @@ export function dateChoices(query: string, now: number): { label: string; day: n
   return [...choices, { label: t('カレンダーで選ぶ…', 'Pick from a calendar…'), day: null }];
 }
 
+/** What `/` at the start of a row in the document offers: id, label, the Markdown way to write it, words it is found by. */
+const SLASH: [string, () => string, string, string[]][] = [
+  ['h1', () => t('見出し 1', 'Heading 1'), '# ', ['h1', 'heading', 'midashi']],
+  ['h2', () => t('見出し 2', 'Heading 2'), '## ', ['h2', 'heading', 'midashi']],
+  ['h3', () => t('見出し 3', 'Heading 3'), '### ', ['h3', 'heading', 'midashi']],
+  ['list', () => t('箇条書き', 'List'), '- ', ['list', 'bullet', 'ul', 'kajougaki']],
+  ['numbered', () => t('番号付きリスト', 'Numbered list'), '1. ', ['numbered', 'ol', 'number', 'bangou']],
+  ['task', () => t('タスク', 'Task'), '[ ] ', ['task', 'todo', 'check']],
+  ['paragraph', () => t('段落', 'Paragraph'), '', ['paragraph', 'p', 'text', 'danraku']],
+  ['quote', () => t('引用', 'Quote'), '> ', ['quote', 'blockquote', 'inyou']],
+  ['rule', () => t('区切り線', 'Divider'), '---', ['divider', 'rule', 'hr', 'line', 'kugiri']],
+  ['code', () => t('コードブロック', 'Code block'), '```', ['code', 'pre', 'ko-do']],
+  ['markdown', () => t('Markdown ブロック', 'Markdown block'), 'Alt+D', ['markdown', 'md', 'table', 'block']],
+  ['date', () => t('日付', 'Date'), '//', ['date', 'today', 'hiduke', 'day']],
+];
+
+/** The `/` menu's commands matching query (by their label or words), all of them for none. */
+export function slashChoices(query: string): { id: string; label: string; hint: string }[] {
+  const q = query.toLowerCase();
+  return SLASH.filter(([, label, , words]) => !q || label().toLowerCase().includes(q) || words.some((w) => w.startsWith(q))).map(
+    ([id, label, hint]) => ({ id, label: label(), hint })
+  );
+}
+
 export class Editing extends ViewState {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ================================================================ link picker
 
-  /** Open, update or close the picker after the field's value or caret changed (`[[` for a link, `//` for a date). */
   /**
    * text (```, or ```ts with its language) on row id: the row becomes a code block where it is, being written
    * in, as its own undo step. Not a row holding rows (a block holds none), the title or a field. Whether it did.
@@ -67,15 +90,24 @@ export class Editing extends ViewState {
     const { store } = this;
     const m = text.match(CODE_FENCE);
     const n = store.node(id);
-    if (!m || n.key !== null || id === this.zoomId || store.items(id).length) return false;
-    store.setKey(id, store.freeKey(store.parentOf(id)!, 'code'));
-    store.setFormat(id, codeFormat(m[1]));
+    return !!m && this.makeBlock(id, codeFormat(m[1]), 'code');
+  }
+
+  /** Row id made a block in format where it is (named name, or name2 … beside others), being written in. */
+  private makeBlock(id: string, format: string, name: string): boolean {
+    const { store } = this;
+    const n = store.node(id);
+    if (n.key !== null || id === this.zoomId || store.items(id).length) return false;
+    store.setKey(id, store.freeKey(store.parentOf(id)!, name));
+    store.setFormat(id, format);
     store.setText(id, '');
     this.revealFields();
     this.commit(fText(id, 0));
     return true;
   }
 
+  /** Open, update or close the picker after the field's value or caret changed (`[[` for a link, `//` for a date,
+   * `/` alone at the start of a row in the document for what to make it). */
   updatePicker(el: HTMLTextAreaElement | HTMLInputElement, selfId: string) {
     const caret = el.selectionStart ?? 0;
     const key = el.dataset.fk!;
@@ -83,6 +115,13 @@ export class Editing extends ViewState {
     if (q) {
       const candidates = linkCandidates(this.store, q.query, selfId, { deps: this.inDependencies(selfId) });
       this.picker = { key, from: q.from, to: caret, candidates, selected: 0 };
+      return;
+    }
+    const row = key.startsWith('text:') && this.store.node(selfId).key === null;
+    const slash = row && this.view === 'doc' && el.value.slice(caret) === '' ? el.value.slice(0, caret).match(/^\/([^\s/]*)$/) : null;
+    const commands = slash ? slashChoices(slash[1]) : [];
+    if (commands.length) {
+      this.picker = { key, from: 0, to: caret, candidates: [], commands, selected: 0 };
       return;
     }
     const d = key.startsWith('text:') ? dateQueryAt(el.value, caret) : null;
@@ -102,7 +141,7 @@ export class Editing extends ViewState {
   protected pickerKeydown(e: KeyboardEvent, el: HTMLTextAreaElement | HTMLInputElement): boolean {
     const p = this.picker;
     if (!p || p.key !== el.dataset.fk) return false;
-    const n = p.dates?.length ?? p.candidates.length;
+    const n = p.commands?.length ?? p.dates?.length ?? p.candidates.length;
     const key = arrowOf(e);
     if ((key === 'ArrowDown' || key === 'ArrowUp') && n) {
       e.preventDefault();
@@ -112,7 +151,8 @@ export class Editing extends ViewState {
     }
     if ((e.key === 'Enter' || e.key === 'Tab') && n) {
       e.preventDefault();
-      if (p.dates) this.insertDate(p.dates[p.selected].day);
+      if (p.commands) this.runCommand(p.commands[p.selected].id);
+      else if (p.dates) this.insertDate(p.dates[p.selected].day);
       else this.insertLink(p.candidates[p.selected]);
       return true;
     }
@@ -136,6 +176,42 @@ export class Editing extends ViewState {
     this.store.setText(p.key.slice('text:'.length), next);
     this.picker = null;
     this.commit({ key: p.key, start: p.from + link.length });
+  }
+
+  /** Make the row the `/` menu is open on what command says, the `/` and what was typed after it taken away. */
+  runCommand(command: string) {
+    const p = this.picker;
+    if (!p?.commands) return;
+    const { store } = this;
+    const id = p.key.slice('text:'.length);
+    const n = store.node(id);
+    this.picker = null;
+    store.setText(id, '');
+    const heading = command.match(/^h([1-3])$/);
+    if (heading) {
+      store.setText(id, withHeading('', Number(heading[1]) as 1 | 2 | 3));
+      setStyle(n, 'list'); // a heading, not a numbered one (as Enter after one may have made it)
+      return this.commit(fText(id, n.text.length), p.key); // drawn anew as a heading, the caret kept in it
+    }
+    if (command === 'code' || command === 'markdown') {
+      if (this.makeBlock(id, command, command === 'code' ? 'code' : 'note')) return;
+      return this.commit(fText(id, 0));
+    }
+    if (command === 'rule') {
+      // The line, and a new row after it to go on writing in.
+      store.setText(id, '---');
+      setStyle(n, 'list');
+      const next = store.addSiblingAfter(id, '');
+      return this.commit(fText(next.id, 0));
+    }
+    if (command === 'date') {
+      store.setText(id, '//');
+      this.picker = { key: p.key, from: 0, to: 2, candidates: [], dates: dateChoices('', today()), selected: 0 };
+      return this.commit(fText(id, 2));
+    }
+    if (command === 'task') store.setTask(id, true);
+    else setStyle(n, command as RowStyle);
+    this.commit(fText(id, 0));
   }
 
   /** Replace the `//query` before the caret with day (null: one picked from a calendar, first). */

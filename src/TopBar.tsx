@@ -438,6 +438,13 @@ const shortcuts = (): [string, string][] => [
   ['[[', t('他のアイテムへのリンク（本文・属性の値）', 'Link to another item (in text or a field value)')],
   ['//', t('日付を入れる（//12/24、//+3 も可）', 'Insert a date (//12/24 or //+3 too)')],
   [
+    '/',
+    t(
+      'ドキュメントで、行の先頭に打つと見出し・リスト・引用・コードなどを選べる',
+      'In the document, at the start of a row: pick a heading, list, quote, code …'
+    ),
+  ],
+  [
     IS_MAC ? '⌘K' : 'Ctrl+K',
     t('リンクを追加・編集（URL を選択範囲に貼り付けてもリンクになる）', 'Add or edit a link (or paste a URL over selected text)'),
   ],

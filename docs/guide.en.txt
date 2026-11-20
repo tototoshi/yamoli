@@ -241,6 +241,7 @@ Using Yamoli
         Long prose or tables can also go in a Markdown block (Alt+D). Blocks are drawn where they are, between the rows.
         `1. ` typed at the start of a row makes it an item of a numbered list (numbered in order along those that follow one another), `> ` a quotation. Enter goes on in the same way; Backspace at its start, or `- `, makes it a plain list item again. In the outline a numbered row shows its number for a bullet and a quotation a bar (typing `1. ` or `> ` changes a row only in the Document view).
         A row of just `---` is a dividing line (the `---` shows while it is typed in).
+        `/` typed on an empty row opens a menu of what to make it (a heading, list, numbered list, task, paragraph, quote, divider, code block, Markdown block or date). Type on (`/quo`, `/h2`) to narrow it; ↑↓ and Enter, or a click, picks one. On the right is the way to write each without the menu. Two, `//`, are the dates as before.
         Tasks made with `[ ]` have checkboxes.
         `embed: [[item]] diagram` draws that item’s diagram there (`mindmap` a mind map, else its Gantt chart). Other fields are left out; the zoomed item’s `description` leads the document.
       On the line being typed in, **⌘⌥1** / **⌘⌥2** / **⌘⌥3** make it a heading (writing the `#`s at its start) and **⌘⌥0** a plain row again (Ctrl+Alt outside macOS; in the outline too).
