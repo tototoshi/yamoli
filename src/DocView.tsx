@@ -22,7 +22,7 @@ import { fText } from './focus';
 import { docLines, gripAt, startDocDrag } from './docDrag';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
-import { setStyle, type OutlineStore } from './model';
+import type { OutlineStore } from './model';
 import { headingOf, lineAt, occurrences, replaceIn, withHeading } from './doc';
 import type { Controller } from './controller';
 
@@ -435,7 +435,7 @@ function Text({ id }: { id: string }) {
 
 function Part({ part }: { part: DocPart }) {
   if (part.kind === 'heading') return <Heading id={part.id} level={part.level} />;
-  if (part.kind === 'rows') return <Rows items={part.items} />;
+  if (part.kind === 'rows') return <Flow items={part.items} />;
   return <ExtraView extra={part} />;
 }
 
@@ -455,34 +455,6 @@ function Check({ id }: { id: string }) {
   const n = store.node(id);
   if (!n.task && !n.completed) return null;
   return <input type="checkbox" class="doc-check" checked={n.completed} disabled={readOnly} onChange={() => ctl.toggleComplete(id)} />;
-}
-
-/** Rows side by side, with the switch making them all paragraphs (or all list items) at their side. */
-function Rows({ items }: { items: (DocItem | Extra)[] }) {
-  const { ctl, readOnly } = useSource();
-  const rows = items.filter((it): it is DocItem => it.kind === 'item');
-  const para = !rows.every((it) => it.para);
-  return (
-    <div class="doc-rows">
-      {!readOnly && rows.length > 0 && (
-        <button
-          class="mini doc-style"
-          title={t(
-            '行のまとまりを段落 / 箇条書きにする（1 行だけなら、行の先頭で Backspace か - ）',
-            'Make these rows paragraphs or a list (one row: Backspace at its start, or - )'
-          )}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            for (const it of rows) setStyle(ctl.store.node(it.id), para ? 'paragraph' : 'list');
-            ctl.commit(null);
-          }}
-        >
-          {para ? t('段落にする', 'Paragraphs') : t('箇条書きにする', 'List')}
-        </button>
-      )}
-      <Flow items={items} />
-    </div>
-  );
 }
 
 /** How a row is drawn among its neighbours: rows drawn the same way one after another go together (but paragraphs). */

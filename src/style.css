@@ -904,15 +904,6 @@ span.doc-lang { width: auto; border: 0; }
 @media (hover: none) {
   .doc-grip { display: none; }
 }
-.doc-rows { position: relative; }
-.doc-style { position: absolute; top: 0; right: 100%; margin-right: 36px; font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.1s; }
-.doc-rows:hover > .doc-style, .doc-style:focus-visible { opacity: 1; }
-@media (max-width: 1100px), (hover: none) {
-  .doc-style { position: static; display: block; margin: 0 0 2px auto; }
-}
-@media (hover: none) {
-  .doc-style { opacity: 1; }
-}
 
 /* ---------------------------------------------------------------- gantt */
 
