@@ -392,7 +392,10 @@ function SaveIndicator() {
 const shortcuts = (): [string, string][] => [
   ['Enter', t('新しい行（カーソル位置で分割）', 'New row (splits at the caret)')],
   ['Shift+Enter', t('行内改行', 'Line break within a row')],
-  ['Tab / Shift+Tab', t('インデント / アウトデント', 'Indent / outdent')],
+  [
+    'Tab / Shift+Tab',
+    t('インデント / アウトデント（できない行では Tab で一段ずつ開く）', 'Indent / outdent (Tab opens a level where it can’t indent)'),
+  ],
   [t('↑ ↓ / Ctrl+P N（Mac）', '↑ ↓ / Ctrl+P N (Mac)'), t('前 / 次の行へ', 'Previous / next row')],
   [t('← → / Ctrl+B F（Mac）', '← → / Ctrl+B F (Mac)'), t('行の端で前 / 次の行へ', 'At a row’s ends, on to the previous / next row')],
   ['Alt(⌘)+Shift+↑↓', t('行を移動', 'Move the row')],

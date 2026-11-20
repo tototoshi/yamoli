@@ -877,3 +877,30 @@ test('Esc leaves the line: in the outline the row is then selected, in the docum
   expect(ctl.selection).toBeNull();
   expect(document.activeElement).not.toBe(ta);
 });
+
+test('in the outline, Tab with nowhere to indent the row to opens it a level further at each press', () => {
+  let a = '';
+  let b = '';
+  let c = '';
+  const ctl = setup((s, add) => {
+    a = add(s.rootId, 'first');
+    b = add(a, 'under');
+    c = add(b, 'deeper');
+    add(c, 'deepest');
+    s.setCollapsed(a, true);
+    s.setCollapsed(b, true);
+    s.setCollapsed(c, true);
+  });
+  const ta = editor(ctl, a);
+  ta.setSelectionRange(0, 0);
+  press(ctl, ta, 'Tab');
+  expect([a, b, c].map((id) => ctl.store.node(id).collapsed)).toEqual([false, true, true]);
+  press(ctl, ta, 'Tab');
+  expect([a, b, c].map((id) => ctl.store.node(id).collapsed)).toEqual([false, false, true]);
+  press(ctl, ta, 'Tab');
+  press(ctl, ta, 'Tab'); // all open: nothing
+  expect([a, b, c].map((id) => ctl.store.node(id).collapsed)).toEqual([false, false, false]);
+  expect(ctl.store.parentOf(a)).toBe(ctl.store.rootId);
+  press(ctl, ta, 'Tab', { shiftKey: true });
+  expect(ctl.store.node(a).collapsed).toBe(false); // Shift+Tab doesn't fold
+});

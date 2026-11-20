@@ -267,7 +267,8 @@ export class Controller extends Editing {
       e.preventDefault();
       if (isTitle) return;
       const ok = e.shiftKey ? store.outdent(id, zoomId) : this.indentShown(id);
-      if (ok) this.commit(fText(id, start, end));
+      // In the outline, Tab with nowhere to indent the row to opens it a level further.
+      if (ok || (!e.shiftKey && this.view === 'outline' && this.openLevel(id))) this.commit(fText(id, start, end));
       return;
     }
     if (e.key === 'Backspace' && isMod(e) && e.shiftKey) {
@@ -465,6 +466,23 @@ export class Controller extends Editing {
         this.focus(store.node(next).key !== null ? { ...fKey(next), start: 0 } : fText(next, 0));
       }
     }
+  }
+
+  /**
+   * Open the row a level further: itself when folded, else the folded rows shown under it (the ones whose rows are
+   * hidden nearest it). Whether anything opened.
+   */
+  private openLevel(id: string): boolean {
+    const { store } = this;
+    const folded: string[] = [];
+    const walk = (c: string) => {
+      const n = store.node(c);
+      if (!n.children.length || n.format !== null) return;
+      if (n.collapsed) folded.push(c);
+      else n.children.forEach(walk);
+    };
+    walk(id);
+    return folded.map((c) => store.setCollapsed(c, false)).includes(true);
   }
 
   /** Like store.indent, but under the previous *displayed* sibling. */
