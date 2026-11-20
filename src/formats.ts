@@ -16,6 +16,7 @@
  * TypeScript, rendered by `code` with `ts` passed on.
  */
 import DOMPurify from 'dompurify';
+import hljs from 'highlight.js/lib/common';
 import { Marked } from 'marked';
 import { jsonTokens, tokensHtml } from './highlight';
 import { t } from './i18n';
@@ -85,9 +86,24 @@ registerFormat('text', {
   render: (c) => `<div class="fmt-text">${escapeHtml(c)}</div>`,
 });
 
+// ---------------------------------------------------------------- code colours
+
+/** code coloured as lang is (hljs-… spans); only escaped in a language it does not know. */
+export const highlighted = (code: string, lang: string) =>
+  lang && hljs.getLanguage(lang) ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value : escapeHtml(code);
+
 // ---------------------------------------------------------------- markdown
 
 const md = new Marked({ gfm: true, breaks: true, async: false });
+// Fenced code in its language's colours, as a code block's.
+md.use({
+  renderer: {
+    code: ({ text, lang }) => {
+      const l = (lang ?? '').trim().split(/\s/)[0];
+      return `<pre><code${l ? ` class="language-${escapeHtml(l)}"` : ''}>${highlighted(text, l)}</code></pre>\n`;
+    },
+  },
+});
 
 export const markdown = (src: string) => md.parse(src) as string;
 
@@ -190,6 +206,6 @@ registerFormat('code', {
   // The language as Markdown's fences mark it, and named in a corner.
   render: (c, lang) =>
     lang
-      ? `<pre class="fmt-code" data-lang="${escapeHtml(lang)}"><code class="language-${escapeHtml(lang)}">${escapeHtml(c)}</code></pre>`
+      ? `<pre class="fmt-code" data-lang="${escapeHtml(lang)}"><code class="language-${escapeHtml(lang)}">${highlighted(c, lang)}</code></pre>`
       : `<pre class="fmt-code"><code>${escapeHtml(c)}</code></pre>`,
 });

@@ -57,7 +57,15 @@ test('a file block links to the file, downloaded under its own name, with its si
 
 test('a code block carries its language in its format name: code:ts', () => {
   expect(getFormat('code:ts').name).toBe('code');
-  const html = renderFormat('code:ts', 'let a = <b>;');
-  expect(html).toMatch(/<pre class="fmt-code" data-lang="ts"><code class="language-ts">let a = &lt;b&gt;;<\/code><\/pre>/);
+  const html = renderFormat('code:ts', 'let a = "<b>";');
+  expect(html).toMatch(/<pre class="fmt-code" data-lang="ts"><code class="language-ts">/);
+  // In its colours, escaped still.
+  expect(html).toMatch(/<span class="hljs-keyword">let<\/span> a = <span class="hljs-string">"&lt;b&gt;"<\/span>;/);
+  // A language it does not know: as it is.
+  expect(renderFormat('code:nolang', '<x>')).toMatch(/<code class="language-nolang">&lt;x&gt;<\/code>/);
+  // Fenced code in Markdown too.
+  expect(renderFormat('markdown', '```python\ndef f(): pass\n```')).toMatch(
+    /<code class="language-python"><span class="hljs-keyword">def<\/span>/
+  );
   expect(renderFormat('code', 'x')).toMatch(/<pre class="fmt-code"><code>x<\/code>/);
 });

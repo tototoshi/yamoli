@@ -674,6 +674,16 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 .j-num { color: var(--j-num); }
 .j-lit { color: var(--j-lit); }
 .j-tag { color: var(--j-num); font-style: italic; }
+/* Code in its language's colours (highlight.js), in the YAML view's. */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag { color: var(--j-lit); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-template-tag { color: var(--j-str); }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-variable.constant_ { color: var(--j-num); }
+.hljs-title, .hljs-attr, .hljs-attribute, .hljs-property, .hljs-selector-class, .hljs-selector-id, .hljs-name { color: var(--j-key); }
+.hljs-type, .hljs-built_in, .hljs-meta { color: var(--j-num); }
+.hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+.hljs-deletion { color: var(--danger); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
 .j-punct { color: var(--muted); }
 
 .fmt-markdown > :first-child { margin-top: 0; }
