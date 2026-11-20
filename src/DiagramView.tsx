@@ -881,6 +881,11 @@ function ZoomTools({ zoom, onFit }: { zoom: ReturnType<typeof useZoom>; onFit: (
  * it lets go of that. zoomable (in a document): drawn and zoomed as in its own
  * view, rather than shrunk into the space given.
  */
+/** How near the dot to draw arrows from the pointer catches it. */
+const DOT_REACH = 12;
+/** How near it the pointer, leaving its box, keeps it there. */
+const DOT_HOLD = 24;
+
 export function DiagramView({
   rootId,
   embedded,
@@ -1283,6 +1288,19 @@ export function DiagramView({
   /** Where the dot for drawing an arrow sits on a box: its right side, or its bottom going down. */
   const dotAt = (b: Box): Pt => (d.direction === 'TB' ? [b.x + b.w / 2, b.y + b.h] : [b.x + b.w, b.y + b.h / 2]);
   const dotFor = editable && !link && !bend && !moving && !renaming && !labeling && hover !== null && hover !== id ? hover : null;
+  /**
+   * The pointer over box id. Half the dot lies outside its box, over the frame around it (or the box next to it):
+   * on its way there, the pointer keeps the dot where it is.
+   */
+  const hoverBox = (id: string | null, e?: MouseEvent) => {
+    const shown = dotFor !== null && id !== dotFor ? L.boxes.get(dotFor) : undefined;
+    if (shown && e) {
+      const [x, y] = dotAt(shown);
+      const [px, py] = toDrawing(e);
+      if (Math.hypot(px - x, py - y) < DOT_HOLD) return;
+    }
+    if (id !== hover) setHover(id);
+  };
   const linkFrom = link && L.boxes.get(link.from);
   const movingBox = moving && L.boxes.get(moving.id);
   const dropHolder = moving?.drop && moving.drop.parent !== id ? L.boxes.get(moving.drop.parent) : undefined;
@@ -1385,7 +1403,7 @@ export function DiagramView({
             </text>
           ))}
           {[...L.boxes].map(([nid, b]) =>
-            b.frame ? <Frame key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={setHover} /> : null
+            b.frame ? <Frame key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={hoverBox} /> : null
           )}
           {L.branches.map(([a, b]) => (
             <path key={a + '>' + b} class="dg-branch" data-from={a} data-to={b} d={branch(L.boxes.get(a)!, L.boxes.get(b)!, d.direction)} />
@@ -1431,7 +1449,7 @@ export function DiagramView({
             );
           })}
           {[...L.boxes].map(([nid, b]) =>
-            b.frame ? null : <Shape key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={setHover} />
+            b.frame ? null : <Shape key={nid} node={d.nodes.get(nid)!} box={b} on={handlers} onHover={hoverBox} />
           )}
           {/* Titles and labels over the lines, so a line passing behind one keeps it readable. */}
           {[...L.boxes].map(([nid, b]) => {
@@ -1513,16 +1531,12 @@ export function DiagramView({
               </>
             )}
             {dotFor && L.boxes.has(dotFor) && (
-              <circle
-                class="dg-link-dot"
-                cx={dotAt(L.boxes.get(dotFor)!)[0]}
-                cy={dotAt(L.boxes.get(dotFor)!)[1]}
-                r={5}
-                onMouseEnter={() => setHover(dotFor)}
-                onPointerDown={(e) => startLink(e, dotFor)}
-              >
+              <g class="dg-link" onMouseEnter={() => setHover(dotFor)} onPointerDown={(e) => startLink(e, dotFor)}>
                 <title>{t('ドラッグして、矢印を引く先の箱へ', 'Drag to the box the arrow should point to')}</title>
-              </circle>
+                {/* Easier to catch than it looks. */}
+                <circle class="dg-link-hit" cx={dotAt(L.boxes.get(dotFor)!)[0]} cy={dotAt(L.boxes.get(dotFor)!)[1]} r={DOT_REACH} />
+                <circle class="dg-link-dot" cx={dotAt(L.boxes.get(dotFor)!)[0]} cy={dotAt(L.boxes.get(dotFor)!)[1]} r={5} />
+              </g>
             )}
             {link && linkFrom && (
               <>
@@ -2081,7 +2095,8 @@ interface Drawn {
     rename: (id: string) => void;
     menu: (e: MouseEvent, id: string) => void;
   };
-  onHover: (id: string | null) => void;
+  /** The pointer over it (e: where, to keep the dot of the box it is leaving while it heads for it). */
+  onHover: (id: string | null, e?: MouseEvent) => void;
 }
 
 const tint = (color: string | undefined, amount = 12) =>
@@ -2182,7 +2197,9 @@ function Frame({ node, box, on, onHover }: Drawn) {
       class={'dg-frame ' + node.frame + (node.done ? ' done' : '')}
       data-box={node.id}
       transform={`translate(${box.x},${box.y})`}
-      onMouseEnter={() => onHover(node.id)}
+      onMouseEnter={(e) => onHover(node.id, e)}
+      // Over a frame, nearer the boxes in it or away from them: whichever is under the pointer gets the dot.
+      onMouseMove={(e) => onHover(node.id, e)}
       onPointerDown={on && ((e) => on.press(e, node.id))}
       onDblClick={on && (() => on.rename(node.id))}
       onContextMenu={on && ((e) => on.menu(e, node.id))}
@@ -2289,7 +2306,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
         style={inkOf(node)}
         data-box={node.id}
         transform={`translate(${box.x},${box.y})`}
-        onMouseEnter={() => onHover(node.id)}
+        onMouseEnter={(e) => onHover(node.id, e)}
         onPointerDown={on && ((e) => on.press(e, node.id))}
         onDblClick={on && (() => on.rename(node.id))}
         onContextMenu={on && ((e) => on.menu(e, node.id))}
@@ -2315,7 +2332,7 @@ function Shape({ node, box, on, onHover }: Drawn) {
       style={inkOf(node)}
       data-box={node.id}
       transform={`translate(${box.x},${box.y})`}
-      onMouseEnter={() => onHover(node.id)}
+      onMouseEnter={(e) => onHover(node.id, e)}
       onPointerDown={on && ((e) => on.press(e, node.id))}
       onDblClick={on && (() => on.rename(node.id))}
       onContextMenu={on && ((e) => on.menu(e, node.id))}
