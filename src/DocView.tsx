@@ -8,7 +8,7 @@
  * the side, the one being read marked.
  */
 import { createContext, type ComponentChildren } from 'preact';
-import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
@@ -168,11 +168,11 @@ function DocFind() {
   const input = useRef<HTMLInputElement>(null);
   const jump = useRef(false);
   const asked = ctl.findAsked;
-  useEffect(() => {
-    if (!asked) return;
-    setOpen(true);
-    requestAnimationFrame(() => (input.current?.focus(), input.current?.select()));
-  }, [asked]);
+  // Open, and the caret in it before the next key (typed straight after ⌘F) arrives.
+  useLayoutEffect(() => void (asked && setOpen(true)), [asked]);
+  useLayoutEffect(() => {
+    if (open && asked) (input.current?.focus(), input.current?.select());
+  }, [open, asked]);
   // The places found, again whenever the document is drawn anew.
   useEffect(() => {
     const main = document.querySelector('.doc-main');
@@ -250,7 +250,8 @@ function DocFind() {
       class="doc-find"
       role="search"
       onKeyDown={(e) => {
-        e.stopPropagation();
+        // Its own keys stay here; the rest (⌘Z undoing a replacement) go on to the app.
+        if (e.key === 'Escape' || e.key === 'Enter') e.stopPropagation();
         if (e.key === 'Escape') close();
       }}
     >
