@@ -9,6 +9,7 @@
  *   text: 要件定義
  *   done: true            when completed
  *   todo: true            when marked as a task, not yet done
+ *   paragraph: true       when written as a paragraph in the document
  *   duration: 3d          its fields
  *   children: [...]       its sub-items
  *
@@ -56,7 +57,7 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   const items = store.items(id);
   const hasId = linked.has(id);
   const todo = n.task && !n.completed;
-  if (!fields.length && !items.length && !n.completed && !todo && !hasId) return n.text;
+  if (!fields.length && !items.length && !n.completed && !todo && !n.paragraph && !hasId) return n.text;
 
   const fieldValues: Record<string, Value> = {};
   for (const f of fields) fieldValues[store.node(f).key!] = rowValue(store, f);
@@ -70,6 +71,7 @@ function itemValue(store: OutlineStore, id: string, linked: Set<string>): Value 
   own('text', n.text);
   if (n.completed) own('done', true);
   if (todo) own('todo', true);
+  if (n.paragraph) own('paragraph', true);
   Object.assign(out, fieldValues);
   if (items.length)
     own(

@@ -126,3 +126,11 @@ test('toMarkdownList: a row marked as a paragraph is one, the rows under it a li
   const rows = (id: string) => s.items(id);
   expect(toMarkdownList(s, p, rows)).toBe('- 検索\n\n前のサイトは古い。\n\n問い合わせが増えている。\n\n- 電話\n');
 });
+
+test('a paragraph row says so in its data, as a task does', () => {
+  const s = OutlineStore.create();
+  const p = s.addChild(s.rootId, -1, '前のサイトは古い。');
+  p.paragraph = true;
+  expect(toValue(s, p.id)).toEqual({ text: '前のサイトは古い。', paragraph: true });
+  expect(toYaml(toValue(s, p.id))).toBe('text: 前のサイトは古い。\nparagraph: true\n');
+});
