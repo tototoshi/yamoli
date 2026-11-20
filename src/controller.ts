@@ -292,10 +292,11 @@ export class Controller extends Editing {
       store.setTask(id, false);
       return this.commit(fText(id, 0));
     }
-    // An item of a numbered list or a quotation is a plain list item first, as a task is a plain row.
+    // An item of a numbered list or a quotation is plain text first, as a task is a plain row: a paragraph in the
+    // document (as word processors take a list or quotation off), a list item in the outline.
     if (e.key === 'Backspace' && start === 0 && end === 0 && !isTitle && n.key === null && (n.numbered || n.quote)) {
       e.preventDefault();
-      setStyle(n, 'list');
+      setStyle(n, this.view === 'doc' ? 'paragraph' : 'list');
       return this.commit(fText(id, 0));
     }
     // In the document a list item is a paragraph first (as in word processors), before joining anything.

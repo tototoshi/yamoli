@@ -749,7 +749,7 @@ test('in the document view, ⌘Enter in a block goes on to a new line right afte
   expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + next }));
 });
 
-test('in the document `1. ` makes a numbered item and `> ` a quotation; Enter keeps it, Backspace at the start takes it off', () => {
+test('in the document `1. ` makes a numbered item and `> ` a quotation; Enter keeps it, Backspace at the start makes it a paragraph', () => {
   let doc = '';
   let a = '';
   let b = '';
@@ -780,7 +780,15 @@ test('in the document `1. ` makes a numbered item and `> ` a quotation; Enter ke
   const tb = editor(ctl, b);
   tb.setSelectionRange(0, 0);
   press(ctl, tb, 'Backspace');
-  expect(ctl.store.node(b)).toMatchObject({ quote: false, paragraph: false });
+  expect(ctl.store.node(b)).toMatchObject({ quote: false, paragraph: true }); // in the document, a paragraph
+  ctl.store.node(b).paragraph = false;
+  ctl.store.node(b).numbered = true;
+  location.hash = `#/${doc}?view=outline`;
+  ctl.onHashChange();
+  const outline = editor(ctl, b);
+  outline.setSelectionRange(0, 0);
+  press(ctl, outline, 'Backspace');
+  expect(ctl.store.node(b)).toMatchObject({ numbered: false, paragraph: false }); // in the outline, a list item
 });
 
 test('outside the document `1. ` is only text', () => {
