@@ -12,12 +12,11 @@ import { createContext } from 'preact';
 import { createPortal } from 'preact/compat';
 import type { RefObject } from 'preact';
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { BlockBody, NodeText } from './App';
+import { BlockBody, NodeText, useRendered } from './App';
 import { fText } from './focus';
 import { useCtl } from './context';
 import { useFlowEditor } from './flowEditor';
 import { t } from './i18n';
-import { renderFormat } from './formats';
 import { DiagramView } from './DiagramView';
 import { GanttView } from './GanttView';
 import { InlineText } from './InlineText';
@@ -828,7 +827,7 @@ function slideOf(slides: Slide[], store: ReturnType<typeof useCtl>['store'], id:
 function SlideBlock({ id }: { id: string }) {
   const ctl = useCtl();
   const n = ctl.store.node(id);
-  const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
+  const html = useRendered(n.format!, n.text);
   const still = useContext(Still);
   if (ctl.activeField === fText(id).key && !still) {
     return (

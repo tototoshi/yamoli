@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, test } from 'vitest';
-import { getFormat, parseCsv, renderFormat } from './formats';
+import { getFormat, loadHighlighter, onHighlighter, parseCsv, renderFormat } from './formats';
 
 test('markdown is rendered and sanitized', () => {
   const html = renderFormat(
@@ -55,7 +55,18 @@ test('a file block links to the file, downloaded under its own name, with its si
   expect(renderFormat('markdown', '[minutes](files/x.pdf)')).toContain('href="./api/files/x.pdf"');
 });
 
-test('a code block carries its language in its format name: code:ts', () => {
+test('code in a language is drawn plain until highlight.js has come, then coloured', async () => {
+  expect(renderFormat('code:ts', 'let a')).toMatch(/<code class="language-ts">let a<\/code>/);
+  let told = 0;
+  const stop = onHighlighter(() => told++);
+  await loadHighlighter();
+  stop();
+  expect(told).toBe(1);
+  expect(renderFormat('code:ts', 'let a')).toMatch(/<span class="hljs-keyword">let<\/span> a/);
+});
+
+test('a code block carries its language in its format name: code:ts', async () => {
+  await loadHighlighter();
   expect(getFormat('code:ts').name).toBe('code');
   const html = renderFormat('code:ts', 'let a = "<b>";');
   expect(html).toMatch(/<pre class="fmt-code" data-lang="ts"><code class="language-ts">/);

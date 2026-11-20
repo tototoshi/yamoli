@@ -16,7 +16,7 @@
  * TypeScript, rendered by `code` with `ts` passed on.
  */
 import DOMPurify from 'dompurify';
-import hljs from 'highlight.js/lib/common';
+import type { HLJSApi } from 'highlight.js';
 import { Marked } from 'marked';
 import { jsonTokens, tokensHtml } from './highlight';
 import { t } from './i18n';
@@ -88,9 +88,33 @@ registerFormat('text', {
 
 // ---------------------------------------------------------------- code colours
 
-/** code coloured as lang is (hljs-… spans); only escaped in a language it does not know. */
-export const highlighted = (code: string, lang: string) =>
-  lang && hljs.getLanguage(lang) ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value : escapeHtml(code);
+// highlight.js is loaded when code in a language is first drawn, not with the page: until it is there, code is drawn
+// plain, and what draws it is told when it comes, to draw it again.
+let hljs: HLJSApi | null = null;
+let loading: Promise<void> | null = null;
+const waiting = new Set<() => void>();
+
+/** Load highlight.js (once); resolves when code can be coloured. */
+export function loadHighlighter(): Promise<void> {
+  loading ??= import('highlight.js/lib/common').then((m) => {
+    hljs = m.default;
+    for (const f of waiting) f();
+  });
+  return loading;
+}
+
+/** Call f when highlight.js has come, to colour code drawn plain before; returns what stops it. */
+export function onHighlighter(f: () => void): () => void {
+  waiting.add(f);
+  return () => waiting.delete(f);
+}
+
+/** code coloured as lang is (hljs-… spans); only escaped in a language it does not know, or before it is loaded. */
+export function highlighted(code: string, lang: string): string {
+  if (!lang) return escapeHtml(code);
+  if (!hljs) return (loadHighlighter(), escapeHtml(code));
+  return hljs.getLanguage(lang) ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value : escapeHtml(code);
+}
 
 // ---------------------------------------------------------------- markdown
 

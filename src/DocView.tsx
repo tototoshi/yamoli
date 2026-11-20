@@ -12,10 +12,10 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
-import { getFormat, renderFormat } from './formats';
+import { getFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
-import { BlockBody, LangInput, NodeText } from './App';
+import { BlockBody, LangInput, NodeText, useRendered } from './App';
 import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
@@ -284,7 +284,7 @@ function ExtraView({ extra }: { extra: Extra }) {
 function Block({ id }: { id: string }) {
   const { store, readOnly, ctl } = useSource();
   const n = store.node(id);
-  const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
+  const html = useRendered(n.format!, n.text);
   if (readOnly) return <div class="data-view doc-block" data-format={n.format} dangerouslySetInnerHTML={{ __html: html }} />;
   if (ctl.activeField === fText(id).key) return <BlockBody node={n} />;
   const view = (

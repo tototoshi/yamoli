@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } fro
 import { Controller } from './controller';
 import { applyFocus, fKey, fText } from './focus';
 import { IS_MAC } from './keys';
-import { codeFormat, formatArg, hasFormat, listFormats, getFormat, placeholderOf, renderFormat } from './formats';
+import { codeFormat, formatArg, hasFormat, listFormats, getFormat, onHighlighter, placeholderOf, renderFormat } from './formats';
 import { t } from './i18n';
 import { parseInline } from './inline';
 import { findBacklinks, nodeLabel } from './links';
@@ -601,6 +601,13 @@ function BlockHead({ node }: { node: OutlineNode }) {
   );
 }
 
+/** A block's text rendered in its format, again once highlight.js has come to colour its code. */
+export function useRendered(format: string, text: string): string {
+  const [loaded, setLoaded] = useState(0);
+  useEffect(() => onHighlighter(() => setLoaded((n) => n + 1)), []);
+  return useMemo(() => renderFormat(format, text), [format, text, loaded]);
+}
+
 /** A code block's language, to change (empty: none). */
 export function LangInput({ node, class: cls = 'block-lang' }: { node: OutlineNode; class?: string }) {
   const ctl = useCtl();
@@ -632,7 +639,7 @@ export function BlockBody({ node }: { node: OutlineNode }) {
   const ctl = useCtl();
   const key = 'text:' + node.id;
   const editing = ctl.activeField === key;
-  const html = useMemo(() => renderFormat(node.format!, node.text), [node.format, node.text]);
+  const html = useRendered(node.format!, node.text);
   if (node.collapsed && !editing) return null;
   return (
     <div class={'block' + (editing ? ' editing' : '')} data-format={node.format}>
