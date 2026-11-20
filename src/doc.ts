@@ -12,7 +12,8 @@
  *                                    of an item; `- ` typed makes it one again),
  *                                    the rows under it a list after it
  *   a task ([ ] / done)             an item with a checkbox
- *   a block (Markdown, CSV, image …) drawn where it is: prose goes in one
+ *   a block (Markdown, code, image …) drawn where it is among the rows (```
+ *                                    typed on a row makes it a code block)
  *   embed: [[item]] diagram         that item's diagram there (or `mindmap`,
  *                                    else its Gantt chart; no link: the row's own)
  *
@@ -44,19 +45,22 @@ export type EmbedAs = 'gantt' | 'diagram' | 'mindmap';
 export type Extra = { kind: 'data'; id: string } | { kind: 'embed'; id: string; as: EmbedAs };
 
 export interface DocItem {
+  kind: 'item';
   id: string;
   /** Marked as a task (or completed): drawn with a checkbox. */
   task: boolean;
   /** A paragraph, not a list item. */
   para: boolean;
-  items: DocItem[];
+  /** The rows under it, and the blocks among them. */
+  items: (DocItem | Extra)[];
+  /** What its `embed` draws, after its line. */
   extras: Extra[];
 }
 
 export type DocPart =
   | { kind: 'heading'; id: string; level: 1 | 2 | 3 }
   /** Rows side by side: list items, and paragraphs among them. */
-  | { kind: 'rows'; items: DocItem[] }
+  | { kind: 'rows'; items: (DocItem | Extra)[] }
   | Extra;
 
 export interface Doc {
@@ -78,29 +82,31 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
     const target = refIds(value).length ? refIds(value).find((r) => store.get(r)) : id;
     return target ? { kind: 'embed', id: target, as } : null;
   };
-  /** id's blocks, and what its `embed` draws (no link: its rows, drawn instead of written out). */
+  /** What id's `embed` draws (no link: its rows, drawn instead of written out). */
   const extrasOf = (id: string): Extra[] => {
-    const blocks: Extra[] = store
-      .node(id)
-      .children.filter((c) => store.node(c).format !== null && !QUIET.has(store.node(c).key!.trim().toLowerCase()))
-      .map((c) => ({ kind: 'data', id: c }));
     const embed = embedOf(id);
-    return embed ? [...blocks, embed] : blocks;
+    return embed ? [embed] : [];
   };
-  const rowsOf = (id: string) => (embedOf(id)?.id === id ? [] : rows(id));
-  const isHeading = (id: string) => headingOf(store.node(id).text) !== null;
+  const isBlock = (c: string) => store.node(c).format !== null && !QUIET.has(store.node(c).key!.trim().toLowerCase());
+  /** The rows under id and the blocks among them, in order (only the blocks, where its embed draws its rows). */
+  const rowsOf = (id: string) => {
+    const shown = new Set(embedOf(id)?.id === id ? [] : rows(id));
+    return store.node(id).children.filter((c) => shown.has(c) || isBlock(c));
+  };
+  const isHeading = (id: string) => store.node(id).key === null && headingOf(store.node(id).text) !== null;
+  const block = (id: string): Extra => ({ kind: 'data', id });
   /** id as a list item; a heading among the rows under it, and those after it, go to out (to come after the list). */
   const item = (id: string, out: string[]): DocItem => {
     const kids = rowsOf(id);
     const at = kids.findIndex(isHeading);
-    const items = (at < 0 ? kids : kids.slice(0, at)).map((c) => item(c, out));
+    const items = (at < 0 ? kids : kids.slice(0, at)).map((c) => (isBlock(c) ? block(c) : item(c, out)));
     if (at >= 0) out.push(...kids.slice(at));
     const n = store.node(id);
-    return { id, task: n.task || n.completed, para: n.paragraph, items, extras: extrasOf(id) };
+    return { kind: 'item', id, task: n.task || n.completed, para: n.paragraph, items, extras: extrasOf(id) };
   };
 
   const parts: DocPart[] = [];
-  let run: DocItem[] = [];
+  let run: (DocItem | Extra)[] = [];
   const flush = () => {
     if (run.length) parts.push({ kind: 'rows', items: run });
     run = [];
@@ -108,7 +114,11 @@ export function buildDoc(store: OutlineStore, rootId: string, { showCompleted = 
   /** Rows in their place: a heading ends the list before it, and its rows come after it. */
   const write = (ids: string[]) => {
     for (const c of ids) {
-      const h = headingOf(store.node(c).text);
+      if (isBlock(c)) {
+        run.push(block(c)); // among the rows it is with
+        continue;
+      }
+      const h = isHeading(c) ? headingOf(store.node(c).text) : null;
       if (h) {
         flush();
         parts.push({ kind: 'heading', id: c, level: h.level }, ...extrasOf(c));

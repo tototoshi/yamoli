@@ -9,7 +9,7 @@ function sketch(s: OutlineStore, parts: DocPart[]): string[] {
     p.kind === 'heading'
       ? `h${p.level} ${label(p.id)}`
       : p.kind === 'rows'
-        ? `list[${p.items.map((i) => label(i.id) + (i.items.length ? `(${i.items.map((j) => label(j.id)).join(', ')})` : '')).join(', ')}]`
+        ? `list[${p.items.map((i) => (i.kind !== 'item' ? i.kind : label(i.id) + (i.items.length ? `(${i.items.map((j) => (j.kind === 'item' ? label(j.id) : j.kind)).join(', ')})` : ''))).join(', ')}]`
         : p.kind === 'data'
           ? 'data'
           : `embed ${p.as}`
@@ -49,7 +49,9 @@ test('a # row is a heading, the rows under it its section after it; tasks are ma
     'list[調査]',
     'list[後書き]',
   ]);
-  expect(d.parts.flatMap((p) => (p.kind === 'rows' ? p.items.filter((i) => i.task).map((i) => i.id) : []))).toEqual([todo]);
+  expect(d.parts.flatMap((p) => (p.kind === 'rows' ? p.items.filter((i) => i.kind === 'item' && i.task).map((i) => i.id) : []))).toEqual([
+    todo,
+  ]);
   expect(docContents(s, d.parts).map((c) => [c.level, c.text])).toEqual([
     [1, '背景'],
     [2, '進め方'],
@@ -73,7 +75,7 @@ test('a # row inside a list ends it, as in Markdown: it and the rows after it in
   ]);
 });
 
-test('blocks are drawn where they are, and an embed draws its item (or the row its own rows)', () => {
+test('blocks are drawn where they are among the rows, and an embed draws its item (or the row its own rows)', () => {
   const s = OutlineStore.create();
   const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
   const doc = add(s.rootId, 'Doc');
@@ -87,9 +89,12 @@ test('blocks are drawn where they are, and an embed draws its item (or the row i
   add(own, 'hidden');
   const d = buildDoc(s, doc);
   // (Flow is not in A's section, but no more than in Markdown is anything there to end it.)
-  expect(sketch(s, d.parts)).toEqual(['h1 # A', 'data', 'embed diagram', 'list[x]', 'list[Flow]']);
+  // A's block where it is, before its row x (its embed drawn after the heading).
+  expect(sketch(s, d.parts)).toEqual(['h1 # A', 'embed diagram', 'list[data, x]', 'list[Flow]']);
   const flow = d.parts.at(-1)!;
-  expect(flow.kind === 'rows' && flow.items[0].extras).toEqual([{ kind: 'embed', id: own, as: 'mindmap' }]);
+  expect(flow.kind === 'rows' && flow.items[0].kind === 'item' && flow.items[0].extras).toEqual([
+    { kind: 'embed', id: own, as: 'mindmap' },
+  ]);
 });
 
 test('headingOf reads the #s, withHeading sets them', () => {
@@ -112,5 +117,24 @@ test('a row marked as a paragraph is one among the list items, the rows under it
   add(doc, '通知');
   const parts = buildDoc(s, doc).parts;
   expect(sketch(s, parts)).toEqual(['list[検索, ¶ここからは文章。(電話), 通知]']);
-  expect(parts[0].kind === 'rows' && parts[0].items.map((i) => i.para)).toEqual([false, true, false]);
+  expect(parts[0].kind === 'rows' && parts[0].items.map((i) => i.kind === 'item' && i.para)).toEqual([false, true, false]);
+});
+
+test('a block among rows is drawn between them, in a list item too', () => {
+  const s = OutlineStore.create();
+  const add = (parent: string, text: string) => s.addChild(parent, -1, text).id;
+  /** A row made a code block where it is (as ``` typed on it does). */
+  const code = (parent: string, text: string) => {
+    const id = add(parent, text);
+    s.setKey(id, 'code');
+    s.setFormat(id, 'code');
+  };
+  const doc = add(s.rootId, 'Doc');
+  add(doc, 'before');
+  code(doc, 'npm test');
+  const a = add(doc, 'after');
+  add(a, 'one');
+  code(a, 'ls');
+  add(a, 'two');
+  expect(sketch(s, buildDoc(s, doc).parts)).toEqual(['list[before, data, after(one, data, two)]']);
 });

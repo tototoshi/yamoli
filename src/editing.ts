@@ -398,7 +398,7 @@ export class Editing extends ViewState {
    * Text typed into a row. Typing `name: ` at the start of an ordinary row
    * turns it into a field (Backspace at the start of the value turns it back);
    * `[ ] ` makes it a task (`[x] ` a completed one), Backspace at its start a
-   * plain row again.
+   * plain row again; ``` on an empty row makes it a code block.
    */
   onTextInput(id: string, ta: HTMLTextAreaElement) {
     const { store } = this;
@@ -419,6 +419,14 @@ export class Editing extends ViewState {
       if (box[1].trim()) this.setDone(id, true);
       this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
       return this.rerender();
+    }
+    // ``` typed on an empty row makes it a code block where it is (a block holds no rows: not on one that does).
+    if (n.key === null && id !== this.zoomId && value === '```' && !store.items(id).length) {
+      store.setKey(id, store.freeKey(store.parentOf(id)!, 'code'));
+      store.setFormat(id, 'code');
+      store.setText(id, '');
+      this.revealFields();
+      return this.commit(fText(id, 0)); // its own undo step, so ⌘Z turns it back
     }
     // `- ` typed at the start of a paragraph makes it a list item again.
     const bullet = n.paragraph && n.key === null ? value.match(/^[-*・][ \u3000]/) : null;

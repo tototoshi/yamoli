@@ -696,3 +696,42 @@ test('typing // offers dates: Enter writes today in its place, a date typed afte
   type('https://');
   expect(ctl.picker).toBeNull();
 });
+
+test('``` typed on an empty row makes it a code block where it is, being written in', () => {
+  let a = '';
+  let b = '';
+  const ctl = setup((s, add) => {
+    add(s.rootId, 'before');
+    a = add(s.rootId, '');
+    b = add(s.rootId, 'after');
+  });
+  const ta = editor(ctl, a);
+  ta.value = '```';
+  ta.setSelectionRange(3, 3);
+  ctl.onTextInput(a, ta);
+  expect(ctl.store.node(a)).toMatchObject({ key: 'code', format: 'code', text: '' });
+  expect(ctl.store.node(ctl.store.rootId).children.indexOf(a)).toBe(1);
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + a }));
+  expect(ctl.store.node(b).key).toBeNull();
+});
+
+test('in the document view, ⌘Enter in a block goes on to a new line right after it', () => {
+  let doc = '';
+  let code = '';
+  const ctl = setup((s, add) => {
+    doc = add(s.rootId, 'Doc');
+    s.addField(doc, 'views', 'doc');
+    add(doc, 'before');
+    code = add(doc, '');
+    s.setKey(code, 'code');
+    s.setFormat(code, 'code');
+    add(doc, 'after');
+  });
+  location.hash = `#/${doc}?view=doc`;
+  ctl.onHashChange();
+  press(ctl, editor(ctl, code), 'Enter', { metaKey: true, ctrlKey: true });
+  const kids = ctl.store.node(doc).children;
+  const next = kids[kids.indexOf(code) + 1];
+  expect(ctl.store.node(next)).toMatchObject({ text: '', key: null });
+  expect(ctl.pendingFocus).toEqual(expect.objectContaining({ key: 'text:' + next }));
+});

@@ -168,12 +168,13 @@ function Check({ id }: { id: string }) {
 }
 
 /** Rows side by side, with the switch making them all paragraphs (or all list items) at their side. */
-function Rows({ items }: { items: DocItem[] }) {
+function Rows({ items }: { items: (DocItem | Extra)[] }) {
   const { ctl, readOnly } = useSource();
-  const para = !items.every((it) => it.para);
+  const rows = items.filter((it): it is DocItem => it.kind === 'item');
+  const para = !rows.every((it) => it.para);
   return (
     <div class="doc-rows">
-      {!readOnly && (
+      {!readOnly && rows.length > 0 && (
         <button
           class="mini doc-style"
           title={t(
@@ -182,7 +183,7 @@ function Rows({ items }: { items: DocItem[] }) {
           )}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            for (const it of items) ctl.store.node(it.id).paragraph = para;
+            for (const it of rows) ctl.store.node(it.id).paragraph = para;
             ctl.commit(null);
           }}
         >
@@ -194,15 +195,28 @@ function Rows({ items }: { items: DocItem[] }) {
   );
 }
 
-/** Rows in order: list items together in a list, paragraphs between. */
-function Flow({ items }: { items: DocItem[] }) {
-  const runs: DocItem[][] = [];
+/** Rows in order: list items together in a list, paragraphs and blocks between. */
+function Flow({ items }: { items: (DocItem | Extra)[] }) {
+  const runs: (DocItem[] | Extra)[] = [];
   for (const it of items) {
     const last = runs.at(-1);
-    if (last && !it.para && !last[0].para) last.push(it);
+    if (it.kind !== 'item') runs.push(it);
+    else if (Array.isArray(last) && !it.para && !last[0].para) last.push(it);
     else runs.push([it]);
   }
-  return <>{runs.map((r) => (r[0].para ? <Paragraph key={r[0].id} item={r[0]} /> : <List key={r[0].id} items={r} />))}</>;
+  return (
+    <>
+      {runs.map((r) =>
+        !Array.isArray(r) ? (
+          <ExtraView key={r.id} extra={r} />
+        ) : r[0].para ? (
+          <Paragraph key={r[0].id} item={r[0]} />
+        ) : (
+          <List key={r[0].id} items={r} />
+        )
+      )}
+    </>
+  );
 }
 
 /** A row as a paragraph; the rows under it come after it. */

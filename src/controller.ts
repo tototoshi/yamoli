@@ -463,10 +463,18 @@ export class Controller extends Editing {
 
   /**
    * Keys inside a block, which is multi-line text: Enter and Tab type, Esc
-   * (or ⌘/Ctrl+Enter) leaves it, Backspace in an empty block removes it.
+   * (or ⌘/Ctrl+Enter) leaves it (in the document, ⌘Enter for a new line after
+   * it), Backspace in an empty block removes it.
    * Returns false to let the usual row keys (moving, ↑ ↓ past the ends …) run.
    */
   private blockKeydown(e: KeyboardEvent, ta: HTMLTextAreaElement, id: string): boolean {
+    // In the document, where a block lies among the lines: ⌘Enter goes on to a new line after it.
+    if (e.key === 'Enter' && isMod(e) && this.view === 'doc') {
+      e.preventDefault();
+      const row = this.store.addChild(this.store.parentOf(id)!, this.store.indexOf(id) + 1, '');
+      this.commit(fText(row.id, 0));
+      return true;
+    }
     if (e.key === 'Escape' || (e.key === 'Enter' && isMod(e))) {
       e.preventDefault();
       this.focus(fText(this.store.parentOf(id)!));
