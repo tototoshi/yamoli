@@ -12,10 +12,10 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCtl } from './context';
 import { DiagramView } from './DiagramView';
 import { buildDoc, docContents, type DocItem, type DocPart, type Extra } from './doc';
-import { renderFormat } from './formats';
+import { getFormat, renderFormat } from './formats';
 import { GanttView } from './GanttView';
 import { t } from './i18n';
-import { BlockBody, NodeText } from './App';
+import { BlockBody, LangInput, NodeText } from './App';
 import { fText } from './focus';
 import { useFlowEditor } from './flowEditor';
 import { InlineText } from './InlineText';
@@ -287,7 +287,7 @@ function Block({ id }: { id: string }) {
   const html = useMemo(() => renderFormat(n.format!, n.text), [n.format, n.text]);
   if (readOnly) return <div class="data-view doc-block" data-format={n.format} dangerouslySetInnerHTML={{ __html: html }} />;
   if (ctl.activeField === fText(id).key) return <BlockBody node={n} />;
-  return (
+  const view = (
     <div
       class="data-view doc-block"
       data-format={n.format}
@@ -295,5 +295,13 @@ function Block({ id }: { id: string }) {
       dangerouslySetInnerHTML={{ __html: html }}
       onClick={(e) => !(e.target as Element).closest('a') && !document.getSelection()?.toString() && ctl.focus(fText(id, 'end'))}
     />
+  );
+  if (getFormat(n.format!).name !== 'code') return view;
+  // Code: its language in the corner, to change there.
+  return (
+    <div class="doc-code">
+      {view}
+      <LangInput node={n} class="doc-lang" />
+    </div>
   );
 }

@@ -774,6 +774,13 @@ a.ref.done { text-decoration: line-through; opacity: 0.7; }
 /* A code block's language, named in its corner. */
 .fmt-code[data-lang] { position: relative; }
 .fmt-code[data-lang]::after { content: attr(data-lang); position: absolute; top: 4px; right: 8px; font-size: 11px; color: var(--muted); font-family: var(--font); }
+/* In the document the corner holds the language to change (none: shown on hover, to add one). */
+.doc-code { position: relative; }
+.doc-code .fmt-code[data-lang]::after { content: none; }
+.doc-lang { position: absolute; top: 3px; right: 6px; width: 7em; padding: 0 4px; text-align: right; font: 11px var(--font); color: var(--muted); border: 1px solid transparent; border-radius: 4px; background: transparent; }
+.doc-lang:placeholder-shown { opacity: 0; }
+.doc-code:hover .doc-lang, .doc-lang:focus { opacity: 1; }
+.doc-lang:hover, .doc-lang:focus { border-color: var(--faint); background: var(--bg); color: var(--fg); outline: none; }
 @media (max-width: 1100px) {
   .doc-page.with-contents { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .doc-toc { position: static; max-height: none; }

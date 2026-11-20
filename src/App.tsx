@@ -595,20 +595,35 @@ function BlockHead({ node }: { node: OutlineNode }) {
           </option>
         )}
       </select>
-      {name === 'code' && (
-        <input
-          class="block-lang"
-          size={8}
-          spellcheck={false}
-          placeholder={t('言語', 'language')}
-          title={t('コードの言語（ts、python …）', "The code's language (ts, python …)")}
-          value={formatArg(node.format!)}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-          onChange={(e) => set(codeFormat(e.currentTarget.value.trim().replace(/[^\w+#.-]/g, '')))}
-        />
-      )}
+      {name === 'code' && <LangInput node={node} />}
       {node.collapsed && <span class="block-preview">{node.text.split('\n')[0].slice(0, 80)}</span>}
     </span>
+  );
+}
+
+/** A code block's language, to change (empty: none). */
+export function LangInput({ node, class: cls = 'block-lang' }: { node: OutlineNode; class?: string }) {
+  const ctl = useCtl();
+  return (
+    <input
+      class={cls}
+      size={8}
+      spellcheck={false}
+      placeholder={t('言語', 'language')}
+      title={t('コードの言語（ts、python …）', "The code's language (ts, python …)")}
+      value={formatArg(node.format!)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+      }}
+      onChange={(e) => {
+        const format = codeFormat(e.currentTarget.value.trim().replace(/[^\w+#.-]/g, ''));
+        if (format === node.format) return;
+        ctl.store.setFormat(node.id, format);
+        ctl.commit();
+      }}
+    />
   );
 }
 
